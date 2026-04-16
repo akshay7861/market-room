@@ -1,5 +1,7 @@
 import eiaWtiMonthly from "../../../../../knowledge/data-lake/normalized/eia_wti_monthly.json";
 import fredCpiHeadline from "../../../../../knowledge/data-lake/normalized/fred_cpi_headline.json";
+import fredM1Monthly from "../../../../../knowledge/data-lake/normalized/fred_m1_monthly.json";
+import fredM2Monthly from "../../../../../knowledge/data-lake/normalized/fred_m2_monthly.json";
 
 type HistoricalObservation = {
   date: string;
@@ -38,14 +40,10 @@ export function buildHistoricalDataPromptBlock(question: string): string {
     "## Available Historical Data Context",
     "Use this block as the boundary of what the system can verify from its stored data. Do not invent exact statistics for missing series.",
     availableSeriesLine(wtiMonthlySeries()),
-    availableSeriesLine(cpiHeadlineSeries())
+    availableSeriesLine(cpiHeadlineSeries()),
+    availableSeriesLine(m1MonthlySeries()),
+    availableSeriesLine(m2MonthlySeries())
   ];
-
-  if (mentionsMoneySupply) {
-    blocks.push(
-      "Not currently loaded: M1 / money supply time series. If the user asks for M1 correlation or charts, say that M1 is not available in the current data lake and avoid giving exact M1 correlation numbers."
-    );
-  }
 
   if (asksForCorrelation && mentionsOil && mentionsInflation) {
     const window = mentionsCrisis ? { start: "2007-01", end: "2009-12", label: "2007-2009 crisis window" } : null;
@@ -58,6 +56,22 @@ export function buildHistoricalDataPromptBlock(question: string): string {
           `- WTI price vs headline CPI YoY correlation: ${formatCorrelation(stats.priceVsCpiYoYCorrelation)}`,
           `- WTI YoY change vs headline CPI YoY correlation: ${formatCorrelation(stats.wtiYoYVsCpiYoYCorrelation)}`,
           `- WTI range: $${stats.wtiMin.toFixed(2)}/bbl to $${stats.wtiMax.toFixed(2)}/bbl`,
+          `- CPI YoY range: ${stats.cpiYoYMin.toFixed(1)}% to ${stats.cpiYoYMax.toFixed(1)}%`
+        ].join("\n")
+      );
+    }
+  }
+
+  if (asksForCorrelation && mentionsMoneySupply && mentionsInflation) {
+    const window = mentionsCrisis ? { start: "2007-01", end: "2009-12", label: "2007-2009 crisis window" } : null;
+    const stats = computeM1CpiStats(window?.start, window?.end);
+    if (stats) {
+      blocks.push(
+        [
+          `Computed stored-data check — M1 vs CPI (${window?.label || "full overlapping monthly sample"}):`,
+          `- observations: ${stats.count}`,
+          `- M1 YoY change vs headline CPI YoY correlation: ${formatCorrelation(stats.m1YoYVsCpiYoYCorrelation)}`,
+          `- M1 YoY range: ${stats.m1YoYMin.toFixed(1)}% to ${stats.m1YoYMax.toFixed(1)}%`,
           `- CPI YoY range: ${stats.cpiYoYMin.toFixed(1)}% to ${stats.cpiYoYMax.toFixed(1)}%`
         ].join("\n")
       );
@@ -81,6 +95,14 @@ function wtiMonthlySeries(): HistoricalSeries {
 
 function cpiHeadlineSeries(): HistoricalSeries {
   return fredCpiHeadline as HistoricalSeries;
+}
+
+function m1MonthlySeries(): HistoricalSeries {
+  return fredM1Monthly as HistoricalSeries;
+}
+
+function m2MonthlySeries(): HistoricalSeries {
+  return fredM2Monthly as HistoricalSeries;
 }
 
 function computeWtiCpiStats(start?: string, end?: string) {
@@ -119,6 +141,37 @@ function computeWtiCpiStats(start?: string, end?: string) {
     wtiMax: Math.max(...priceVsCpiYoY.map((point) => point.left)),
     cpiYoYMin: Math.min(...priceVsCpiYoY.map((point) => point.right)),
     cpiYoYMax: Math.max(...priceVsCpiYoY.map((point) => point.right))
+  };
+}
+
+function computeM1CpiStats(start?: string, end?: string) {
+  const m1 = m1MonthlySeries();
+  const cpi = cpiHeadlineSeries();
+  const m1ByMonth = toMonthlyMap(m1.observations);
+  const cpiByMonth = toMonthlyMap(cpi.observations);
+  const cpiYoYByMonth = yoyMap(cpiByMonth);
+  const m1YoYByMonth = yoyMap(m1ByMonth);
+
+  const points: AlignedPoint[] = [];
+
+  for (const [month, m1YoY] of m1YoYByMonth) {
+    if (start && month < start) continue;
+    if (end && month > end) continue;
+    const cpiYoY = cpiYoYByMonth.get(month);
+    if (typeof cpiYoY === "number") {
+      points.push({ date: month, left: m1YoY, right: cpiYoY });
+    }
+  }
+
+  if (points.length < 6) return null;
+
+  return {
+    count: points.length,
+    m1YoYVsCpiYoYCorrelation: pearson(points),
+    m1YoYMin: Math.min(...points.map((p) => p.left)),
+    m1YoYMax: Math.max(...points.map((p) => p.left)),
+    cpiYoYMin: Math.min(...points.map((p) => p.right)),
+    cpiYoYMax: Math.max(...points.map((p) => p.right))
   };
 }
 

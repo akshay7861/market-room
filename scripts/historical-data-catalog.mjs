@@ -62,6 +62,26 @@ export const STARTER_SERIES_CATALOG = [
     agents: ["macro-agent", "rates-agent"]
   },
   {
+    id: "fred_m1_monthly",
+    source: "fred",
+    sourceSeriesId: "M1SL",
+    label: "M1 Money Stock",
+    description: "M1 money supply (currency, demand deposits, other liquid deposits), monthly, seasonally adjusted.",
+    usageNote: "Use for liquidity regime context, money supply expansion/contraction cycles, and correlation with inflation and asset prices.",
+    frequency: "monthly",
+    agents: ["macro-agent", "rates-agent", "fx-agent"]
+  },
+  {
+    id: "fred_m2_monthly",
+    source: "fred",
+    sourceSeriesId: "M2SL",
+    label: "M2 Money Stock",
+    description: "M2 money supply (M1 plus savings, time deposits under $100k, retail money market funds), monthly, seasonally adjusted.",
+    usageNote: "Use for broader liquidity regime and money supply growth rate context alongside M1.",
+    frequency: "monthly",
+    agents: ["macro-agent", "rates-agent", "fx-agent"]
+  },
+  {
     id: "fred_pce_headline",
     source: "fred",
     sourceSeriesId: "PCEPI",
