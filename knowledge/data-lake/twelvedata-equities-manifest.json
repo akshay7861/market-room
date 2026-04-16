@@ -1,0 +1,310 @@
+{
+  "generatedAt": "2026-04-04T13:54:02.343Z",
+  "startDate": "1990-01-01",
+  "provider": "twelve_data",
+  "seriesCount": 20,
+  "failedSeriesCount": 0,
+  "series": [
+    {
+      "symbol": "SPY",
+      "label": "S&P 500 proxy",
+      "role": "Large-cap benchmark and headline index anchor.",
+      "themes": [
+        "broad market",
+        "index leadership",
+        "beta"
+      ],
+      "rawFile": "knowledge/data-lake/raw/twelve_data/td_spy_daily.json",
+      "normalizedFile": "knowledge/data-lake/normalized/td_spy_daily.json",
+      "observationCount": 5000,
+      "coverageStart": "2006-05-19",
+      "coverageEnd": "2026-04-02"
+    },
+    {
+      "symbol": "QQQ",
+      "label": "Nasdaq 100 proxy",
+      "role": "Growth and long-duration leadership anchor.",
+      "themes": [
+        "growth",
+        "AI concentration",
+        "duration"
+      ],
+      "rawFile": "knowledge/data-lake/raw/twelve_data/td_qqq_daily.json",
+      "normalizedFile": "knowledge/data-lake/normalized/td_qqq_daily.json",
+      "observationCount": 5000,
+      "coverageStart": "2006-05-18",
+      "coverageEnd": "2026-04-02"
+    },
+    {
+      "symbol": "IWM",
+      "label": "Russell 2000 proxy",
+      "role": "Small-cap participation and domestic breadth proxy.",
+      "themes": [
+        "breadth",
+        "small caps",
+        "cyclicals"
+      ],
+      "rawFile": "knowledge/data-lake/raw/twelve_data/td_iwm_daily.json",
+      "normalizedFile": "knowledge/data-lake/normalized/td_iwm_daily.json",
+      "observationCount": 5000,
+      "coverageStart": "2006-05-18",
+      "coverageEnd": "2026-04-02"
+    },
+    {
+      "symbol": "RSP",
+      "label": "Equal-weight S&P 500",
+      "role": "Breadth check versus cap-weighted index strength.",
+      "themes": [
+        "breadth",
+        "equal-weight",
+        "participation"
+      ],
+      "rawFile": "knowledge/data-lake/raw/twelve_data/td_rsp_daily.json",
+      "normalizedFile": "knowledge/data-lake/normalized/td_rsp_daily.json",
+      "observationCount": 5000,
+      "coverageStart": "2006-05-18",
+      "coverageEnd": "2026-04-02"
+    },
+    {
+      "symbol": "XLK",
+      "label": "Technology sector ETF",
+      "role": "Growth and software/mega-cap tech leadership proxy.",
+      "themes": [
+        "technology",
+        "leadership",
+        "multiple sensitivity"
+      ],
+      "rawFile": "knowledge/data-lake/raw/twelve_data/td_xlk_daily.json",
+      "normalizedFile": "knowledge/data-lake/normalized/td_xlk_daily.json",
+      "observationCount": 5000,
+      "coverageStart": "2006-05-18",
+      "coverageEnd": "2026-04-02"
+    },
+    {
+      "symbol": "SMH",
+      "label": "Semiconductor ETF",
+      "role": "AI and cyclical hardware leadership proxy.",
+      "themes": [
+        "AI",
+        "semiconductors",
+        "capex cycle"
+      ],
+      "rawFile": "knowledge/data-lake/raw/twelve_data/td_smh_daily.json",
+      "normalizedFile": "knowledge/data-lake/normalized/td_smh_daily.json",
+      "observationCount": 5000,
+      "coverageStart": "2006-05-18",
+      "coverageEnd": "2026-04-02"
+    },
+    {
+      "symbol": "XLF",
+      "label": "Financials sector ETF",
+      "role": "Bank and financial-conditions transmission proxy.",
+      "themes": [
+        "banks",
+        "credit",
+        "rates transmission"
+      ],
+      "rawFile": "knowledge/data-lake/raw/twelve_data/td_xlf_daily.json",
+      "normalizedFile": "knowledge/data-lake/normalized/td_xlf_daily.json",
+      "observationCount": 5000,
+      "coverageStart": "2006-05-18",
+      "coverageEnd": "2026-04-02"
+    },
+    {
+      "symbol": "KRE",
+      "label": "Regional banks ETF",
+      "role": "Smaller-bank stress and domestic credit pulse proxy.",
+      "themes": [
+        "regional banks",
+        "credit stress",
+        "domestic lending"
+      ],
+      "rawFile": "knowledge/data-lake/raw/twelve_data/td_kre_daily.json",
+      "normalizedFile": "knowledge/data-lake/normalized/td_kre_daily.json",
+      "observationCount": 4976,
+      "coverageStart": "2006-06-22",
+      "coverageEnd": "2026-04-02"
+    },
+    {
+      "symbol": "XLY",
+      "label": "Consumer discretionary ETF",
+      "role": "Consumer demand and cyclical spending proxy.",
+      "themes": [
+        "consumer",
+        "discretionary",
+        "growth confidence"
+      ],
+      "rawFile": "knowledge/data-lake/raw/twelve_data/td_xly_daily.json",
+      "normalizedFile": "knowledge/data-lake/normalized/td_xly_daily.json",
+      "observationCount": 5000,
+      "coverageStart": "2006-05-18",
+      "coverageEnd": "2026-04-02"
+    },
+    {
+      "symbol": "XLP",
+      "label": "Consumer staples ETF",
+      "role": "Defensive consumer rotation and inflation pass-through proxy.",
+      "themes": [
+        "defensives",
+        "staples",
+        "rotation"
+      ],
+      "rawFile": "knowledge/data-lake/raw/twelve_data/td_xlp_daily.json",
+      "normalizedFile": "knowledge/data-lake/normalized/td_xlp_daily.json",
+      "observationCount": 5000,
+      "coverageStart": "2006-05-18",
+      "coverageEnd": "2026-04-02"
+    },
+    {
+      "symbol": "XLI",
+      "label": "Industrials sector ETF",
+      "role": "Cyclical manufacturing and capital-goods participation proxy.",
+      "themes": [
+        "industrials",
+        "manufacturing",
+        "capex"
+      ],
+      "rawFile": "knowledge/data-lake/raw/twelve_data/td_xli_daily.json",
+      "normalizedFile": "knowledge/data-lake/normalized/td_xli_daily.json",
+      "observationCount": 5000,
+      "coverageStart": "2006-05-18",
+      "coverageEnd": "2026-04-02"
+    },
+    {
+      "symbol": "XLB",
+      "label": "Materials sector ETF",
+      "role": "Commodity-linked equity sensitivity proxy.",
+      "themes": [
+        "materials",
+        "commodity linkage",
+        "cyclicals"
+      ],
+      "rawFile": "knowledge/data-lake/raw/twelve_data/td_xlb_daily.json",
+      "normalizedFile": "knowledge/data-lake/normalized/td_xlb_daily.json",
+      "observationCount": 5000,
+      "coverageStart": "2006-05-18",
+      "coverageEnd": "2026-04-02"
+    },
+    {
+      "symbol": "XLV",
+      "label": "Healthcare sector ETF",
+      "role": "Defensive quality and lower-beta rotation proxy.",
+      "themes": [
+        "healthcare",
+        "defensive quality",
+        "rotation"
+      ],
+      "rawFile": "knowledge/data-lake/raw/twelve_data/td_xlv_daily.json",
+      "normalizedFile": "knowledge/data-lake/normalized/td_xlv_daily.json",
+      "observationCount": 5000,
+      "coverageStart": "2006-05-18",
+      "coverageEnd": "2026-04-02"
+    },
+    {
+      "symbol": "XLU",
+      "label": "Utilities sector ETF",
+      "role": "Bond-sensitive defensive equity proxy.",
+      "themes": [
+        "utilities",
+        "rates sensitivity",
+        "defensives"
+      ],
+      "rawFile": "knowledge/data-lake/raw/twelve_data/td_xlu_daily.json",
+      "normalizedFile": "knowledge/data-lake/normalized/td_xlu_daily.json",
+      "observationCount": 5000,
+      "coverageStart": "2006-05-18",
+      "coverageEnd": "2026-04-02"
+    },
+    {
+      "symbol": "XLE",
+      "label": "Energy sector ETF",
+      "role": "Commodity-led equity transmission proxy.",
+      "themes": [
+        "energy",
+        "oil beta",
+        "inflation linkage"
+      ],
+      "rawFile": "knowledge/data-lake/raw/twelve_data/td_xle_daily.json",
+      "normalizedFile": "knowledge/data-lake/normalized/td_xle_daily.json",
+      "observationCount": 5000,
+      "coverageStart": "2006-05-18",
+      "coverageEnd": "2026-04-02"
+    },
+    {
+      "symbol": "XLC",
+      "label": "Communication services ETF",
+      "role": "Internet platform and media leadership proxy.",
+      "themes": [
+        "platforms",
+        "communication services",
+        "growth leadership"
+      ],
+      "rawFile": "knowledge/data-lake/raw/twelve_data/td_xlc_daily.json",
+      "normalizedFile": "knowledge/data-lake/normalized/td_xlc_daily.json",
+      "observationCount": 1958,
+      "coverageStart": "2018-06-19",
+      "coverageEnd": "2026-04-02"
+    },
+    {
+      "symbol": "NVDA",
+      "label": "NVIDIA",
+      "role": "Single-name AI leadership marker.",
+      "themes": [
+        "AI",
+        "single-name leadership",
+        "crowding"
+      ],
+      "rawFile": "knowledge/data-lake/raw/twelve_data/td_nvda_daily.json",
+      "normalizedFile": "knowledge/data-lake/normalized/td_nvda_daily.json",
+      "observationCount": 5000,
+      "coverageStart": "2006-05-18",
+      "coverageEnd": "2026-04-02"
+    },
+    {
+      "symbol": "MSFT",
+      "label": "Microsoft",
+      "role": "Mega-cap quality growth marker.",
+      "themes": [
+        "mega-cap tech",
+        "quality growth",
+        "AI monetization"
+      ],
+      "rawFile": "knowledge/data-lake/raw/twelve_data/td_msft_daily.json",
+      "normalizedFile": "knowledge/data-lake/normalized/td_msft_daily.json",
+      "observationCount": 5000,
+      "coverageStart": "2006-05-18",
+      "coverageEnd": "2026-04-02"
+    },
+    {
+      "symbol": "AAPL",
+      "label": "Apple",
+      "role": "Mega-cap consumer-tech and index concentration marker.",
+      "themes": [
+        "consumer tech",
+        "index concentration",
+        "hardware demand"
+      ],
+      "rawFile": "knowledge/data-lake/raw/twelve_data/td_aapl_daily.json",
+      "normalizedFile": "knowledge/data-lake/normalized/td_aapl_daily.json",
+      "observationCount": 5000,
+      "coverageStart": "2006-05-18",
+      "coverageEnd": "2026-04-02"
+    },
+    {
+      "symbol": "JPM",
+      "label": "JPMorgan",
+      "role": "Large-bank leadership and credit-confidence marker.",
+      "themes": [
+        "banks",
+        "credit confidence",
+        "financial leadership"
+      ],
+      "rawFile": "knowledge/data-lake/raw/twelve_data/td_jpm_daily.json",
+      "normalizedFile": "knowledge/data-lake/normalized/td_jpm_daily.json",
+      "observationCount": 5000,
+      "coverageStart": "2006-05-18",
+      "coverageEnd": "2026-04-02"
+    }
+  ],
+  "failures": []
+}

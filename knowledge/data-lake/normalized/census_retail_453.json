@@ -1,0 +1,22 @@
+{
+  "id": "census_retail_453",
+  "source": "census",
+  "label": "Miscellaneous store retailers",
+  "description": "US Census MRTS monthly retail sales for Miscellaneous store retailers.",
+  "usageNote": "Useful for small discretionary categories and retail breadth.",
+  "frequency": "monthly",
+  "units": "million_usd",
+  "categoryCode": "453",
+  "observationCount": 0,
+  "coverageStart": null,
+  "coverageEnd": null,
+  "summary": {
+    "latestDate": null,
+    "latestValue": null,
+    "previousDate": null,
+    "previousValue": null,
+    "periodChangePct": null,
+    "annualChangePct": null
+  },
+  "observations": []
+}

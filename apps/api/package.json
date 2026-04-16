@@ -1,0 +1,23 @@
+{
+  "name": "@market-room/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "dev:scheduled": "wrangler dev --test-scheduled",
+    "build": "wrangler deploy --dry-run",
+    "check": "tsc -p tsconfig.json --noEmit && wrangler deploy --dry-run",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "db:init:local": "bash ../../scripts/init-d1-local.sh",
+    "db:init:remote": "bash ../../scripts/init-d1-remote.sh"
+  },
+  "dependencies": {
+    "@market-room/shared": "0.1.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "latest",
+    "typescript": "^5.9.3",
+    "wrangler": "^4.40.0"
+  }
+}

@@ -1,0 +1,3557 @@
+import type {
+  Agent,
+  AgentDiscussionThread,
+  AgentMessage,
+  AgentBehavioralSummary,
+  DiscussionRun,
+  DynamicMemoryContext,
+  LiveMarketView,
+  MarketEvent,
+  MarketSnapshotPayload,
+  MarketRoomView,
+  MarketSnapshot,
+  RoomCoverageState,
+  SnapshotHeadline,
+  SnapshotInstrument,
+  Thesis,
+  ThesisStatus,
+  ThesisUpdate
+} from "@market-room/shared";
+import type { Env } from "../../index";
+import { generateGeminiContent, getLlmModel, isLlmConfigured } from "../gemini";
+import { fetchLatestMarketSnapshot } from "../market-data";
+import { parseStructuredResponseJson } from "../openAiResponses";
+import { createRepositories } from "../repositories";
+import { loadRoom } from "../room";
+import { refreshAgentBehavioralSummary, buildStatePromptBlock } from "./agentBehavioralStateService";
+import { refreshRoomCoverageState, buildRoomCoveragePromptBlock } from "./roomCoverageService";
+import { computeNoveltyAssessment } from "./noveltyScoreService";
+import { makePostingDecision, evaluateCommentTarget } from "./postingDecisionService";
+import { listRelevantMarketCasesForAgent } from "./marketCaseService";
+import { findRelevantKnowledgeSnippets, type LocalKnowledgeSnippet } from "./knowledgeSnippetService";
+import { recordDiscussionLearning } from "./learningService";
+import { fetchOfficialCatalystLayer } from "./officialCatalystService";
+import { fetchYahooFinanceBriefing } from "./yahooFinanceNewsService";
+import { fetchMarketauxBriefing } from "./marketauxNewsService";
+import { analyzeTopHeadlinesForAgent, type HeadlineAnalysis } from "./headlineAnalysisService";
+import { buildDynamicMemoryContext, buildDynamicMemoryPromptBlock, refreshDynamicHouseViews } from "./dynamicMemoryService";
+
+const defaultDiscussionPrompt =
+  "Discuss the biggest market drivers right now, the main risk, and one thing investors should watch next.";
+
+type DiscussionTriggerMode = "manual" | "scheduled";
+type DiscussionProfile =
+  | "commodity_heavy"
+  | "rates_heavy"
+  | "equity_risk_on_off"
+  | "cross_asset";
+
+type RunMarketDiscussionOptions = {
+  triggerMode?: DiscussionTriggerMode;
+  snapshotPayload?: MarketSnapshotPayload;
+  eventTitle?: string;
+  eventSummary?: string;
+  triggerReason?: string;
+  materialityReasons?: string[];
+};
+
+type DiscussionPlan = {
+  profile: DiscussionProfile;
+  profileLabel: string;
+  routingReason: string;
+  selectedAgents: Agent[];
+  opener: Agent;
+  roundTwoAgents: Agent[];
+  roundThreeAgent: Agent | null;
+  orchestration: string[];
+};
+
+type ThemeOpportunity = {
+  themeKey: string;
+  label: string;
+  catalyst: string;
+  score: number;
+  evidence: string[];
+};
+
+type AgentTopicPlan = {
+  primary: ThemeOpportunity;
+  alternates: ThemeOpportunity[];
+  recentAgentThemes: string[];
+  recentRoomThemes: string[];
+  coveredThemesToAvoid: string[];
+  action: "new_post" | "thread_update" | "stay_silent";
+  updateTargetPostId: string | null;
+  matchedThesis: Thesis | null;
+  thesisStatus: ThesisStatus | null;
+  topicPrimaryKey: string;
+  topicSecondaryKey: string | null;
+  hasMeaningfulFreshSignal: boolean;
+};
+
+type CommentPurpose =
+  // Legacy values (kept for backwards compat with stored messages)
+  | "disagreement"
+  | "cross_asset_translation"
+  | "missing_data_point"
+  | "historical_analog"
+  | "invalidation_warning"
+  | "agreement_with_extension"
+  // Expanded taxonomy (added with headline-analysis layer)
+  | "agree_and_extend"
+  | "disagree_on_mechanism"
+  | "disagree_on_market_impact"
+  | "add_cross_asset_spillover"
+  | "add_historical_analog"
+  | "narrow_the_signal"
+  | "call_out_noise"
+  | "ask_for_confirmation_signal"
+  | "confirm_existing_thesis";
+
+type ThesisWritePlan =
+  | {
+      kind: "create";
+      thesis: Thesis;
+      update: ThesisUpdate;
+    }
+  | {
+      kind: "update";
+      thesisId: string;
+      status: ThesisStatus;
+      confidenceCurrent: number | null;
+      latestMessageId: string | null;
+      latestSnapshotId: string | null;
+      latestEventId: string | null;
+      canonicalClaim?: string | null;
+      title?: string | null;
+      topicPrimary?: string | null;
+      topicSecondary?: string | null;
+      lastUpdatedAt: string;
+      update: ThesisUpdate;
+    };
+
+type PlannedForumEntry = {
+  message: AgentMessage;
+  thesisWrite: ThesisWritePlan | null;
+};
+
+export async function listAgents(env: Env): Promise<Agent[]> {
+  return createRepositories(env).agents.list();
+}
+
+const DEFAULT_VISIBLE_THREAD_LIMIT = 18;
+const MAX_VISIBLE_THREAD_LIMIT = 36;
+
+function normalizeVisibleThreadLimit(threadLimit?: number): number {
+  if (!Number.isFinite(threadLimit)) {
+    return DEFAULT_VISIBLE_THREAD_LIMIT;
+  }
+
+  return Math.min(Math.max(Math.floor(threadLimit || DEFAULT_VISIBLE_THREAD_LIMIT), DEFAULT_VISIBLE_THREAD_LIMIT), MAX_VISIBLE_THREAD_LIMIT);
+}
+
+function normalizeThreadOffset(threadOffset?: number): number {
+  if (!Number.isFinite(threadOffset) || !threadOffset || threadOffset < 0) {
+    return 0;
+  }
+
+  return Math.floor(threadOffset);
+}
+
+export async function getMarketRoomView(
+  env: Env,
+  clientId: string | null = null,
+  options: { threadLimit?: number; threadOffset?: number } = {}
+): Promise<MarketRoomView> {
+  const repositories = createRepositories(env);
+  const room = loadRoom();
+  const latestEvent = await repositories.events.getLatestDiscussionEvent();
+  const latestSnapshot = await repositories.marketSnapshots.getLatest();
+  const visibleThreadLimit = normalizeVisibleThreadLimit(options.threadLimit);
+  const visibleThreadOffset = normalizeThreadOffset(options.threadOffset);
+  const rawThreadLimit = visibleThreadLimit * 2;
+  const rawThreadOffset = visibleThreadOffset * 2;
+  const threadBundle = await repositories.messages.listThreadsByRoom(room.id, rawThreadLimit, 6, clientId, rawThreadOffset);
+  const threads = dedupeDisplayThreads(buildDiscussionThreads(threadBundle.posts, threadBundle.comments)).slice(0, visibleThreadLimit);
+  const messages = threads.flatMap((thread) => [thread.post, ...thread.comments]).sort((left, right) =>
+    left.createdAt.localeCompare(right.createdAt)
+  );
+  const activeAgents = await repositories.agents.listActive();
+
+  return {
+    room,
+    latestSnapshot,
+    latestEvent,
+    messages,
+    threads,
+    activeAgents
+  };
+}
+
+export async function getLiveMarketView(env: Env, clientId: string | null = null): Promise<LiveMarketView> {
+  const repositories = createRepositories(env);
+  const room = loadRoom();
+  const latestEvent = await repositories.events.getLatestDiscussionEvent();
+  const latestSnapshot = await repositories.marketSnapshots.getLatest();
+  const threadBundle = await repositories.messages.listThreadsByRoom(room.id, 36, 4, clientId);
+  const threads = dedupeDisplayThreads(buildDiscussionThreads(threadBundle.posts, threadBundle.comments));
+  const activeAgents = await repositories.agents.listActive();
+  const snapshotPayload = parseSnapshotPayload(latestSnapshot);
+
+  return {
+    room,
+    latestSnapshot,
+    latestEvent,
+    headlines: snapshotPayload?.headlines || [],
+    topThreads: [...threads].sort((left, right) => threadScore(right) - threadScore(left)).slice(0, 6),
+    activeAgents
+  };
+}
+
+export async function reactToMarketRoomMessage(
+  env: Env,
+  messageId: string,
+  clientId: string,
+  reaction: "like" | "dislike" | null
+): Promise<AgentMessage | null> {
+  const repositories = createRepositories(env);
+  await repositories.messageReactions.setReaction(messageId, clientId, reaction, new Date().toISOString());
+  return repositories.messages.getById(messageId, clientId);
+}
+
+export function getDefaultDiscussionPrompt(): string {
+  return defaultDiscussionPrompt;
+}
+
+export async function runMarketDiscussion(
+  env: Env,
+  prompt?: string,
+  options: RunMarketDiscussionOptions = {}
+): Promise<DiscussionRun> {
+  const repositories = createRepositories(env);
+  const room = loadRoom();
+  const activeAgents = await repositories.agents.listActive();
+  const previousSnapshotRecord = options.snapshotPayload ? null : await repositories.marketSnapshots.getLatest();
+  const previousSnapshotPayload = parseSnapshotPayload(previousSnapshotRecord);
+  const now = new Date().toISOString();
+  const finalPrompt =
+    prompt?.trim() ||
+    options.snapshotPayload?.prompt ||
+    defaultDiscussionPrompt;
+  const triggerMode = options.triggerMode || "manual";
+  await repositories.theses.markStaleBefore(
+    room.id,
+    new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
+    now
+  );
+  const recentTheses = await repositories.theses.listRecentByRoom(room.id, 24);
+  const marketSnapshotPayload =
+    options.snapshotPayload ||
+    (await fetchLatestMarketSnapshot(env, finalPrompt, {
+      now,
+      previousSnapshot: previousSnapshotPayload
+    }));
+  const discussionPlan = buildDiscussionPlan(activeAgents, marketSnapshotPayload);
+  const priorRoomThreadBundle = await repositories.messages.listThreadsByRoom(room.id, 24, 4); // 24 threads = ~6 full runs of history for novelty check
+  const priorRoomThreads = buildDiscussionThreads(priorRoomThreadBundle.posts, priorRoomThreadBundle.comments);
+  const [officialBriefing, yahooBriefing, marketauxBriefing] = await Promise.all([
+    fetchOfficialCatalystLayer(env, activeAgents),
+    fetchYahooFinanceBriefing(activeAgents),
+    fetchMarketauxBriefing(env, activeAgents)
+  ]);
+
+  const generalCatalystHeadlines = dedupeHeadlines([
+    ...marketauxBriefing.generalHeadlines,
+    ...officialBriefing.generalHeadlines,
+    ...yahooBriefing.generalHeadlines
+  ]);
+  const sectorHeadlinesByAgentId = new Map<string, SnapshotHeadline[]>();
+
+  for (const agent of activeAgents) {
+    // Marketaux headlines go first so analyzeTopHeadlinesForAgent prioritises them
+    sectorHeadlinesByAgentId.set(
+      agent.id,
+      dedupeHeadlines([
+        ...(marketauxBriefing.headlinesByAgentId.get(agent.id) || []),
+        ...(officialBriefing.headlinesByAgentId.get(agent.id) || []),
+        ...(yahooBriefing.headlinesByAgentId.get(agent.id) || [])
+      ])
+    );
+  }
+
+  const enrichedSnapshotPayload = mergeForumHeadlinesIntoSnapshot(
+    marketSnapshotPayload,
+    generalCatalystHeadlines
+  );
+
+  const snapshot: MarketSnapshot = {
+    id: crypto.randomUUID(),
+    snapshotType: enrichedSnapshotPayload.usedFallback ? "fallback_market_snapshot" : "live_market_snapshot",
+    payloadJson: JSON.stringify(enrichedSnapshotPayload, null, 2),
+    createdAt: now
+  };
+
+  await repositories.marketSnapshots.create(snapshot);
+
+  const event: MarketEvent = {
+    id: crypto.randomUUID(),
+    eventType: "market_discussion_run",
+    title: options.eventTitle || eventTitleFor(triggerMode),
+    summary:
+      options.eventSummary ||
+      eventSummaryFor(
+        triggerMode,
+        discussionPlan.selectedAgents.length,
+        activeAgents.length,
+        discussionPlan.profileLabel,
+        discussionPlan.routingReason,
+        options.materialityReasons
+      ),
+    payloadJson: JSON.stringify(
+      {
+        roomId: room.id,
+        prompt: finalPrompt,
+        agentCount: discussionPlan.selectedAgents.length,
+        activeAgentCount: activeAgents.length,
+        selectedAgentIds: discussionPlan.selectedAgents.map((agent) => agent.id),
+        selectedSectors: discussionPlan.selectedAgents.map((agent) => agent.sector),
+        postingAgentIds: activeAgents.map((agent) => agent.id),
+        triggerMode,
+        triggerReason: options.triggerReason || triggerMode,
+        materialityReasons: options.materialityReasons || [],
+        snapshotHeadline: enrichedSnapshotPayload.headline,
+        snapshotProvider: enrichedSnapshotPayload.provider,
+        usedFallback: enrichedSnapshotPayload.usedFallback,
+        discussionProfile: discussionPlan.profile,
+        routingReason: discussionPlan.routingReason,
+        orchestration: ["forum_posts", "agent_comments", ...discussionPlan.orchestration]
+      },
+      null,
+      2
+    ),
+    snapshotId: snapshot.id,
+    createdAt: now
+  };
+
+  await repositories.events.create(event);
+
+  // Persist Marketaux fetch log after event.id is known
+  if (marketauxBriefing.logItems.length > 0) {
+    const itemsWithEventId = marketauxBriefing.logItems.map((item) => ({
+      ...item,
+      eventId: event.id
+    }));
+    repositories.fetchedNews.logBatch(itemsWithEventId).catch((err) =>
+      console.error("[marketaux] Failed to log fetch items:", err)
+    );
+  }
+
+  const generatedForumEntries =
+    discussionPlan.selectedAgents.length === 0
+      ? []
+      : isLlmConfigured(env)
+        ? await generateAgentForumPosts({
+            env,
+            agents: activeAgents,
+            marketSnapshot: enrichedSnapshotPayload,
+            previousSnapshot: previousSnapshotPayload,
+            roomId: room.id,
+            eventId: event.id,
+          discussionPlan,
+          generalHeadlines: generalCatalystHeadlines,
+          sectorHeadlinesByAgentId,
+          priorRoomThreads,
+          recentTheses,
+          snapshotId: snapshot.id
+        })
+        : generateMockForumPosts(activeAgents, marketSnapshotPayload, room.id, event.id, snapshot.id);
+
+  const generatedPostEntries = generatedForumEntries.filter((entry) => entry.message.messageType === "post");
+  const generatedSelfUpdateEntries = generatedForumEntries.filter((entry) => entry.message.messageType === "comment");
+  const generatedPosts = generatedPostEntries.map((entry) => entry.message);
+  const generatedSelfUpdates = generatedSelfUpdateEntries.map((entry) => entry.message);
+
+  const generatedComments =
+    generatedPosts.length === 0 && priorRoomThreads.length === 0
+      ? []
+      : isLlmConfigured(env)
+        ? await generateAgentForumComments({
+            env,
+            agents: activeAgents,
+            posts: generatedPosts,
+            marketSnapshot: enrichedSnapshotPayload,
+            previousSnapshot: previousSnapshotPayload,
+            roomId: room.id,
+            eventId: event.id,
+            discussionPlan,
+            generalHeadlines: generalCatalystHeadlines,
+            sectorHeadlinesByAgentId,
+            priorRoomThreads,
+            snapshotId: snapshot.id
+          })
+        : generateMockForumComments(activeAgents, generatedPosts, room.id, event.id);
+
+  const plannedEntries = [...generatedForumEntries, ...generatedComments].sort((left, right) =>
+    left.message.createdAt.localeCompare(right.message.createdAt)
+  );
+
+  for (const entry of plannedEntries) {
+    await repositories.messages.create(entry.message);
+  }
+
+  for (const entry of plannedEntries) {
+    if (!entry.thesisWrite) {
+      continue;
+    }
+
+    if (entry.thesisWrite.kind === "create") {
+      await repositories.theses.create(entry.thesisWrite.thesis);
+      await repositories.theses.createUpdate(entry.thesisWrite.update);
+      continue;
+    }
+
+    await repositories.theses.applyUpdate(entry.thesisWrite.thesisId, {
+      status: entry.thesisWrite.status,
+      confidenceCurrent: entry.thesisWrite.confidenceCurrent,
+      latestMessageId: entry.thesisWrite.latestMessageId,
+      latestSnapshotId: entry.thesisWrite.latestSnapshotId,
+      latestEventId: entry.thesisWrite.latestEventId,
+      canonicalClaim: entry.thesisWrite.canonicalClaim,
+      title: entry.thesisWrite.title,
+      topicPrimary: entry.thesisWrite.topicPrimary,
+      topicSecondary: entry.thesisWrite.topicSecondary,
+      lastUpdatedAt: entry.thesisWrite.lastUpdatedAt
+    });
+    await repositories.theses.createUpdate(entry.thesisWrite.update);
+  }
+
+  await refreshDynamicHouseViews(env, activeAgents, event.id);
+
+  await recordDiscussionLearning({
+    env,
+    event,
+    snapshot,
+    marketSnapshot: enrichedSnapshotPayload,
+    messages: generatedPosts
+  });
+
+  for (const agent of activeAgents) {
+    await refreshAgentBehavioralSummary(env, agent.id, room.id);
+  }
+
+  await refreshRoomCoverageState(env, room.id);
+
+  const generatedCommentMessages = generatedComments.map((entry) => entry.message);
+  const generatedThreads = buildDiscussionThreads(generatedPosts, [...generatedSelfUpdates, ...generatedCommentMessages]);
+  const generatedMessages = [...generatedPosts, ...generatedSelfUpdates, ...generatedCommentMessages].sort((left, right) =>
+    left.createdAt.localeCompare(right.createdAt)
+  );
+
+  return {
+    id: event.id,
+    roomId: room.id,
+    prompt: finalPrompt,
+    snapshotId: snapshot.id,
+    eventId: event.id,
+    createdAt: now,
+    status: "completed",
+    messages: generatedMessages,
+    threads: generatedThreads
+  };
+}
+
+function eventTitleFor(triggerMode: DiscussionTriggerMode): string {
+  return triggerMode === "scheduled"
+    ? "Market Room scheduled forum update"
+    : "Market Room forum update";
+}
+
+function eventSummaryFor(
+  triggerMode: DiscussionTriggerMode,
+  selectedAgentCount: number,
+  activeAgentCount: number,
+  profileLabel: string,
+  routingReason: string,
+  materialityReasons?: string[]
+): string {
+  if (triggerMode === "scheduled") {
+    const reasons = materialityReasons?.slice(0, 2).join("; ");
+    const isHourlyRefresh = reasons?.toLowerCase().includes("hourly scheduled refresh");
+    return reasons
+      ? isHourlyRefresh
+        ? `A scheduled ${profileLabel} forum update woke ${selectedAgentCount} of ${activeAgentCount} active agents for the hourly room refresh.`
+        : `A scheduled ${profileLabel} forum update woke ${selectedAgentCount} of ${activeAgentCount} active agents after material changes were detected: ${reasons}.`
+      : `A scheduled ${profileLabel} forum update woke ${selectedAgentCount} of ${activeAgentCount} active agents because ${routingReason.toLowerCase()}.`;
+  }
+
+  return `A ${profileLabel} forum update woke ${selectedAgentCount} of ${activeAgentCount} active agents because ${routingReason.toLowerCase()}.`;
+}
+
+function buildDiscussionPlan(agents: Agent[], marketSnapshot: MarketSnapshotPayload): DiscussionPlan {
+  if (agents.length === 0) {
+    return {
+      profile: "cross_asset",
+      profileLabel: "cross-asset",
+      routingReason: "no active specialists were available",
+      selectedAgents: [],
+      opener: createSyntheticFallbackAgent(),
+      roundTwoAgents: [],
+      roundThreeAgent: null,
+      orchestration: ["route:cross_asset", "no_active_agents"]
+    };
+  }
+
+  const profileDecision = classifyDiscussionProfile(marketSnapshot);
+  const primaryRoute = sectorRouteForProfile(profileDecision.profile)
+    .map((sector) => agents.find((agent) => agent.sector === sector))
+    .filter((agent): agent is Agent => Boolean(agent));
+  const supplementalAgents = agents.filter(
+    (agent) => !primaryRoute.some((selected) => selected.id === agent.id)
+  );
+  const selectedAgents = [...primaryRoute, ...supplementalAgents].slice(0, 4);
+  const opener = selectedAgents.find((agent) => agent.sector === "Macro") || selectedAgents[0];
+  const specialists = selectedAgents.filter((agent) => agent.id !== opener.id);
+
+  return {
+    profile: profileDecision.profile,
+    profileLabel: profileLabelFor(profileDecision.profile),
+    routingReason: profileDecision.reason,
+    selectedAgents,
+    opener,
+    roundTwoAgents: specialists.slice(0, 2),
+    roundThreeAgent: specialists[2] || null,
+    orchestration: [
+      `route:${profileDecision.profile}`,
+      "round_1_macro_open",
+      "round_2_specialist_replies",
+      "round_3_final_specialist"
+    ]
+  };
+}
+
+function createSyntheticFallbackAgent(): Agent {
+  return {
+    id: "macro-agent",
+    name: "Macro Agent",
+    slug: "macro-agent",
+    sector: "Macro",
+    bio: "",
+    avatarUrl: "",
+    systemPrompt: "",
+    memorySummary: "",
+    vectorStoreId: null,
+    active: false,
+    createdAt: new Date(0).toISOString(),
+    updatedAt: new Date(0).toISOString()
+  };
+}
+
+function classifyDiscussionProfile(marketSnapshot: MarketSnapshotPayload): {
+  profile: DiscussionProfile;
+  reason: string;
+} {
+  const commodityMoves = [
+    absolutePercentChangeFor(marketSnapshot, "wti"),
+    absolutePercentChangeFor(marketSnapshot, "brent"),
+    absolutePercentChangeFor(marketSnapshot, "natural_gas"),
+    absolutePercentChangeFor(marketSnapshot, "copper"),
+    absolutePercentChangeFor(marketSnapshot, "gold")
+  ];
+  const commodityScore =
+    commodityMoves.filter((move) => move >= 2).length * 2 +
+    commodityMoves.filter((move) => move >= 1 && move < 2).length +
+    headlineKeywordScore(marketSnapshot, [
+      "oil",
+      "opec",
+      "crude",
+      "gas",
+      "lng",
+      "gold",
+      "copper",
+      "metals",
+      "commodity"
+    ]);
+
+  const ratesScore =
+    (absoluteBpsChangeFor(marketSnapshot, "us10y") >= 8 ? 3 : 0) +
+    (absolutePercentChangeFor(marketSnapshot, "dxy") >= 0.5 ? 1 : 0) +
+    headlineKeywordScore(marketSnapshot, [
+      "fed",
+      "treasury",
+      "yield",
+      "rates",
+      "inflation",
+      "cpi",
+      "payroll",
+      "central bank",
+      "bond"
+    ]);
+
+  const equityScore =
+    (Math.max(
+      absolutePercentChangeFor(marketSnapshot, "sp500"),
+      absolutePercentChangeFor(marketSnapshot, "nasdaq")
+    ) >= 1
+      ? 2
+      : 0) +
+    headlineKeywordScore(marketSnapshot, [
+      "stocks",
+      "equity",
+      "nasdaq",
+      "s&p",
+      "earnings",
+      "tech",
+      "selloff",
+      "rally",
+      "volatility",
+      "risk"
+    ]);
+
+  if (commodityScore >= 2 && commodityScore >= ratesScore && commodityScore >= equityScore) {
+    return {
+      profile: "commodity_heavy",
+      reason: `commodity signals led the snapshot, with natural gas ${metricChangeOrValue(marketSnapshot, "natural_gas")} and WTI ${metricChangeOrValue(marketSnapshot, "wti")}`
+    };
+  }
+
+  if (ratesScore >= 2 && ratesScore >= equityScore) {
+    return {
+      profile: "rates_heavy",
+      reason: `rates signals led the snapshot, with the US 10Y at ${metricValue(snapshotMetricsMap(marketSnapshot), "us10y")} and DXY ${metricChangeOrValue(marketSnapshot, "dxy")}`
+    };
+  }
+
+  if (equityScore >= 2) {
+    return {
+      profile: "equity_risk_on_off",
+      reason: `equity-risk signals led the snapshot, with the S&P 500 ${metricChangeOrValue(marketSnapshot, "sp500")} and Nasdaq ${metricChangeOrValue(marketSnapshot, "nasdaq")}`
+    };
+  }
+
+  return {
+    profile: "cross_asset",
+    reason: "no single sector dominated, so the room is using a balanced cross-asset route"
+  };
+}
+
+function sectorRouteForProfile(profile: DiscussionProfile): string[] {
+  switch (profile) {
+    case "commodity_heavy":
+      return ["Macro", "Commodities", "FX", "Risk/Sentiment"];
+    case "rates_heavy":
+      return ["Macro", "Rates", "FX", "Equities"];
+    case "equity_risk_on_off":
+      return ["Macro", "Equities", "Risk/Sentiment", "FX"];
+    case "cross_asset":
+    default:
+      return ["Macro", "Equities", "Commodities", "Risk/Sentiment"];
+  }
+}
+
+function profileLabelFor(profile: DiscussionProfile): string {
+  switch (profile) {
+    case "commodity_heavy":
+      return "commodity-heavy";
+    case "rates_heavy":
+      return "rates-heavy";
+    case "equity_risk_on_off":
+      return "equity-risk";
+    case "cross_asset":
+    default:
+      return "cross-asset";
+  }
+}
+
+function fallbackContributionText(
+  agent: Agent,
+  marketSnapshot: MarketSnapshotPayload,
+  discussionPlan: DiscussionPlan,
+  priorMessages: AgentMessage[]
+): string {
+  const metrics = snapshotMetricsMap(marketSnapshot);
+  const leadName = priorMessages[0]?.agentName || "Macro Agent";
+  const confidence = Math.round(confidenceFor(agent) * 100);
+
+  switch (agent.sector) {
+    case "Macro":
+      return trimToWordLimit(
+        `Macro Agent opens the ${discussionPlan.profileLabel} route through growth, rates, and policy. US 10Y is ${metricValue(metrics, "us10y")}, DXY is ${metricValue(metrics, "dxy")}, and the key framing is that ${discussionPlan.routingReason}. My stance is cautious with ${confidence}% confidence.`,
+        120
+      );
+    case "Equities":
+      return trimToWordLimit(
+        `Equities Agent builds on ${leadName}'s macro framing, but the tape still hinges on breadth and leadership. The S&P 500 is ${metricValue(metrics, "sp500")} and Nasdaq is ${metricValue(metrics, "nasdaq")}. My stance is selective with ${confidence}% confidence because equity risk appetite still looks uneven.`,
+        120
+      );
+    case "Commodities":
+      return trimToWordLimit(
+        `Commodities Agent adds the raw-material angle after ${leadName}. WTI is ${metricValue(metrics, "wti")}, Brent is ${metricValue(metrics, "brent")}, natural gas is ${metricValue(metrics, "natural_gas")}, and gold is ${metricValue(metrics, "gold")}. My stance is watchful with ${confidence}% confidence because supply pressure can keep inflation sticky.`,
+        120
+      );
+    case "FX":
+      return trimToWordLimit(
+        `FX Agent takes ${leadName}'s point into currencies. DXY is ${metricValue(metrics, "dxy")} while US 10Y is ${metricValue(metrics, "us10y")}, so dollar direction still matters for global liquidity and imported inflation. My stance is alert with ${confidence}% confidence.`,
+        120
+      );
+    case "Rates":
+      return trimToWordLimit(
+        `Rates Agent sharpens the duration angle after ${leadName}. The US 10Y is ${metricValue(metrics, "us10y")} and the market still has to absorb policy repricing rather than assume a smooth easing path. My stance is disciplined with ${confidence}% confidence.`,
+        120
+      );
+    case "Risk/Sentiment":
+      return trimToWordLimit(
+        `Risk/Sentiment Agent reads the tape after ${leadName} through positioning and appetite for risk. The S&P 500 is ${metricValue(metrics, "sp500")}, Nasdaq is ${metricValue(metrics, "nasdaq")}, and gold is ${metricValue(metrics, "gold")}. My stance is defensive with ${confidence}% confidence because resilience still looks fragile.`,
+        120
+      );
+    default:
+      return trimToWordLimit(
+        `${agent.name} adds a sector-specific perspective to the ${discussionPlan.profileLabel} discussion and keeps the focus on what matters next. My stance is ${stanceFor(agent)} with ${confidence}% confidence.`,
+        120
+      );
+  }
+}
+
+function stanceFor(agent: Agent): string {
+  switch (agent.sector) {
+    case "Macro":
+      return "cautious";
+    case "Equities":
+      return "selective";
+    case "Commodities":
+      return "watchful";
+    case "FX":
+      return "alert";
+    case "Rates":
+      return "disciplined";
+    case "Risk/Sentiment":
+      return "defensive";
+    default:
+      return "measured";
+  }
+}
+
+function confidenceFor(agent: Agent): number {
+  switch (agent.sector) {
+    case "Macro":
+      return 0.74;
+    case "Equities":
+      return 0.78;
+    case "Commodities":
+      return 0.72;
+    case "FX":
+      return 0.73;
+    case "Rates":
+      return 0.76;
+    case "Risk/Sentiment":
+      return 0.75;
+    default:
+      return 0.7;
+  }
+}
+
+function buildDiscussionThreads(posts: AgentMessage[], comments: AgentMessage[]): AgentDiscussionThread[] {
+  const commentsByParent = new Map<string, AgentMessage[]>();
+
+  for (const comment of comments) {
+    const parentId = comment.parentMessageId;
+
+    if (!parentId) {
+      continue;
+    }
+
+    commentsByParent.set(parentId, [...(commentsByParent.get(parentId) || []), comment]);
+  }
+
+  return [...posts]
+    .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+    .map((post) => ({
+      post,
+      comments: [...(commentsByParent.get(post.id) || [])].sort((left, right) =>
+        left.createdAt.localeCompare(right.createdAt)
+      )
+    }));
+}
+
+function dedupeDisplayThreads(threads: AgentDiscussionThread[]): AgentDiscussionThread[] {
+  const seen = new Set<string>();
+  const deduped: AgentDiscussionThread[] = [];
+
+  for (const thread of threads) {
+    const key = displayThreadDedupeKey(thread.post);
+    if (seen.has(key)) {
+      console.log(
+        `[room-feed] suppressed duplicate display thread key=${key} title="${thread.post.title || thread.post.catalyst || thread.post.id}"`
+      );
+      continue;
+    }
+
+    seen.add(key);
+    deduped.push(thread);
+  }
+
+  return deduped;
+}
+
+function displayThreadDedupeKey(post: AgentMessage): string {
+  const raw = `${post.catalyst || ""} ${post.title || ""}`.toLowerCase();
+  if (/nonfarm payroll|payroll|nfp/.test(raw) && /\b178k?\b|jobs change context/.test(raw)) {
+    return "official:nfp:178";
+  }
+
+  if (/fed funds|federal funds/.test(raw) && /3\.64/.test(raw)) {
+    return "official:fed-funds:3.64";
+  }
+
+  if (/unemployment rate/.test(raw)) {
+    const date = post.createdAt.slice(0, 10);
+    return `official:unemployment:${date}`;
+  }
+
+  return `${post.agentId}:${normalizeDisplayText(post.catalyst || post.title || post.id).slice(0, 90)}`;
+}
+
+function normalizeDisplayText(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/['’]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\b(latest|official|print|context|keeps|holds|sustains|reinforces|amid|set|to|persist)\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function threadScore(thread: AgentDiscussionThread): number {
+  return thread.post.likeCount - thread.post.dislikeCount;
+}
+
+function mergeForumHeadlinesIntoSnapshot(
+  snapshot: MarketSnapshotPayload,
+  generalHeadlines: SnapshotHeadline[]
+): MarketSnapshotPayload {
+  const mergedHeadlines = dedupeHeadlines([
+    ...generalHeadlines,
+    ...snapshot.headlines
+  ]).slice(0, 8);
+
+  if (mergedHeadlines.length === 0) {
+    return snapshot;
+  }
+
+  const topHeadline = mergedHeadlines[0];
+  const onlyFallbackHeadlines = snapshot.headlines.every((headline) =>
+    headline.source === "Market Room"
+  );
+
+  return {
+    ...snapshot,
+    headlines: mergedHeadlines,
+    headline:
+      onlyFallbackHeadlines && topHeadline?.title
+        ? topHeadline.title
+        : snapshot.headline,
+    summary:
+      onlyFallbackHeadlines && topHeadline?.title
+        ? `Latest market catalyst: ${topHeadline.title}. ${snapshot.summary}`
+        : snapshot.summary
+  };
+}
+
+async function generateAgentForumPosts({
+  env,
+  agents,
+  marketSnapshot,
+  previousSnapshot,
+  roomId,
+  eventId,
+  discussionPlan,
+  generalHeadlines,
+  sectorHeadlinesByAgentId,
+  priorRoomThreads,
+  recentTheses,
+  snapshotId
+}: {
+  env: Env;
+  agents: Agent[];
+  marketSnapshot: MarketSnapshotPayload;
+  previousSnapshot: MarketSnapshotPayload | null;
+  roomId: string;
+  eventId: string;
+  discussionPlan: DiscussionPlan;
+  generalHeadlines: SnapshotHeadline[];
+  sectorHeadlinesByAgentId: Map<string, SnapshotHeadline[]>;
+  priorRoomThreads: AgentDiscussionThread[];
+  recentTheses: Thesis[];
+  snapshotId: string;
+}): Promise<PlannedForumEntry[]> {
+  const repositories = createRepositories(env);
+  const sortedAgents = sortAgentsForForum(agents);
+  const recentRoomCoverage = buildRoomThemeCoverage(priorRoomThreads);
+  const runThemeCoverage = new Map<string, number>();
+  const recentThesesByOwner = new Map<string, Thesis[]>();
+  const entries: PlannedForumEntry[] = [];
+  const roomCoverage = await repositories.roomCoverage.getByRoomId(roomId);
+  // Tracks posts published earlier in this same run so subsequent agents can avoid echoing them.
+  const thisRunPosts: AgentMessage[] = [];
+
+  for (const thesis of recentTheses) {
+    recentThesesByOwner.set(thesis.ownerAgentId, [...(recentThesesByOwner.get(thesis.ownerAgentId) || []), thesis]);
+  }
+
+  for (const [index, agent] of sortedAgents.entries()) {
+    const sectorHeadlines = sectorHeadlinesByAgentId.get(agent.id) || [];
+    const [recentPosts, relevantCases, knowledgeSnippets, dynamicMemory, agentState] = await Promise.all([
+      repositories.messages.listRecentByAgent(agent.id, 8),  // 8 not 4 — wider cross-run novelty window
+      listRelevantMarketCasesForAgent(env, agent, marketSnapshot, discussionPlan.profile),
+      findRelevantKnowledgeSnippets(
+        env,
+        agent,
+        [
+          discussionPlan.profileLabel,
+          marketSnapshot.headline,
+          marketSnapshot.summary,
+          ...generalHeadlines.map((headline) => headline.title),
+          ...sectorHeadlines.map((headline) => headline.title)
+        ].join("\n"),
+        8
+      ),
+      buildDynamicMemoryContext(env, agent),
+      repositories.agentState.getByAgentId(agent.id)
+    ]);
+    const topicPlan = buildAgentTopicPlan(
+      agent,
+      marketSnapshot,
+      previousSnapshot,
+      recentPosts,
+      priorRoomThreads,
+      recentRoomCoverage,
+      runThemeCoverage,
+      generalHeadlines,
+      sectorHeadlinesByAgentId.get(agent.id) || [],
+      recentThesesByOwner.get(agent.id) || [],
+      roomCoverage
+    );
+
+    const noveltyAssessment = computeNoveltyAssessment({
+      candidateThemeKey: topicPlan.primary.themeKey,
+      candidateCatalyst: topicPlan.primary.catalyst,
+      candidateStance: stanceFor(agent),
+      agentSector: agent.sector,
+      agentRecentPosts: recentPosts,
+      roomRecentPosts: flattenThreadPosts(priorRoomThreads),
+      agentState,
+      roomCoverage,
+      hasMeaningfulFreshSignal: topicPlan.hasMeaningfulFreshSignal,
+      matchedThesis: topicPlan.matchedThesis
+    });
+
+    // Analyze top 3 sector headlines for this agent (heuristic, zero LLM calls).
+    // Pass room-wide recent posts (not just this agent's) so isNewInformation is cross-agent aware:
+    // if another agent already posted on NFP, this agent won't treat NFP as new information.
+    const roomWidePosts = flattenThreadPosts(priorRoomThreads).slice(0, 24); // 24 not 8 — deeper history
+    const topSectorHeadlines = (sectorHeadlinesByAgentId.get(agent.id) || []).slice(0, 3);
+    const headlineAnalysis: HeadlineAnalysis | null = topSectorHeadlines.length > 0
+      ? analyzeTopHeadlinesForAgent(topSectorHeadlines, agent, {
+          recentPosts: [...recentPosts, ...roomWidePosts],
+          openTheses: recentThesesByOwner.get(agent.id) || [],
+          sectorKeywords: sectorKeywordsFor(agent)
+        })
+      : null;
+
+    const rawPostingDecision = makePostingDecision({
+      topicPlan,
+      noveltyAssessment,
+      agentState,
+      roomCoverage,
+      agentSector: agent.sector,
+      headlineAnalysis
+    });
+
+    // ── Run-level catalyst guard ──────────────────────────────────────────────
+    // Prevents two agents from opening separate top-level posts on the same article.
+    //
+    // Two-tier logic:
+    //  • MACRO events (macro_release / policy / regulatory): multiple sectors genuinely
+    //    bring different angles (Rates takes the yield view, FX takes the dollar view on NFP).
+    //    Only block if the SAME sector already posted on this catalyst.
+    //  • COMPANY / COMMODITY / GEOPOLITICAL / OTHER: these are specific articles that only
+    //    one sector should "own". If ANY agent already posted on this article, downgrade
+    //    the second one to comment_only.
+    const postingDecision = (() => {
+      if (rawPostingDecision.actionType !== "new_post" || !headlineAnalysis?.headline_title) {
+        return rawPostingDecision;
+      }
+      const hTokens = headlineAnalysis.headline_title
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, " ")
+        .split(/\s+/)
+        .filter((t) => t.length > 4);
+
+      const isMacroPolicy = (["macro_release", "policy", "regulatory"] as string[]).includes(
+        headlineAnalysis.headline_type
+      );
+
+      const catalystAlreadyClaimed = thisRunPosts.some((p) => {
+        // Macro/policy: only block within same sector
+        if (isMacroPolicy && p.sector !== agent.sector) return false;
+        // Company/commodity/geo/other: ANY prior post on this article blocks a second top-level
+        const runCat = (p.catalyst || "").toLowerCase();
+        const runTitle = (p.title || "").toLowerCase();
+        return hTokens.some((token) => runCat.includes(token) || runTitle.includes(token));
+      });
+
+      if (!catalystAlreadyClaimed) return rawPostingDecision;
+      return {
+        ...rawPostingDecision,
+        actionType: "comment_only" as const,
+        reasonCodes: [...rawPostingDecision.reasonCodes, "run_catalyst_claimed" as const]
+      };
+    })();
+
+    // Pre-generate message ID so it can be linked in the decision log
+    const willPost =
+      postingDecision.actionType === "new_post" || postingDecision.actionType === "update_existing";
+    const preGeneratedMessageId = willPost ? crypto.randomUUID() : null;
+
+    // Log all decisions including silent ones (fire-and-forget)
+    void repositories.decisionLog.log({
+      id: crypto.randomUUID(),
+      agentId: agent.id,
+      roomId,
+      actionType: postingDecision.actionType,
+      reasonCodes: postingDecision.reasonCodes,
+      noveltyScore: postingDecision.noveltyScore,
+      candidateThemeKey: postingDecision.suggestedTopic?.themeKey ?? null,
+      targetThesisId: postingDecision.targetThesisId,
+      messageId: preGeneratedMessageId,
+      decidedAt: postingDecision.decidedAt,
+      headlineAnalysisJson: headlineAnalysis ? JSON.stringify(headlineAnalysis) : null
+    });
+
+    if (!willPost) {
+      continue;
+    }
+
+    const result = await requestStructuredForumPost({
+      env,
+      agent,
+      marketSnapshot,
+      previousSnapshot,
+      discussionPlan,
+      topicPlan,
+      recentPosts,
+      relevantCases,
+      knowledgeSnippets,
+      generalHeadlines,
+      sectorHeadlines,
+      priorRoomThreads,
+      dynamicMemory,
+      agentState,
+      roomCoverage,
+      thisRunPosts: [...thisRunPosts],
+      headlineAnalysis
+    });
+
+    const createdAt = offsetTimestamp(index * 3);
+    const isUpdate = postingDecision.actionType === "update_existing";
+    const thesisId =
+      postingDecision.targetThesisId ||
+      topicPlan.matchedThesis?.id ||
+      (isUpdate ? null : crypto.randomUUID());
+    const parentPostId =
+      postingDecision.targetPostId ||
+      (isUpdate ? topicPlan.updateTargetPostId : null);
+    const message: AgentMessage = {
+      id: preGeneratedMessageId!,
+      roomId,
+      eventId,
+      agentId: agent.id,
+      agentName: agent.name,
+      sector: agent.sector,
+      role: "assistant",
+      messageType: isUpdate ? "comment" : "post",
+      parentMessageId: parentPostId,
+      title: isUpdate
+        ? null
+        : result?.title || fallbackForumTitle(agent, marketSnapshot, topicPlan),
+      catalyst: result?.catalyst || topicPlan.primary.catalyst || fallbackCatalyst(agent, marketSnapshot),
+      thesisId,
+      thesisUpdateId: thesisId ? crypto.randomUUID() : null,
+      thesisStatus: topicPlan.thesisStatus,
+      thesisTopicPrimary: topicPlan.topicPrimaryKey,
+      thesisTopicSecondary: topicPlan.topicSecondaryKey,
+      content: trimToWordLimit(
+        result?.content || fallbackForumPost(agent, marketSnapshot, previousSnapshot),
+        isUpdate ? 170 : 320
+      ),
+      stance: result?.stance || stanceFor(agent),
+      confidence: result?.confidence ?? confidenceFor(agent),
+      likeCount: 0,
+      dislikeCount: 0,
+      viewerReaction: null,
+      noveltyAssessment: noveltyAssessment,
+      postingDecision: postingDecision,
+      createdAt
+    };
+
+    entries.push({
+      message,
+      thesisWrite: buildPostThesisWritePlan({
+        message,
+        agent,
+        marketSnapshot,
+        eventId,
+        snapshotId,
+        topicPlan
+      })
+    });
+    runThemeCoverage.set(topicPlan.primary.themeKey, (runThemeCoverage.get(topicPlan.primary.themeKey) || 0) + 1);
+    thisRunPosts.push(message);
+  }
+
+  return entries;
+}
+
+async function generateAgentForumComments({
+  env,
+  agents,
+  posts,
+  marketSnapshot,
+  previousSnapshot,
+  roomId,
+  eventId,
+  discussionPlan,
+  generalHeadlines,
+  sectorHeadlinesByAgentId,
+  priorRoomThreads,
+  snapshotId
+}: {
+  env: Env;
+  agents: Agent[];
+  posts: AgentMessage[];
+  marketSnapshot: MarketSnapshotPayload;
+  previousSnapshot: MarketSnapshotPayload | null;
+  roomId: string;
+  eventId: string;
+  discussionPlan: DiscussionPlan;
+  generalHeadlines: SnapshotHeadline[];
+  sectorHeadlinesByAgentId: Map<string, SnapshotHeadline[]>;
+  priorRoomThreads: AgentDiscussionThread[];
+  snapshotId: string;
+}): Promise<PlannedForumEntry[]> {
+  const orderedAgents = sortAgentsForForum(agents);
+  const commentRoomCoverage = await createRepositories(env).roomCoverage.getByRoomId(roomId);
+  const targetPosts = selectPostsForComments(
+    dedupePostsForComments([...posts, ...priorRoomThreads.map((thread) => thread.post)]),
+    discussionPlan.selectedAgents,
+    3
+  );
+
+  // Each agent may only comment ONCE in this phase — track used responders sequentially.
+  // Using a for-loop (not Promise.all) so each iteration sees the updated exclusion set
+  // before the next responder is picked.
+  const usedResponderIds = new Set<string>(posts.map((p) => p.agentId));
+  const comments: PlannedForumEntry[] = [];
+
+  for (const [index, post] of targetPosts.entries()) {
+    const responder = pickCommentResponder(post, orderedAgents, discussionPlan.selectedAgents, usedResponderIds);
+
+    if (!responder) {
+      continue;
+    }
+
+    // Immediately reserve this agent so no subsequent post in this loop picks them again.
+    usedResponderIds.add(responder.id);
+
+    const commentPurpose = pickCommentPurpose(responder, post);
+    const [knowledgeSnippets, commentDynamicMemory, commentAgentState] = await Promise.all([
+      findRelevantKnowledgeSnippets(
+        env,
+        responder,
+        [
+          post.title || "",
+          post.catalyst || "",
+          post.content,
+          marketSnapshot.headline,
+          ...generalHeadlines.map((headline) => headline.title),
+          ...(sectorHeadlinesByAgentId.get(responder.id) || []).map((headline) => headline.title)
+        ].join("\n"),
+        6
+      ),
+      buildDynamicMemoryContext(env, responder),
+      createRepositories(env).agentState.getByAgentId(responder.id)
+    ]);
+    const commentEval = evaluateCommentTarget({
+      responder,
+      targetPost: post,
+      agentState: commentAgentState,
+      roomCoverage: commentRoomCoverage,
+      agentRecentPosts: await createRepositories(env).messages.listRecentByAgent(responder.id, 4),
+      commentPurpose
+    });
+
+    if (!commentEval.shouldComment) {
+      continue;
+    }
+
+    const result = await requestStructuredForumComment({
+      env,
+      agent: responder,
+      post,
+      marketSnapshot,
+      previousSnapshot,
+      commentPurpose,
+      generalHeadlines,
+      sectorHeadlines: sectorHeadlinesByAgentId.get(responder.id) || [],
+      knowledgeSnippets,
+      dynamicMemory: commentDynamicMemory,
+      agentState: commentAgentState,
+      roomCoverage: commentRoomCoverage
+    });
+
+    const message: AgentMessage = {
+      id: crypto.randomUUID(),
+      roomId,
+      eventId,
+      agentId: responder.id,
+      agentName: responder.name,
+      sector: responder.sector,
+      role: "assistant",
+      messageType: "comment",
+      parentMessageId: post.id,
+      title: null,
+      catalyst: result?.catalyst || commentPurposeLabel(commentPurpose),
+      thesisId: post.thesisId,
+      thesisUpdateId: post.thesisId ? crypto.randomUUID() : null,
+      thesisStatus: post.thesisStatus,
+      thesisTopicPrimary: post.thesisTopicPrimary,
+      thesisTopicSecondary: post.thesisTopicSecondary,
+      content: trimToWordLimit(result?.content || fallbackForumComment(responder, post, marketSnapshot), 140),
+      stance: result?.stance || stanceFor(responder),
+      confidence: result?.confidence ?? confidenceFor(responder),
+      likeCount: 0,
+      dislikeCount: 0,
+      viewerReaction: null,
+      createdAt: offsetTimestamp(posts.length * 3 + index * 2)
+    };
+
+    comments.push({
+      message,
+      thesisWrite: buildCommentThesisWritePlan({
+        message,
+        post,
+        eventId,
+        snapshotId
+      })
+    });
+  }
+
+  return comments;
+}
+
+function selectPostsForComments(posts: AgentMessage[], preferredAgents: Agent[], maxPosts: number): AgentMessage[] {
+  const preferredIds = new Set(preferredAgents.map((agent) => agent.id));
+  const prioritized = [
+    ...posts.filter((post) => preferredIds.has(post.agentId)),
+    ...posts.filter((post) => !preferredIds.has(post.agentId))
+  ];
+  const seen = new Set<string>();
+  const seenThemes = new Set<string>();
+
+  return prioritized.filter((post) => {
+    if (seen.has(post.id)) {
+      return false;
+    }
+
+    const themeKey =
+      post.thesisTopicPrimary ||
+      inferPrimaryThemeKey(post.title || post.catalyst || post.content, post.sector);
+
+    if (seenThemes.has(themeKey)) {
+      return false;
+    }
+
+    seen.add(post.id);
+    seenThemes.add(themeKey);
+    return true;
+  }).slice(0, maxPosts);
+}
+
+function dedupePostsForComments(posts: AgentMessage[]): AgentMessage[] {
+  const seen = new Set<string>();
+
+  return posts.filter((post) => {
+    if (seen.has(post.id)) {
+      return false;
+    }
+
+    seen.add(post.id);
+    return true;
+  });
+}
+
+function buildRoomThemeCoverage(threads: AgentDiscussionThread[]): Map<string, number> {
+  const coverage = new Map<string, number>();
+
+  for (const thread of threads) {
+    const keys = thread.post.thesisTopicPrimary
+      ? [thread.post.thesisTopicPrimary, ...(thread.post.thesisTopicSecondary ? [thread.post.thesisTopicSecondary] : [])]
+      : inferThemeKeysFromText(
+          [thread.post.title, thread.post.catalyst, thread.post.content].filter(Boolean).join(" "),
+          thread.post.sector
+        );
+
+    for (const key of keys) {
+      coverage.set(key, (coverage.get(key) || 0) + 1);
+    }
+  }
+
+  return coverage;
+}
+
+function buildAgentTopicPlan(
+  agent: Agent,
+  marketSnapshot: MarketSnapshotPayload,
+  previousSnapshot: MarketSnapshotPayload | null,
+  recentPosts: AgentMessage[],
+  priorRoomThreads: AgentDiscussionThread[],
+  recentRoomCoverage: Map<string, number>,
+  runThemeCoverage: Map<string, number>,
+  generalHeadlines: SnapshotHeadline[],
+  sectorHeadlines: SnapshotHeadline[],
+  recentTheses: Thesis[],
+  roomCoverage: RoomCoverageState | null
+): AgentTopicPlan {
+  const mergedHeadlines = relevantHeadlinesForAgent(agent, [
+    ...sectorHeadlines,
+    ...generalHeadlines,
+    ...marketSnapshot.headlines
+  ]).slice(0, 10);
+  const candidateMap = new Map<string, ThemeOpportunity>();
+  const recentThemeEntries = recentPosts
+    .map((post) => ({
+      post,
+      themeKey:
+        post.thesisTopicPrimary ||
+        inferPrimaryThemeKey([post.title, post.catalyst, post.content].filter(Boolean).join(" "), agent.sector)
+    }))
+    .slice(0, 4);
+  const recentAgentThemes = recentThemeEntries
+    .map((entry) => entry.themeKey)
+    .filter((theme, index, list) => list.indexOf(theme) === index);
+  const recentRoomThemes = [...recentRoomCoverage.entries()]
+    .sort((left, right) => right[1] - left[1])
+    .map(([theme]) => humanizeThemeKey(theme))
+    .slice(0, 5);
+
+  for (const [index, headline] of mergedHeadlines.entries()) {
+    const themeKey = inferPrimaryThemeKey(headline.title, agent.sector);
+    const baseScore = Math.max(10 - index, 4) + scoreHeadlineForKeywords(headline, sectorKeywordsFor(agent));
+    addThemeOpportunity(candidateMap, themeKey, {
+      themeKey,
+      label: humanizeThemeKey(themeKey),
+      catalyst: `${headline.title} (${headline.source})`,
+      score: adjustOpportunityScore(themeKey, baseScore, recentAgentThemes, recentRoomCoverage, runThemeCoverage, roomCoverage),
+      evidence: [headline.title]
+    });
+  }
+
+  for (const instrument of relevantInstrumentsForAgent(agent, marketSnapshot)) {
+    const themeKey = instrumentThemeKey(agent, instrument.key);
+    const baseScore =
+      4 +
+      Math.max(absolutePercentChangeFor(marketSnapshot, instrument.key), absoluteBpsChangeFor(marketSnapshot, instrument.key) / 4) +
+      (instrument.status === "live" ? 1.5 : 0);
+    addThemeOpportunity(candidateMap, themeKey, {
+      themeKey,
+      label: humanizeThemeKey(themeKey),
+      catalyst: `${instrument.label} ${instrument.value}${instrument.change ? ` (${instrument.change})` : ""}`,
+      score: adjustOpportunityScore(themeKey, baseScore, recentAgentThemes, recentRoomCoverage, runThemeCoverage, roomCoverage),
+      evidence: [`${instrument.label} ${instrument.change || instrument.value}`]
+    });
+  }
+
+  for (const watchlistOpportunity of equityWatchlistThemeOpportunities(agent, mergedHeadlines)) {
+    addThemeOpportunity(candidateMap, watchlistOpportunity.themeKey, {
+      ...watchlistOpportunity,
+      score: adjustOpportunityScore(
+        watchlistOpportunity.themeKey,
+        watchlistOpportunity.score,
+        recentAgentThemes,
+        recentRoomCoverage,
+        runThemeCoverage,
+        roomCoverage
+      )
+    });
+  }
+
+  for (const evergreen of evergreenThemesFor(agent, marketSnapshot, previousSnapshot, priorRoomThreads)) {
+    addThemeOpportunity(candidateMap, evergreen.themeKey, {
+      ...evergreen,
+      score: adjustOpportunityScore(
+        evergreen.themeKey,
+        evergreen.score,
+        recentAgentThemes,
+        recentRoomCoverage,
+        runThemeCoverage,
+        roomCoverage
+      )
+    });
+  }
+
+  const opportunities = [...candidateMap.values()]
+    .sort((left, right) => right.score - left.score)
+    .slice(0, 5);
+
+  const primaryCandidate =
+    choosePrimaryOpportunity(opportunities, recentThemeEntries, agent) ||
+    {
+      themeKey: inferPrimaryThemeKey(agent.sector, agent.sector),
+      label: `${agent.sector} market setup`,
+      catalyst: fallbackCatalyst(agent, marketSnapshot),
+      score: 1,
+      evidence: ["fallback market setup"]
+    };
+  const activeTheses = recentTheses.filter((thesis) =>
+    ["open", "developing", "waiting_for_data", "confirmed", "reopened"].includes(thesis.status)
+  );
+  const matchedFallbackOpportunity = opportunities.find((opportunity) =>
+    Boolean(findBestMatchingThesis(opportunity.themeKey, recentTheses))
+  );
+  const primary =
+    !findBestMatchingThesis(primaryCandidate.themeKey, recentTheses) &&
+    matchedFallbackOpportunity &&
+    activeTheses.length >= 2 &&
+    matchedFallbackOpportunity.score >= primaryCandidate.score - 3
+      ? matchedFallbackOpportunity
+      : primaryCandidate;
+
+  const matchedThesis = findBestMatchingThesis(primary.themeKey, recentTheses);
+  const updateTarget =
+    matchedThesis?.rootMessageId
+      ? { id: matchedThesis.rootMessageId }
+      : recentThemeEntries.find((entry) => entry.themeKey === primary.themeKey)?.post || null;
+  const topRecentThemes = recentThemeEntries.slice(0, 2).map((entry) => entry.themeKey);
+  const isImmediateRepeat = topRecentThemes[0] === primary.themeKey;
+  const isMultiPostRepeat = topRecentThemes.filter((themeKey) => themeKey === primary.themeKey).length >= 2;
+  const hasMeaningfulFreshSignal = checkMeaningfulFreshSignal(agent, sectorHeadlines, previousSnapshot, marketSnapshot);
+  const shouldStaySilent =
+    !matchedThesis &&
+    primary.score <= 0 &&
+    !hasMeaningfulFreshSignal &&
+    recentPosts.length > 0;
+  const shouldUpdateExistingThread =
+    Boolean(matchedThesis || updateTarget) &&
+    (Boolean(matchedThesis) || isImmediateRepeat || isMultiPostRepeat);
+  const thesisStatus = matchedThesis
+    ? nextThesisStatusForUpdate(matchedThesis, hasMeaningfulFreshSignal)
+    : shouldStaySilent
+      ? null
+      : hasMeaningfulFreshSignal
+        ? "open"
+        : "waiting_for_data";
+
+  return {
+    primary,
+    alternates: opportunities.slice(1, 4),
+    recentAgentThemes: recentAgentThemes.map((theme) => humanizeThemeKey(theme)),
+    recentRoomThemes,
+    coveredThemesToAvoid: [
+      ...[...recentRoomCoverage.entries()]
+        .filter(([theme, count]) => count >= 2 && theme !== primary.themeKey)
+        .map(([theme]) => humanizeThemeKey(theme)),
+      ...(roomCoverage?.overcoveredTopics || [])
+        .filter((t) => t !== primary.themeKey)
+        .map((t) => humanizeThemeKey(t))
+    ]
+      .filter((theme, index, list) => list.indexOf(theme) === index)
+      .slice(0, 6),
+    action: shouldStaySilent ? "stay_silent" : shouldUpdateExistingThread ? "thread_update" : "new_post",
+    updateTargetPostId: shouldUpdateExistingThread ? updateTarget?.id || null : null,
+    matchedThesis,
+    thesisStatus,
+    topicPrimaryKey: primary.themeKey,
+    topicSecondaryKey:
+      opportunities.find((opportunity) => opportunity.themeKey !== primary.themeKey)?.themeKey || null,
+    hasMeaningfulFreshSignal
+  };
+}
+
+function checkMeaningfulFreshSignal(
+  agent: Agent,
+  sectorHeadlines: SnapshotHeadline[],
+  previousSnapshot: MarketSnapshotPayload | null,
+  marketSnapshot: MarketSnapshotPayload
+): boolean {
+  return (
+    sectorHeadlines.length > 0 ||
+    buildSectorDeltaSummary(agent, previousSnapshot, marketSnapshot).some(
+      (delta) =>
+        !delta.includes("broadly unchanged") &&
+        !delta.includes("No prior snapshot is available")
+    )
+  );
+}
+
+function flattenThreadPosts(threads: AgentDiscussionThread[]): AgentMessage[] {
+  return threads.flatMap((t) => [t.post, ...t.comments]).slice(0, 12);
+}
+
+function findBestMatchingThesis(themeKey: string, recentTheses: Thesis[]): Thesis | null {
+  const activeStatuses: ThesisStatus[] = ["open", "developing", "waiting_for_data", "confirmed", "reopened"];
+  const matching = recentTheses.filter(
+    (thesis) => thesisMatchesTheme(thesis, themeKey)
+  );
+
+  return (
+    matching.find((thesis) => activeStatuses.includes(thesis.status)) ||
+    matching.find((thesis) => thesis.status === "stale") ||
+    matching.find((thesis) => thesis.status === "invalidated") ||
+    null
+  );
+}
+
+function thesisMatchesTheme(thesis: Thesis, themeKey: string): boolean {
+  const targetFamily = topicFamilyFor(themeKey);
+  return (
+    thesis.topicPrimary === themeKey ||
+    thesis.topicSecondary === themeKey ||
+    topicFamilyFor(thesis.topicPrimary) === targetFamily ||
+    (thesis.topicSecondary ? topicFamilyFor(thesis.topicSecondary) === targetFamily : false)
+  );
+}
+
+function topicFamilyFor(themeKey: string): string {
+  const families: Record<string, string> = {
+    inflation_regime: "macro_policy",
+    policy_path: "macro_policy",
+    real_yields: "macro_policy",
+    duration_pressure: "macro_policy",
+    curve_shape: "macro_policy",
+    treasury_auctions: "macro_policy",
+    labor_growth: "growth_conditions",
+    consumer_demand: "growth_conditions",
+    dollar_path: "fx_liquidity",
+    policy_divergence: "fx_liquidity",
+    carry_em_fx: "fx_liquidity",
+    oil_structure: "energy_complex",
+    gas_power: "energy_complex",
+    metals_growth: "commodity_growth",
+    gold_real_rates: "rates_real_assets",
+    breadth_rotation: "equity_breadth",
+    consumer_equities: "equity_breadth",
+    banks_small_caps: "equity_breadth",
+    sector_defensives: "equity_breadth",
+    ai_concentration: "equity_leadership",
+    market_fragility: "risk_conditions",
+    credit_stress: "risk_conditions",
+    crowding_positioning: "risk_conditions",
+    crypto_speculation: "risk_conditions"
+  };
+
+  return families[themeKey] || themeKey;
+}
+
+function nextThesisStatusForUpdate(thesis: Thesis, hasMeaningfulFreshSignal: boolean): ThesisStatus {
+  if (thesis.status === "stale" || thesis.status === "invalidated") {
+    return "reopened";
+  }
+
+  if (!hasMeaningfulFreshSignal) {
+    return "waiting_for_data";
+  }
+
+  return thesis.status === "confirmed" ? "confirmed" : "developing";
+}
+
+function buildPostThesisWritePlan({
+  message,
+  agent,
+  marketSnapshot,
+  eventId,
+  snapshotId,
+  topicPlan
+}: {
+  message: AgentMessage;
+  agent: Agent;
+  marketSnapshot: MarketSnapshotPayload;
+  eventId: string;
+  snapshotId: string;
+  topicPlan: AgentTopicPlan;
+}): ThesisWritePlan | null {
+  if (!message.thesisId || !message.thesisUpdateId || !topicPlan.thesisStatus) {
+    return null;
+  }
+
+  const update: ThesisUpdate = {
+    id: message.thesisUpdateId,
+    thesisId: message.thesisId,
+    agentId: message.agentId,
+    eventId,
+    snapshotId,
+    messageId: message.id,
+    updateType:
+      topicPlan.action === "thread_update" && topicPlan.thesisStatus === "reopened"
+        ? "reopen"
+        : topicPlan.action === "thread_update"
+          ? "update"
+          : "create",
+    statusBefore: topicPlan.matchedThesis?.status || null,
+    statusAfter: topicPlan.thesisStatus,
+    confidenceBefore: topicPlan.matchedThesis?.confidenceCurrent ?? null,
+    confidenceAfter: message.confidence,
+    summary: summarizeThesisUpdate(message),
+    createdAt: message.createdAt
+  };
+
+  if (topicPlan.action === "thread_update" && topicPlan.matchedThesis) {
+    return {
+      kind: "update",
+      thesisId: topicPlan.matchedThesis.id,
+      status: topicPlan.thesisStatus,
+      confidenceCurrent: message.confidence,
+      latestMessageId: message.id,
+      latestSnapshotId: snapshotId,
+      latestEventId: eventId,
+      topicPrimary: topicPlan.topicPrimaryKey,
+      topicSecondary: topicPlan.topicSecondaryKey,
+      lastUpdatedAt: message.createdAt,
+      update
+    };
+  }
+
+  return {
+    kind: "create",
+    thesis: {
+      id: message.thesisId,
+      roomId: message.roomId,
+      ownerAgentId: message.agentId,
+      ownerAgentName: message.agentName,
+      sector: agent.sector,
+      canonicalClaim: canonicalClaimForMessage(message),
+      title: message.title || fallbackForumTitle(agent, marketSnapshot, topicPlan),
+      topicPrimary: topicPlan.topicPrimaryKey,
+      topicSecondary: topicPlan.topicSecondaryKey,
+      status: topicPlan.thesisStatus,
+      confidenceCurrent: message.confidence,
+      rootMessageId: message.id,
+      latestMessageId: message.id,
+      createdSnapshotId: snapshotId,
+      latestSnapshotId: snapshotId,
+      createdEventId: eventId,
+      latestEventId: eventId,
+      createdAt: message.createdAt,
+      lastUpdatedAt: message.createdAt
+    },
+    update
+  };
+}
+
+function buildCommentThesisWritePlan({
+  message,
+  post,
+  eventId,
+  snapshotId
+}: {
+  message: AgentMessage;
+  post: AgentMessage;
+  eventId: string;
+  snapshotId: string;
+}): ThesisWritePlan | null {
+  if (!message.thesisId || !message.thesisUpdateId) {
+    return null;
+  }
+
+  return {
+    kind: "update",
+    thesisId: message.thesisId,
+    status: post.thesisStatus || "developing",
+    confidenceCurrent: post.confidence,
+    latestMessageId: message.id,
+    latestSnapshotId: snapshotId,
+    latestEventId: eventId,
+    lastUpdatedAt: message.createdAt,
+    update: {
+      id: message.thesisUpdateId,
+      thesisId: message.thesisId,
+      agentId: message.agentId,
+      eventId,
+      snapshotId,
+      messageId: message.id,
+      updateType: "comment",
+      statusBefore: post.thesisStatus,
+      statusAfter: post.thesisStatus,
+      confidenceBefore: post.confidence,
+      confidenceAfter: post.confidence,
+      summary: summarizeThesisUpdate(message),
+      createdAt: message.createdAt
+    }
+  };
+}
+
+function canonicalClaimForMessage(message: AgentMessage): string {
+  const firstSentence = message.content
+    .replace(/\s+/g, " ")
+    .split(/(?<=[.!?])\s+/)[0]
+    ?.trim();
+
+  return truncateText(firstSentence || message.content, 220);
+}
+
+function summarizeThesisUpdate(message: AgentMessage): string {
+  return truncateText(
+    [message.title, message.catalyst, message.content].filter(Boolean).join(" | "),
+    260
+  );
+}
+
+function addThemeOpportunity(
+  candidateMap: Map<string, ThemeOpportunity>,
+  themeKey: string,
+  opportunity: ThemeOpportunity
+) {
+  const existing = candidateMap.get(themeKey);
+
+  if (!existing) {
+    candidateMap.set(themeKey, opportunity);
+    return;
+  }
+
+  candidateMap.set(themeKey, {
+    ...existing,
+    score: Math.max(existing.score, opportunity.score),
+    catalyst: existing.score >= opportunity.score ? existing.catalyst : opportunity.catalyst,
+    evidence: [...new Set([...existing.evidence, ...opportunity.evidence])].slice(0, 3)
+  });
+}
+
+function adjustOpportunityScore(
+  themeKey: string,
+  baseScore: number,
+  recentAgentThemes: string[],
+  recentRoomCoverage: Map<string, number>,
+  runThemeCoverage: Map<string, number>,
+  roomCoverage: RoomCoverageState | null
+): number {
+  const personalPenalty = recentAgentThemes.includes(themeKey) ? 8 : 0;
+  const roomPenalty = (recentRoomCoverage.get(themeKey) || 0) * 2.5;
+  const currentRunPenalty = (runThemeCoverage.get(themeKey) || 0) * 4;
+  const noveltyBonus = !recentAgentThemes.includes(themeKey) && !recentRoomCoverage.has(themeKey) ? 2.5 : 0;
+  const persistentOvercoveredPenalty = roomCoverage?.overcoveredTopics.includes(themeKey) ? 3 : 0;
+  const undercoveredBonus = roomCoverage?.undercoveredTopics.includes(themeKey) ? 4 : 0;
+  const unresolvedBonus = roomCoverage?.unresolvedMajorThemes.some((t) => t.topicPrimary === themeKey) ? 2 : 0;
+  return baseScore - personalPenalty - roomPenalty - currentRunPenalty + noveltyBonus - persistentOvercoveredPenalty + undercoveredBonus + unresolvedBonus;
+}
+
+function sectorKeywordsFor(agent: Agent): string[] {
+  const keywordsBySector: Record<string, string[]> = {
+    Macro: ["fed", "inflation", "jobs", "cpi", "payroll", "growth", "retail", "consumer", "yield", "policy"],
+    Rates: ["yield", "treasury", "bond", "curve", "breakeven", "auction", "fed"],
+    FX: ["dollar", "fx", "currency", "euro", "yen", "carry", "em", "funding"],
+    Equities: ["stock", "equity", "earnings", "ai", "semiconductor", "bank", "small-cap", "sector", "breadth"],
+    Commodities: ["oil", "wti", "brent", "gas", "gold", "copper", "metal", "inventory", "opec"],
+    "Risk/Sentiment": ["risk", "volatility", "credit", "spread", "fragile", "positioning", "selloff", "bitcoin"]
+  };
+
+  return keywordsBySector[agent.sector] || [];
+}
+
+function equityWatchlistThemeOpportunities(
+  agent: Agent,
+  headlines: SnapshotHeadline[]
+): ThemeOpportunity[] {
+  if (agent.sector !== "Equities") {
+    return [];
+  }
+
+  const mappings = [
+    {
+      themeKey: "ai_concentration",
+      label: "AI concentration",
+      catalyst: "AI leadership and semiconductor concentration",
+      score: 9,
+      pattern: /\bnvda\b|\bnvidia\b|\bmsft\b|\bmicrosoft\b|\bsemiconductor\b|\bsmh\b|\bxlk\b|\bai\b/i
+    },
+    {
+      themeKey: "banks_small_caps",
+      label: "banks and small caps",
+      catalyst: "banks and small-cap participation",
+      score: 8.5,
+      pattern: /\bjpm\b|\bjpmorgan\b|\bbank\b|\bfinancial\b|\bxlf\b|\bkre\b|\biwm\b|\bsmall cap\b/i
+    },
+    {
+      themeKey: "consumer_equities",
+      label: "consumer equities",
+      catalyst: "consumer-facing sector rotation",
+      score: 8,
+      pattern: /\bconsumer\b|\bretail\b|\bxly\b|\bxlp\b|\bstaples\b|\bdiscretionary\b/i
+    },
+    {
+      themeKey: "breadth_rotation",
+      label: "breadth and rotation",
+      catalyst: "equal-weight versus cap-weight breadth",
+      score: 8.5,
+      pattern: /\brsp\b|\bequal[- ]weight\b|\bbreadth\b|\bparticipation\b|\brotation\b/i
+    },
+    {
+      themeKey: "sector_defensives",
+      label: "defensives versus cyclicals",
+      catalyst: "defensive sector rotation",
+      score: 7.5,
+      pattern: /\bxlv\b|\bxlu\b|\bdefensive\b|\butilities\b|\bhealthcare\b/i
+    }
+  ];
+
+  const opportunities: ThemeOpportunity[] = [];
+
+  for (const headline of headlines) {
+    for (const mapping of mappings) {
+      if (!mapping.pattern.test(headline.title)) {
+        continue;
+      }
+
+      opportunities.push({
+        themeKey: mapping.themeKey,
+        label: mapping.label,
+        catalyst: `${headline.title} (${headline.source})`,
+        score: mapping.score,
+        evidence: [headline.title]
+      });
+    }
+  }
+
+  return opportunities;
+}
+
+function choosePrimaryOpportunity(
+  opportunities: ThemeOpportunity[],
+  recentThemeEntries: Array<{ post: AgentMessage; themeKey: string }>,
+  agent: Agent
+): ThemeOpportunity | null {
+  if (opportunities.length === 0) {
+    return null;
+  }
+
+  const mostRecentTheme = recentThemeEntries[0]?.themeKey;
+  const freshAlternative = opportunities.find((opportunity) => opportunity.themeKey !== mostRecentTheme);
+  const forceRotateSectors = new Set(["Equities", "Commodities", "FX", "Risk/Sentiment"]);
+
+  if (
+    freshAlternative &&
+    mostRecentTheme &&
+    forceRotateSectors.has(agent.sector) &&
+    freshAlternative.themeKey !== mostRecentTheme
+  ) {
+    return freshAlternative;
+  }
+
+  if (freshAlternative && freshAlternative.score >= (opportunities[0]?.score ?? 0) - 2.5) {
+    return freshAlternative;
+  }
+
+  return opportunities[0];
+}
+
+function evergreenThemesFor(
+  agent: Agent,
+  marketSnapshot: MarketSnapshotPayload,
+  previousSnapshot: MarketSnapshotPayload | null,
+  priorRoomThreads: AgentDiscussionThread[]
+): ThemeOpportunity[] {
+  const defaults: Record<string, Array<{ key: string; catalyst: string }>> = {
+    Macro: [
+      { key: "inflation_regime", catalyst: "Inflation and real-yield regime" },
+      { key: "labor_growth", catalyst: "Labor and growth pulse" },
+      { key: "policy_path", catalyst: "Fed path and policy restraint" },
+      { key: "consumer_demand", catalyst: "Consumer and retail demand" }
+    ],
+    Rates: [
+      { key: "curve_shape", catalyst: "Curve shape and front-end repricing" },
+      { key: "duration_pressure", catalyst: "Duration pressure and term premium" },
+      { key: "treasury_auctions", catalyst: "Treasury supply and auction tone" }
+    ],
+    FX: [
+      { key: "dollar_path", catalyst: "Dollar path and funding conditions" },
+      { key: "policy_divergence", catalyst: "Policy divergence across major currencies" },
+      { key: "carry_em_fx", catalyst: "Carry and EM FX fragility" }
+    ],
+    Equities: [
+      { key: "breadth_rotation", catalyst: "Breadth and sector rotation" },
+      { key: "ai_concentration", catalyst: "AI leadership and concentration risk" },
+      { key: "banks_small_caps", catalyst: "Banks and small-cap participation" },
+      { key: "consumer_equities", catalyst: "Consumer-sensitive equities" },
+      { key: "sector_defensives", catalyst: "Defensives versus cyclicals" }
+    ],
+    Commodities: [
+      { key: "oil_structure", catalyst: "Oil structure and inventory confirmation" },
+      { key: "gas_power", catalyst: "Gas and power-market stress" },
+      { key: "metals_growth", catalyst: "Copper/metals and growth read-through" },
+      { key: "gold_real_rates", catalyst: "Gold vs real yields" }
+    ],
+    "Risk/Sentiment": [
+      { key: "market_fragility", catalyst: "Tape fragility and narrow leadership" },
+      { key: "credit_stress", catalyst: "Credit stress and follow-through" },
+      { key: "crypto_speculation", catalyst: "Crypto and speculative appetite" },
+      { key: "crowding_positioning", catalyst: "Crowding and positioning risk" }
+    ]
+  };
+
+  const priorThreadText = priorRoomThreads
+    .slice(0, 8)
+    .map((thread) => [thread.post.title, thread.post.catalyst, thread.post.content].filter(Boolean).join(" "))
+    .join(" \n");
+  const deltas = buildSectorDeltaSummary(agent, previousSnapshot, marketSnapshot).join(" ");
+
+  return (defaults[agent.sector] || []).map((item, index) => ({
+    themeKey: item.key,
+    label: humanizeThemeKey(item.key),
+    catalyst: item.catalyst,
+    score: (priorThreadText.toLowerCase().includes(item.catalyst.toLowerCase()) ? 1.5 : 3.5) + Math.max(0, 3 - index) + (deltas.includes("newly tracked") ? 1 : 0),
+    evidence: [item.catalyst]
+  }));
+}
+
+function instrumentThemeKey(agent: Agent, instrumentKey: string): string {
+  const instrumentThemes: Record<string, string> = {
+    sp500: agent.sector === "Equities" ? "breadth_rotation" : "market_fragility",
+    nasdaq: agent.sector === "Equities" ? "ai_concentration" : "duration_pressure",
+    us10y: agent.sector === "Rates" ? "duration_pressure" : "real_yields",
+    dxy: agent.sector === "FX" ? "dollar_path" : "policy_divergence",
+    wti: "oil_structure",
+    brent: "oil_structure",
+    natural_gas: "gas_power",
+    copper: "metals_growth",
+    gold: agent.sector === "Risk/Sentiment" ? "crowding_positioning" : "gold_real_rates"
+  };
+
+  return instrumentThemes[instrumentKey] || inferPrimaryThemeKey(instrumentKey, agent.sector);
+}
+
+function inferPrimaryThemeKey(text: string, sector?: string): string {
+  return inferThemeKeysFromText(text, sector)[0] || "cross_asset_setup";
+}
+
+function inferThemeKeysFromText(text: string, sector?: string): string[] {
+  const normalized = text.toLowerCase();
+  const matches: string[] = [];
+  const themeMatchers: Array<[string, RegExp]> = [
+    ["inflation_regime", /\bcpi\b|\binflation\b|\bpce\b|\bprice(s)?\b/],
+    ["labor_growth", /\bpayroll\b|\bjobs\b|\bunemployment\b|\bnfp\b|\blabor\b/],
+    ["policy_path", /\bfed\b|\bcentral bank\b|\bfomc\b|\bpolicy\b/],
+    ["real_yields", /\breal yield\b|\b10y\b|\byield\b|\btreasury\b/],
+    ["curve_shape", /\bcurve\b|\b2s10s\b|\bsteepen|\bflatten/],
+    ["treasury_auctions", /\bauction\b|\btreasury supply\b/],
+    ["dollar_path", /\bdollar\b|\bdxy\b|\bfx\b|\bcurrency\b/],
+    ["policy_divergence", /\bpolicy divergence\b|\brate differential\b|\bcarry\b|\bem\b/],
+    ["oil_structure", /\boil\b|\bwti\b|\bbrent\b|\bcrude\b|\bopec\b/],
+    ["gas_power", /\bnatural gas\b|\blng\b|\bgas\b|\bpower\b/],
+    ["metals_growth", /\bcopper\b|\bmetal\b|\bmining\b/],
+    ["gold_real_rates", /\bgold\b/],
+    ["breadth_rotation", /\bbreadth\b|\bsector rotation\b|\bequal-weight\b|\bparticipation\b/],
+    ["ai_concentration", /\bai\b|\bsemiconductor\b|\bchip\b|\bnvidia\b|\bconcentration\b/],
+    ["banks_small_caps", /\bbank\b|\bfinancial\b|\bsmall cap\b|\biwm\b/],
+    ["consumer_equities", /\bconsumer\b|\bretail\b|\bdiscretionary\b|\bstaples\b|\bxly\b|\bxlp\b/],
+    ["sector_defensives", /\bdefensive\b|\butilities\b|\bhealthcare\b|\bxlv\b|\bxlu\b/],
+    ["market_fragility", /\bfragile\b|\bfollow-through\b|\btape\b|\brisk\b|\bselloff\b/],
+    ["credit_stress", /\bcredit\b|\bspread\b|\bhy\b|\bcds\b/],
+    ["crypto_speculation", /\bbitcoin\b|\bcrypto\b/],
+    ["crowding_positioning", /\bcrowd(ed|ing)\b|\bpositioning\b|\bde-?risk\b/]
+  ];
+
+  for (const [themeKey, pattern] of themeMatchers) {
+    if (pattern.test(normalized)) {
+      matches.push(themeKey);
+    }
+  }
+
+  if (matches.length === 0 && sector) {
+    switch (sector) {
+      case "Macro":
+        matches.push("policy_path");
+        break;
+      case "Rates":
+        matches.push("duration_pressure");
+        break;
+      case "FX":
+        matches.push("dollar_path");
+        break;
+      case "Equities":
+        matches.push("breadth_rotation");
+        break;
+      case "Commodities":
+        matches.push("oil_structure");
+        break;
+      case "Risk/Sentiment":
+        matches.push("market_fragility");
+        break;
+      default:
+        matches.push("cross_asset_setup");
+    }
+  }
+
+  return matches.filter((value, index, list) => list.indexOf(value) === index);
+}
+
+function humanizeThemeKey(themeKey: string): string {
+  const labels: Record<string, string> = {
+    inflation_regime: "inflation regime",
+    labor_growth: "labor and growth",
+    policy_path: "policy path",
+    real_yields: "real yields",
+    duration_pressure: "duration pressure",
+    curve_shape: "curve shape",
+    treasury_auctions: "Treasury auctions",
+    dollar_path: "dollar path",
+    policy_divergence: "policy divergence",
+    carry_em_fx: "carry and EM FX",
+    oil_structure: "oil structure",
+    gas_power: "gas and power",
+    metals_growth: "metals and growth",
+    gold_real_rates: "gold vs real yields",
+    breadth_rotation: "breadth and rotation",
+    ai_concentration: "AI concentration",
+    banks_small_caps: "banks and small caps",
+    consumer_equities: "consumer equities",
+    sector_defensives: "defensives versus cyclicals",
+    consumer_demand: "consumer demand",
+    market_fragility: "market fragility",
+    credit_stress: "credit stress",
+    crypto_speculation: "crypto speculation",
+    crowding_positioning: "crowding and positioning",
+    cross_asset_setup: "cross-asset setup"
+  };
+
+  return labels[themeKey] || themeKey.replace(/_/g, " ");
+}
+
+function pickCommentPurpose(responder: Agent, post: AgentMessage): CommentPurpose {
+  const postText = `${post.title || ""} ${post.content} ${post.catalyst || ""}`.toLowerCase();
+
+  // Risk/Sentiment: challenge signal quality or narrow scope
+  if (responder.sector === "Risk/Sentiment") {
+    return /significant|major|large|sharp|dramatic|clear|certain|confirmed/i.test(postText)
+      ? "narrow_the_signal"
+      : "call_out_noise";
+  }
+
+  // Cross-sector: FX or Macro → translate spillover
+  if ((responder.sector === "FX" || responder.sector === "Macro") && post.sector !== responder.sector) {
+    return "add_cross_asset_spillover";
+  }
+
+  // Rates agent on a post with rate/yield content → add confirmation signal
+  if (responder.sector === "Rates" && /yield|treasury|bond|rate|bps|duration|curve/i.test(postText)) {
+    return "ask_for_confirmation_signal";
+  }
+
+  // Commodities cross-sector → historical analog (commodities has strong playbook memory)
+  if (responder.sector === "Commodities" && post.sector !== "Commodities") {
+    return "add_historical_analog";
+  }
+
+  // Same sector: check if thesis already exists on same topic → confirm it
+  if (responder.sector === post.sector) {
+    if (post.thesisId && /strong|confirmed|playing\s+out|materializ/i.test(postText)) {
+      return "confirm_existing_thesis";
+    }
+    // Post makes a large directional claim → challenge impact magnitude
+    if (/significant|major|large|sharp|dramatic/i.test(postText)) {
+      return "disagree_on_market_impact";
+    }
+    return "agree_and_extend";
+  }
+
+  // Cross-sector without specific mapping → challenge the mechanism
+  return "disagree_on_mechanism";
+}
+
+function commentPurposeDescription(purpose: CommentPurpose, agent: Agent, post: AgentMessage): string {
+  switch (purpose) {
+    // Legacy
+    case "disagreement":
+      return `${agent.name} should challenge the weak point in ${post.agentName}'s thesis with a concrete sector reason. Name the specific mechanism step that is wrong and explain why.`;
+    case "cross_asset_translation":
+      return `${agent.name} should translate ${post.agentName}'s thesis into ${agent.sector} market consequences. Name the specific asset that moves and through what channel.`;
+    case "missing_data_point":
+      return `${agent.name} should add the missing datapoint or market confirmation needed before trusting the thesis. Name the specific indicator to watch.`;
+    case "historical_analog":
+      return `${agent.name} should bring in a historical analog with a specific date and event that sharpens the current thread. Say what that episode predicted and whether it played out.`;
+    case "invalidation_warning":
+      return `${agent.name} should spell out what could invalidate the thesis and what specific fragility signal to watch.`;
+    case "agreement_with_extension":
+      return `${agent.name} should extend the thesis with one materially new angle from ${agent.sector} that the post did not address.`;
+    // Expanded taxonomy
+    case "agree_and_extend":
+      return `${agent.name} agrees with ${post.agentName}'s direction but must add ONE specific mechanism or data point the post missed — not just restate the thesis.`;
+    case "disagree_on_mechanism":
+      return `${agent.name} should identify the SPECIFIC step in ${post.agentName}'s transmission chain that breaks. Name the broken link and explain the correct mechanism.`;
+    case "disagree_on_market_impact":
+      return `${agent.name} should challenge the SIZE or DIRECTION of the market impact claimed by ${post.agentName}. Use a specific datapoint or historical size comparison.`;
+    case "add_cross_asset_spillover":
+      return `${agent.name} should name the SPECIFIC asset outside ${post.sector} that is affected and explain the exact transmission channel (e.g., dollar → EM debt → commodity demand).`;
+    case "add_historical_analog":
+      return `${agent.name} should name a SPECIFIC historical date/event that is analogous. State what that episode predicted, whether it played out, and why the current setup is similar or different.`;
+    case "narrow_the_signal":
+      return `${agent.name} should explain why ${post.agentName}'s thesis is directionally correct but too broad. Name the specific condition that makes this signal real versus noise.`;
+    case "call_out_noise":
+      return `${agent.name} should explain WHY this headline or catalyst is not a real market signal. Name the specific confirming data point that would make it actionable — and note that it is currently absent.`;
+    case "ask_for_confirmation_signal":
+      return `${agent.name} should name the ONE specific data point or market event that would confirm ${post.agentName}'s thesis — and explain what to do if it does not arrive.`;
+    case "confirm_existing_thesis":
+    default:
+      return `${agent.name} should add fresh corroborating evidence to ${post.agentName}'s existing thesis. Name the specific new data point or event that has confirmed the thesis since it was written.`;
+  }
+}
+
+function commentPurposeMustAdd(purpose: CommentPurpose): string {
+  switch (purpose) {
+    case "disagree_on_mechanism":   return "the specific broken link in the mechanism chain, with a correction";
+    case "disagree_on_market_impact": return "a specific size or direction comparison using data";
+    case "add_cross_asset_spillover": return "a named asset outside the original sector + the transmission path";
+    case "add_historical_analog":   return "a specific date, event, and outcome — not a vague 'this reminds me of'";
+    case "narrow_the_signal":       return "the one specific condition that separates signal from noise here";
+    case "call_out_noise":          return "the specific confirming data that is absent and would make this real";
+    case "ask_for_confirmation_signal": return "a single named indicator and the threshold that matters";
+    case "confirm_existing_thesis": return "a new piece of evidence that was not available when the thesis was written";
+    case "agree_and_extend":        return "one specific mechanism or implication the original post did not mention";
+    default:                        return "one specific new angle not already in the post";
+  }
+}
+
+function commentPurposeMustAvoid(purpose: CommentPurpose): string {
+  switch (purpose) {
+    case "disagree_on_mechanism":   return "vague disagreement without naming the broken step; 'I'm not sure about this' type phrases";
+    case "disagree_on_market_impact": return "directional agreement while only quibbling on magnitude without data";
+    case "add_cross_asset_spillover": return "mentioning cross-asset without naming the specific transmission channel";
+    case "add_historical_analog":   return "vague historical references without dates or outcomes; 'this is like 2008' without specifics";
+    case "narrow_the_signal":       return "just saying 'it's too early to know' without naming the condition to watch";
+    case "call_out_noise":          return "generic skepticism; 'this doesn't matter' without explaining what would make it matter";
+    case "ask_for_confirmation_signal": return "open-ended hedging; a list of 3+ things to watch instead of one specific signal";
+    case "confirm_existing_thesis": return "restating the thesis without adding new corroborating evidence";
+    case "agree_and_extend":        return "opening with 'great point' or restating the post thesis before adding an angle";
+    default:                        return "restating the original post's main thesis without adding new content";
+  }
+}
+
+function commentPurposeLabel(purpose: CommentPurpose): string {
+  const labels: Record<CommentPurpose, string> = {
+    disagreement: "challenge the thesis",
+    cross_asset_translation: "cross-asset translation",
+    missing_data_point: "missing datapoint",
+    historical_analog: "historical analog",
+    invalidation_warning: "invalidation warning",
+    agreement_with_extension: "extend the thesis",
+    agree_and_extend: "extend the thesis",
+    disagree_on_mechanism: "challenge the mechanism",
+    disagree_on_market_impact: "challenge the impact size",
+    add_cross_asset_spillover: "cross-asset spillover",
+    add_historical_analog: "historical analog",
+    narrow_the_signal: "narrow the signal",
+    call_out_noise: "call out noise",
+    ask_for_confirmation_signal: "ask for confirmation signal",
+    confirm_existing_thesis: "confirm existing thesis"
+  };
+
+  return labels[purpose] || purpose;
+}
+
+async function requestStructuredForumPost({
+  env,
+  agent,
+  marketSnapshot,
+  previousSnapshot,
+  discussionPlan,
+  topicPlan,
+  recentPosts,
+  relevantCases,
+  knowledgeSnippets,
+  generalHeadlines,
+  sectorHeadlines,
+  priorRoomThreads,
+  dynamicMemory,
+  agentState,
+  roomCoverage,
+  thisRunPosts,
+  headlineAnalysis
+}: {
+  env: Env;
+  agent: Agent;
+  marketSnapshot: MarketSnapshotPayload;
+  previousSnapshot: MarketSnapshotPayload | null;
+  discussionPlan: DiscussionPlan;
+  topicPlan: AgentTopicPlan;
+  recentPosts: AgentMessage[];
+  relevantCases: import("@market-room/shared").MarketCase[];
+  knowledgeSnippets: LocalKnowledgeSnippet[];
+  generalHeadlines: SnapshotHeadline[];
+  sectorHeadlines: SnapshotHeadline[];
+  priorRoomThreads: AgentDiscussionThread[];
+  dynamicMemory: DynamicMemoryContext;
+  agentState: AgentBehavioralSummary | null;
+  roomCoverage: RoomCoverageState | null;
+  /** Posts already published in this same discussion run — used to prevent echo between agents. */
+  thisRunPosts: AgentMessage[];
+  /** Pre-computed headline analysis for the top candidate headline. */
+  headlineAnalysis: HeadlineAnalysis | null;
+}): Promise<{
+  title?: string;
+  content?: string;
+  stance?: string;
+  confidence?: number;
+  catalyst?: string;
+} | null> {
+  if (!isLlmConfigured(env)) {
+    return null;
+  }
+
+  try {
+    const payload = await generateGeminiContent(env, {
+      model: getLlmModel(env),
+      instructions: [
+        buildAgentInstructions(agent),
+        "Write a standalone forum post, not a reply.",
+        "Make it read like a real market specialist posting in a live internal forum, not a polished strategy memo.",
+        "Aim for roughly 170 to 280 words in 2 to 4 short paragraphs.",
+        "Do not start with 'Hypothesis', 'Base case', 'Trade implication', 'Biggest driver', 'Main risk', or similar section labels.",
+        "Do not repeat your most recent post. If little changed, call it a smaller update and explain the delta in plain language.",
+        "Lead with the catalyst or market move that matters most to your sector — not the room's broad macro theme unless macro IS your sector.",
+        "Your post must open with a sector-specific observation, not a generic market statement that any agent could write.",
+        "Prefer the uncovered topic inventory provided to you over the room's most repeated theme.",
+        "Use the latest headlines, approved long-term memory snippets, and the previous snapshot delta to form a fresh view.",
+        "Make the writing feel human, specific, and conversationally sharp.",
+        // Hard analytical structure rules
+        [
+          "HARD RULES — VIOLATING ANY OF THESE MAKES YOUR POST WORTHLESS:",
+          "1. Your post MUST be specifically about the named PRIMARY HEADLINE in the prompt — do NOT generalize it into a generic sector theme.",
+          "   Example: a 'Fed SLR exemption' headline must produce a post about SLR mechanics and Treasury demand — not a generic 'Fed policy is supportive' post.",
+          "   Example: a natural-gas storage print must name the storage level vs. expectations and the forward curve implication — not generic 'inflationary pressure'.",
+          "2. Your post MUST explain the transmission mechanism — the specific path from event → market impact → what it means for your sector.",
+          "3. Your post MUST state what specifically CHANGED vs. the prior state or prior thesis (not just that 'conditions evolved').",
+          "4. Your post MUST name what to watch next — ONE specific indicator, level, or event that will confirm or invalidate.",
+          "5. BANNED PHRASES — never write any of these:",
+          "   - 'broadly similar to the previous snapshot'",
+          "   - 'this only matters if it transmits into'",
+          "   - 'broadly constructive backdrop'",
+          "   - 'cautiously optimistic'",
+          "   - 'look for a refreshed angle'",
+          "   - 'consistent with the broader narrative'",
+          "   - 'in line with market expectations'",
+          "   - 'the market is pricing in' (without naming the specific mechanism)",
+          "   - Any sentence starting 'As a [sector] specialist, I see...' without a specific new observation."
+        ].join("\n"),
+        thisRunPosts.length > 0
+          ? `CRITICAL — these angles are already covered by other agents this session. Do NOT echo them. Take a genuinely different angle:\n${thisRunPosts.map((p) => `• ${p.agentName} (${p.sector}): "${p.title || "Untitled"}" — ${truncateText(p.content, 90)}`).join("\n")}`
+          : "",
+        `OUTPUT FORMAT: Return a single JSON object (no markdown fences). Required keys: title (string), catalyst (string), content (string, 170-280 words), stance (one of: bullish|bearish|neutral|cautious|selective|alert|disciplined|watchful), confidence (number 0.0-1.0).`
+      ].filter(Boolean).join("\n"),
+      prompt: buildForumPostPrompt(
+        agent,
+        marketSnapshot,
+        previousSnapshot,
+        discussionPlan,
+        topicPlan,
+        recentPosts,
+        relevantCases,
+        knowledgeSnippets,
+        generalHeadlines,
+        sectorHeadlines,
+        priorRoomThreads,
+        dynamicMemory,
+        agentState,
+        roomCoverage,
+        thisRunPosts,
+        headlineAnalysis
+      ),
+      // Gemma 4 / Gemini 2.5 count thinking tokens + output tokens against maxOutputTokens together.
+      // With ~600-1200 thinking tokens per call, we need a generous budget for the actual post.
+      maxOutputTokens: 3000,
+      temperature: 0.72,
+      responseJson: true  // JSON mime type without schema — avoids schema-truncation bugs
+    });
+
+    return parseStructuredResponseJson<{
+      title?: string;
+      content?: string;
+      stance?: string;
+      confidence?: number;
+      catalyst?: string;
+    }>(payload);
+  } catch {
+    return null;
+  }
+}
+
+async function requestStructuredForumComment({
+  env,
+  agent,
+  post,
+  marketSnapshot,
+  previousSnapshot,
+  commentPurpose,
+  generalHeadlines,
+  sectorHeadlines,
+  knowledgeSnippets,
+  dynamicMemory,
+  agentState,
+  roomCoverage
+}: {
+  env: Env;
+  agent: Agent;
+  post: AgentMessage;
+  marketSnapshot: MarketSnapshotPayload;
+  previousSnapshot: MarketSnapshotPayload | null;
+  commentPurpose: CommentPurpose;
+  generalHeadlines: SnapshotHeadline[];
+  sectorHeadlines: SnapshotHeadline[];
+  knowledgeSnippets: LocalKnowledgeSnippet[];
+  dynamicMemory: DynamicMemoryContext;
+  agentState: AgentBehavioralSummary | null;
+  roomCoverage: RoomCoverageState | null;
+}): Promise<{
+  content?: string;
+  stance?: string;
+  confidence?: number;
+  catalyst?: string;
+} | null> {
+  if (!isLlmConfigured(env)) {
+    return null;
+  }
+
+  try {
+    const payload = await generateGeminiContent(env, {
+      model: getLlmModel(env),
+      instructions: [
+        buildAgentInstructions(agent),
+        "Write a targeted forum comment under 110 words.",
+        "React to the post directly with a specific new fact, mechanism, or challenge — not a restatement.",
+        "Your comment job and what it MUST add are stated explicitly in the prompt — follow both exactly.",
+        "Use approved long-term memory snippets only when they provide a concrete historical or data reference.",
+        "Sound like a fast market reply — specific, sharp, one new angle only.",
+        "BANNED: opening with 'great point', 'I agree', or any restatement of the post thesis before adding your contribution.",
+        "BANNED: vague hedges like 'it's too early to know', 'this is uncertain', or 'we'll need to watch'.",
+        "BANNED: listing 3 or more things to watch — name ONE specific indicator, level, or event.",
+        `OUTPUT FORMAT: Return a single JSON object (no markdown fences). Required keys: catalyst (string), content (string, under 110 words), stance (one of: bullish|bearish|neutral|cautious|selective|alert|disciplined|watchful), confidence (number 0.0-1.0).`
+      ].join("\n"),
+      prompt: buildForumCommentPrompt(
+        agent,
+        post,
+        marketSnapshot,
+        previousSnapshot,
+        commentPurpose,
+        generalHeadlines,
+        sectorHeadlines,
+        knowledgeSnippets,
+        dynamicMemory,
+        agentState,
+        roomCoverage
+      ),
+      maxOutputTokens: 1200,  // thinking + output budget combined for Gemma 4 / Gemini 2.5
+      temperature: 0.60,
+      responseJson: true  // JSON mime type without schema — avoids schema-truncation bugs
+    });
+
+    return parseStructuredResponseJson<{
+      content?: string;
+      stance?: string;
+      confidence?: number;
+      catalyst?: string;
+    }>(payload);
+  } catch {
+    return null;
+  }
+}
+
+function buildForumPostPrompt(
+  agent: Agent,
+  marketSnapshot: MarketSnapshotPayload,
+  previousSnapshot: MarketSnapshotPayload | null,
+  discussionPlan: DiscussionPlan,
+  topicPlan: AgentTopicPlan,
+  recentPosts: AgentMessage[],
+  relevantCases: import("@market-room/shared").MarketCase[],
+  knowledgeSnippets: LocalKnowledgeSnippet[],
+  generalHeadlines: SnapshotHeadline[],
+  sectorHeadlines: SnapshotHeadline[],
+  priorRoomThreads: AgentDiscussionThread[],
+  dynamicMemory: DynamicMemoryContext,
+  agentState: AgentBehavioralSummary | null,
+  roomCoverage: RoomCoverageState | null,
+  thisRunPosts: AgentMessage[] = [],
+  headlineAnalysis: HeadlineAnalysis | null = null
+): string {
+  const availableInstruments = relevantInstrumentsForAgent(agent, marketSnapshot);
+  const mergedHeadlines = relevantHeadlinesForAgent(agent, [
+    ...sectorHeadlines,
+    ...generalHeadlines,
+    ...marketSnapshot.headlines
+  ]).slice(0, 6);
+  const postType = postStyleFor(agent, marketSnapshot, previousSnapshot, mergedHeadlines);
+  const ownedCatalystGuard = mainCatalystGuardFor(agent, mergedHeadlines, availableInstruments);
+  const sectorDeltaSummary = buildSectorDeltaSummary(agent, previousSnapshot, marketSnapshot);
+
+  // Build the primary headline analysis block (shown at top when analysis is available)
+  const primaryHeadlineBlock: string[] = [];
+  if (headlineAnalysis && headlineAnalysis.market_signal_strength !== "noise") {
+    primaryHeadlineBlock.push(
+      "=== PRIMARY HEADLINE — YOUR POST MUST BE SPECIFICALLY ABOUT THIS ===",
+      `"${headlineAnalysis.headline_title}"`,
+      `Type: ${headlineAnalysis.headline_type} | Signal: ${headlineAnalysis.market_signal_strength} | New information: ${headlineAnalysis.is_new_information ? "yes" : "no"}`,
+      (() => {
+        // Inject article description when present so the agent can "read the article"
+        const matchedHeadline = sectorHeadlines.find((h) => h.title === headlineAnalysis.headline_title);
+        return matchedHeadline?.description
+          ? `\nArticle context (read this — it is the source material your post must be grounded in):\n"${matchedHeadline.description}"\n`
+          : "";
+      })(),
+      headlineAnalysis.primary_mechanism
+        ? `Transmission mechanism: ${headlineAnalysis.primary_mechanism}`
+        : "Mechanism: unclear — explain what you think the correct mechanism is, or route to a comment instead of a top-level post.",
+      headlineAnalysis.affected_assets.length > 0
+        ? `Affected instruments: ${headlineAnalysis.affected_assets.join(", ")}`
+        : "",
+      headlineAnalysis.what_changed
+        ? `What changed: ${headlineAnalysis.what_changed}`
+        : "",
+      headlineAnalysis.historical_analog_candidate
+        ? `Historical analog hint: ${headlineAnalysis.historical_analog_candidate}`
+        : "",
+      "",
+      "YOUR POST MUST ANSWER ALL FIVE (in your own words, not as labelled sections):",
+      "1. WHAT HAPPENED — state the specific event from the headline above, not a generalised version",
+      "2. WHY IT MATTERS NOW — explain why this is material at this precise moment",
+      "3. THROUGH WHAT MECHANISM — name the exact transmission channel to your sector",
+      "4. WHAT CHANGED — say specifically what is different vs. the prior state or your prior thesis",
+      "5. WHAT TO WATCH NEXT — name ONE specific indicator, level, or event that would confirm or invalidate",
+      "=== END PRIMARY HEADLINE ==="
+    );
+  }
+
+  return [
+    `Agent: ${agent.name} (${agent.sector})`,
+    topicPlan.action === "thread_update"
+      ? "Forum objective: update your existing thread with only what changed."
+      : "Forum objective: publish a fresh market view from your own sector lane.",
+    `Room route in the background: ${discussionPlan.profileLabel}. Treat that as context, not a required lead angle.`,
+    `Post type for this run: ${postType}.`,
+    `Publishing mode for this run: ${topicPlan.action === "thread_update" ? "update your earlier thread, not a new thread" : "open a new thread if your angle is genuinely new"}.`,
+    topicPlan.matchedThesis
+      ? `Matched thesis in memory: ${topicPlan.matchedThesis.title} | status=${topicPlan.matchedThesis.status} | topic=${humanizeThemeKey(topicPlan.matchedThesis.topicPrimary)}`
+      : "No matching live thesis was found for this angle.",
+    // Primary headline analysis block (if available, shown before topic inventory)
+    ...primaryHeadlineBlock,
+    `Preferred fresh angle for this run: ${topicPlan.primary.label}.`,
+    // When a high-quality headline is identified, lock the catalyst to it so the LLM gets a consistent signal
+    headlineAnalysis && headlineAnalysis.market_signal_strength !== "noise" && headlineAnalysis.primary_mechanism !== ""
+      ? `Preferred catalyst to lead with: ${headlineAnalysis.headline_title} (this is the PRIMARY HEADLINE — your post must be about this).`
+      : `Preferred catalyst to lead with: ${topicPlan.primary.catalyst}.`,
+    `Current snapshot provider: ${marketSnapshot.provider}`,
+    `Broad room backdrop: ${marketSnapshot.headline}`,
+    `Backdrop summary: ${marketSnapshot.summary}`,
+    `User task: ${marketSnapshot.prompt}`,
+    "Priority topic inventory in your lane:",
+    `1. ${topicPlan.primary.label} | catalyst=${topicPlan.primary.catalyst} | evidence=${topicPlan.primary.evidence.join("; ") || "market setup"}`,
+    ...topicPlan.alternates.map(
+      (opportunity, index) =>
+        `${index + 2}. ${opportunity.label} | catalyst=${opportunity.catalyst} | evidence=${opportunity.evidence.join("; ") || "market setup"}`
+    ),
+    sectorDeltaSummary.length > 0 ? "Context — instrument changes since the prior snapshot (do NOT copy these lines verbatim into your post):" : "",
+    ...sectorDeltaSummary,
+    availableInstruments.length > 0 ? "Current market metrics:" : "No market metrics available.",
+    ...availableInstruments.map(
+      (instrument) =>
+        `- ${instrument.label}: ${instrument.value}${instrument.change ? ` (${instrument.change})` : ""} [${instrument.source}]`
+    ),
+    mergedHeadlines.length > 0 ? "Additional sector headlines (context only — your primary focus is the headline above):" : "No current headlines available.",
+    ...mergedHeadlines.map((headline, index) => `${index + 1}. ${headline.title} (${headline.source})`),
+    `Catalyst discipline: ${ownedCatalystGuard}`,
+    recentPosts.length > 0 ? "Your most recent posts, avoid repeating them:" : "You do not have recent posts yet.",
+    ...recentPosts.map(
+      (message, index) =>
+        `${index + 1}. ${message.createdAt} | ${message.title || "Untitled"} | ${truncateText(message.content, 240)}`
+    ),
+    topicPlan.recentAgentThemes.length > 0
+      ? `Your recently used themes: ${topicPlan.recentAgentThemes.join("; ")}`
+      : "No recent personal-theme history yet.",
+    topicPlan.recentRoomThemes.length > 0
+      ? `The room has recently talked most about: ${topicPlan.recentRoomThemes.join("; ")}`
+      : "No strong room-wide topic concentration yet.",
+    topicPlan.coveredThemesToAvoid.length > 0
+      ? `Covered themes to avoid unless you add a clearly new angle: ${topicPlan.coveredThemesToAvoid.join("; ")}`
+      : "No heavy coverage warning.",
+    buildDynamicMemoryPromptBlock(agent, dynamicMemory),
+    ...(agentState ? [buildStatePromptBlock(agentState)] : []),
+    ...(roomCoverage ? [buildRoomCoveragePromptBlock(roomCoverage)] : []),
+    knowledgeSnippets.length > 0 ? "Approved long-term memory snippets:" : "No approved long-term memory snippets were retrieved for this post.",
+    ...knowledgeSnippets.map(
+      (snippet, index) => `${index + 1}. ${snippet.title} [${snippet.category}] ${snippet.excerpt}`
+    ),
+    relevantCases.length > 0 ? "Relevant historical analogs:" : "No analog cases were retrieved for this post.",
+    ...relevantCases.map(
+      (marketCase, index) =>
+        `${index + 1}. ${marketCase.title} [${marketCase.dateLabel}] tags=${marketCase.regimeTags.join(", ")} | pattern=${marketCase.patternSummary} | implication=${marketCase.implicationNote}`
+    ),
+    priorRoomThreads.length > 0 ? "Recent room threads for context:" : "No prior room threads were found.",
+    ...priorRoomThreads.slice(0, 3).map(
+      (thread, index) =>
+        `${index + 1}. ${thread.post.agentName}: ${thread.post.title || "Untitled"} | ${truncateText(thread.post.content, 220)}`
+    ),
+    thisRunPosts.length > 0
+      ? `--- ALREADY POSTED THIS SESSION (take a DIFFERENT angle — do not repeat these leads or arguments) ---`
+      : "",
+    ...thisRunPosts.map(
+      (p) =>
+        `• ${p.agentName} (${p.sector}): "${p.title || "Untitled"}" | ${truncateText(p.content, 150)}`
+    ),
+    thisRunPosts.length > 0
+      ? `--- END OF THIS-SESSION POSTS — your job is to add something genuinely new ---`
+      : "",
+    "Return a fresh post with a strong title, a specific catalyst, a clear view, and one thing that would change your mind.",
+    topicPlan.action === "thread_update"
+      ? "Because this is an update, focus on the delta and do not restate the whole thesis."
+      : "Because this is a new thread, make the angle feel distinct from your recent posts.",
+    "Do not recycle the same theme if there is another uncovered opportunity in your lane.",
+    "If your primary catalyst is not oil, do not let oil become the headline of your post.",
+    "Root your post in sector-specific mechanics, not the broad market backdrop that every agent shares."
+  ].filter(Boolean).join("\n");
+}
+
+function buildForumCommentPrompt(
+  agent: Agent,
+  post: AgentMessage,
+  marketSnapshot: MarketSnapshotPayload,
+  previousSnapshot: MarketSnapshotPayload | null,
+  commentPurpose: CommentPurpose,
+  generalHeadlines: SnapshotHeadline[],
+  sectorHeadlines: SnapshotHeadline[],
+  knowledgeSnippets: LocalKnowledgeSnippet[],
+  dynamicMemory: DynamicMemoryContext,
+  agentState: AgentBehavioralSummary | null,
+  roomCoverage: RoomCoverageState | null
+): string {
+  const mergedHeadlines = relevantHeadlinesForAgent(agent, [
+    ...sectorHeadlines,
+    ...generalHeadlines,
+    ...marketSnapshot.headlines
+  ]).slice(0, 4);
+  const relevantInstruments = relevantInstrumentsForAgent(agent, marketSnapshot);
+  const sectorDeltaSummary = buildSectorDeltaSummary(agent, previousSnapshot, marketSnapshot);
+
+  return [
+    `You are replying as ${agent.name} (${agent.sector}).`,
+    `Original post author: ${post.agentName} (${post.sector})`,
+    `Original post title: ${post.title || "Untitled"}`,
+    `Original post catalyst: ${post.catalyst || "none"}`,
+    post.thesisId
+      ? `Thread thesis context: status=${post.thesisStatus || "unknown"} | primary topic=${humanizeThemeKey(post.thesisTopicPrimary || "cross_asset_setup")}`
+      : "This thread does not have thesis metadata yet.",
+    `Original post body: ${truncateText(post.content, 900)}`,
+    `Your comment job: ${commentPurposeDescription(commentPurpose, agent, post)}`,
+    `Your comment MUST contribute: ${commentPurposeMustAdd(commentPurpose)}`,
+    `Your comment MUST NOT: ${commentPurposeMustAvoid(commentPurpose)}`,
+    `Snapshot headline: ${marketSnapshot.headline}`,
+    relevantInstruments.length > 0 ? "Relevant sector metrics:" : "No sector metrics available.",
+    ...relevantInstruments.map(
+      (instrument) =>
+        `- ${instrument.label}: ${instrument.value}${instrument.change ? ` (${instrument.change})` : ""}`
+    ),
+    "What changed vs the previous snapshot:",
+    ...sectorDeltaSummary.slice(0, 4),
+    mergedHeadlines.length > 0 ? "Relevant headlines:" : "No headline context available.",
+    ...mergedHeadlines.map((headline, index) => `${index + 1}. ${headline.title} (${headline.source})`),
+    knowledgeSnippets.length > 0 ? "Approved long-term memory snippets:" : "No approved long-term memory snippets were retrieved for this comment.",
+    ...knowledgeSnippets.map(
+      (snippet, index) => `${index + 1}. ${snippet.title} [${snippet.category}] ${snippet.excerpt}`
+    ),
+    buildDynamicMemoryPromptBlock(agent, dynamicMemory),
+    ...(agentState ? [buildStatePromptBlock(agentState)] : []),
+    ...(roomCoverage ? [buildRoomCoveragePromptBlock(roomCoverage)] : []),
+    "Write a reply that advances the thread with a distinct angle.",
+    "Do not say you agree and need confirmation unless you add a specific transmission channel, missing datapoint, or challenge."
+  ].join("\n");
+}
+
+function relevantInstrumentsForAgent(agent: Agent, marketSnapshot: MarketSnapshotPayload): SnapshotInstrument[] {
+  const keyGroups: Record<string, string[]> = {
+    Macro: ["us10y", "dxy", "sp500", "gold", "wti"],
+    Rates: ["us10y", "dxy", "gold", "sp500"],
+    FX: ["dxy", "us10y", "gold", "sp500"],
+    Equities: ["sp500", "nasdaq", "dxy", "us10y", "gold"],
+    Commodities: ["wti", "brent", "natural_gas", "copper", "gold"],
+    "Risk/Sentiment": ["sp500", "nasdaq", "gold", "dxy", "us10y"]
+  };
+
+  const keys = keyGroups[agent.sector] || marketSnapshot.instruments.map((instrument) => instrument.key);
+  const selected = keys
+    .map((key) => instrumentFor(marketSnapshot, key))
+    .filter((instrument): instrument is SnapshotInstrument => Boolean(instrument))
+    .filter((instrument) => instrument.status !== "unavailable");
+
+  return selected.length > 0
+    ? selected
+    : marketSnapshot.instruments.filter((instrument) => instrument.status !== "unavailable").slice(0, 5);
+}
+
+function relevantHeadlinesForAgent(agent: Agent, headlines: SnapshotHeadline[]): SnapshotHeadline[] {
+  const keywordsBySector: Record<string, string[]> = {
+    Macro: ["fed", "inflation", "jobs", "economy", "growth", "cpi", "payroll", "yield"],
+    Rates: ["yield", "treasury", "bond", "curve", "fed", "inflation"],
+    FX: ["dollar", "fx", "currency", "yen", "euro", "carry", "em"],
+    Equities: ["stock", "earnings", "equity", "sector", "nasdaq", "s&p", "valuation"],
+    Commodities: ["oil", "wti", "brent", "gas", "gold", "copper", "energy", "opec"],
+    "Risk/Sentiment": ["risk", "volatility", "credit", "spread", "sentiment", "selloff", "stress"]
+  };
+
+  const keywords = keywordsBySector[agent.sector] || [];
+  const scored = dedupeHeadlines(headlines)
+    .map((headline) => ({
+      headline,
+      score: scoreHeadlineForKeywords(headline, keywords)
+    }))
+    .sort((left, right) => right.score - left.score || compareHeadlineTimes(right.headline, left.headline));
+
+  const filtered = scored.filter((item) => item.score > 0).map((item) => item.headline);
+  return filtered.length > 0 ? filtered : dedupeHeadlines(headlines);
+}
+
+function postStyleFor(
+  agent: Agent,
+  marketSnapshot: MarketSnapshotPayload,
+  previousSnapshot: MarketSnapshotPayload | null,
+  headlines: SnapshotHeadline[]
+): string {
+  const deltas = buildSnapshotDeltaSummary(previousSnapshot, marketSnapshot);
+
+  if (headlines.length > 0) {
+    return "news reaction";
+  }
+
+  if (deltas.some((delta) => delta.toLowerCase().includes("newly tracked"))) {
+    return "market regime update";
+  }
+
+  if (agent.sector === "Risk/Sentiment" || agent.sector === "FX") {
+    return "cross-asset warning";
+  }
+
+  if (agent.sector === "Macro" || agent.sector === "Rates") {
+    return "historical analog";
+  }
+
+  return "market regime update";
+}
+
+function choosePrimaryCatalystForAgent(
+  agent: Agent,
+  headlines: SnapshotHeadline[],
+  instruments: SnapshotInstrument[],
+  marketSnapshot: MarketSnapshotPayload
+): string {
+  const preferredHeadline = headlines[0];
+
+  if (preferredHeadline) {
+    return `${preferredHeadline.title} (${preferredHeadline.source})`;
+  }
+
+  const firstInstrument = instruments[0];
+
+  if (firstInstrument) {
+    return `${firstInstrument.label} at ${firstInstrument.value}${firstInstrument.change ? ` (${firstInstrument.change})` : ""}`;
+  }
+
+  return marketSnapshot.headline;
+}
+
+function buildSectorDeltaSummary(
+  agent: Agent,
+  previousSnapshot: MarketSnapshotPayload | null,
+  nextSnapshot: MarketSnapshotPayload
+): string[] {
+  if (!previousSnapshot) {
+    return ["No prior snapshot is available, so treat this as the first update for your lane."];
+  }
+
+  const relevantKeys = new Set(relevantInstrumentsForAgent(agent, nextSnapshot).map((instrument) => instrument.key));
+  const previousMap = new Map(previousSnapshot.instruments.map((instrument) => [instrument.key, instrument]));
+  const deltas = nextSnapshot.instruments
+    .filter((instrument) => relevantKeys.has(instrument.key))
+    .map((instrument) => {
+      const previousInstrument = previousMap.get(instrument.key);
+
+      if (!previousInstrument) {
+        return `- ${instrument.label} is newly tracked at ${instrument.value}${instrument.change ? ` (${instrument.change})` : ""}.`;
+      }
+
+      if (
+        previousInstrument.value === instrument.value &&
+        (previousInstrument.change || "") === (instrument.change || "") &&
+        previousInstrument.status === instrument.status
+      ) {
+        return null;
+      }
+
+      return `- ${instrument.label}: was ${previousInstrument.value}${previousInstrument.change ? ` (${previousInstrument.change})` : ""}, now ${instrument.value}${instrument.change ? ` (${instrument.change})` : ""}.`;
+    })
+    .filter((value): value is string => Boolean(value));
+
+  return deltas.length > 0
+    ? deltas.slice(0, 5)
+    : ["- Your sector inputs are broadly unchanged versus the last check, so focus on a sharper interpretation rather than a new macro story."];
+}
+
+function mainCatalystGuardFor(
+  agent: Agent,
+  headlines: SnapshotHeadline[],
+  instruments: SnapshotInstrument[]
+): string {
+  const oilHeadline = headlines.find((headline) => /oil|wti|brent|energy/i.test(headline.title));
+  const oilInstrument = instruments.find((instrument) => /wti|brent|natural gas/i.test(instrument.label));
+
+  if ((oilHeadline || oilInstrument) && !["Macro", "Commodities"].includes(agent.sector)) {
+    return "Oil can be mentioned, but it cannot be the main hook unless it clearly transmits into your sector.";
+  }
+
+  if (agent.sector === "Rates") {
+    return "Lead with yields, curve, Fed repricing, auctions, or breakevens before broader macro narration.";
+  }
+
+  if (agent.sector === "FX") {
+    return "Lead with the dollar, carry, or rate differentials before discussing commodities.";
+  }
+
+  if (agent.sector === "Equities") {
+    return "Lead with breadth, sector rotation, earnings sensitivity, or valuation pressure before macro summary.";
+  }
+
+  if (agent.sector === "Risk/Sentiment") {
+    return "Lead with positioning, fragility, volatility, spreads, or follow-through before repeating the tape.";
+  }
+
+  return "Lead with the catalyst that most naturally belongs to your sector.";
+}
+
+function repeatedRecentCatalysts(recentPosts: AgentMessage[]): string[] {
+  const counts = new Map<string, number>();
+
+  for (const post of recentPosts) {
+    const catalyst = (post.catalyst || "").trim();
+
+    if (!catalyst) {
+      continue;
+    }
+
+    counts.set(catalyst, (counts.get(catalyst) || 0) + 1);
+  }
+
+  return [...counts.entries()]
+    .filter(([, count]) => count >= 1)
+    .map(([catalyst]) => catalyst)
+    .slice(0, 3);
+}
+
+function forumPostSchema() {
+  return {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      title: {
+        type: "string",
+        maxLength: 120
+      },
+      catalyst: {
+        type: "string",
+        maxLength: 120
+      },
+      content: {
+        type: "string",
+        maxLength: 2600
+      },
+      stance: {
+        type: "string",
+        maxLength: 40
+      },
+      confidence: {
+        type: "number",
+        minimum: 0,
+        maximum: 1
+      }
+    },
+    required: ["title", "catalyst", "content", "stance", "confidence"]
+  };
+}
+
+function forumCommentSchema() {
+  return {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      catalyst: {
+        type: "string",
+        maxLength: 120
+      },
+      content: {
+        type: "string",
+        maxLength: 900
+      },
+      stance: {
+        type: "string",
+        maxLength: 40
+      },
+      confidence: {
+        type: "number",
+        minimum: 0,
+        maximum: 1
+      }
+    },
+    required: ["catalyst", "content", "stance", "confidence"]
+  };
+}
+
+function generateMockForumPosts(
+  agents: Agent[],
+  marketSnapshot: MarketSnapshotPayload,
+  roomId: string,
+  eventId: string,
+  snapshotId: string
+): PlannedForumEntry[] {
+  return sortAgentsForForum(agents).map((agent, index) => {
+    const message: AgentMessage = {
+      id: crypto.randomUUID(),
+      roomId,
+      eventId,
+      agentId: agent.id,
+      agentName: agent.name,
+      sector: agent.sector,
+      role: "assistant",
+      messageType: "post",
+      parentMessageId: null,
+      title: fallbackForumTitle(agent, marketSnapshot),
+      catalyst: fallbackCatalyst(agent, marketSnapshot),
+      thesisId: crypto.randomUUID(),
+      thesisUpdateId: crypto.randomUUID(),
+      thesisStatus: "open",
+      thesisTopicPrimary: inferPrimaryThemeKey(agent.sector, agent.sector),
+      thesisTopicSecondary: null,
+      content: fallbackForumPost(agent, marketSnapshot, null),
+      stance: stanceFor(agent),
+      confidence: confidenceFor(agent),
+      likeCount: 0,
+      dislikeCount: 0,
+      viewerReaction: null,
+      createdAt: offsetTimestamp(index * 3)
+    };
+
+    return {
+      message,
+      thesisWrite: buildPostThesisWritePlan({
+        message,
+        agent,
+        marketSnapshot,
+        eventId,
+        snapshotId,
+        topicPlan: {
+          primary: {
+            themeKey: message.thesisTopicPrimary || inferPrimaryThemeKey(agent.sector, agent.sector),
+            label: humanizeThemeKey(message.thesisTopicPrimary || inferPrimaryThemeKey(agent.sector, agent.sector)),
+            catalyst: message.catalyst || fallbackCatalyst(agent, marketSnapshot),
+            score: 1,
+            evidence: ["mock fallback"]
+          },
+          alternates: [],
+          recentAgentThemes: [],
+          recentRoomThemes: [],
+          coveredThemesToAvoid: [],
+          action: "new_post",
+          updateTargetPostId: null,
+          matchedThesis: null,
+          thesisStatus: "open",
+          topicPrimaryKey: message.thesisTopicPrimary || inferPrimaryThemeKey(agent.sector, agent.sector),
+          topicSecondaryKey: null,
+          hasMeaningfulFreshSignal: true
+        }
+      })
+    };
+  });
+}
+
+function generateMockForumComments(
+  agents: Agent[],
+  posts: AgentMessage[],
+  roomId: string,
+  eventId: string
+): PlannedForumEntry[] {
+  const orderedAgents = sortAgentsForForum(agents);
+  const comments: PlannedForumEntry[] = [];
+
+  for (const [index, post] of posts.entries()) {
+    const responder = pickCommentResponder(post, orderedAgents, []);
+
+    if (!responder) {
+      continue;
+    }
+
+    const message: AgentMessage = {
+      id: crypto.randomUUID(),
+      roomId,
+      eventId,
+      agentId: responder.id,
+      agentName: responder.name,
+      sector: responder.sector,
+      role: "assistant",
+      messageType: "comment",
+      parentMessageId: post.id,
+      title: null,
+      catalyst: fallbackCatalyst(responder, marketSnapshotFromPost(post)),
+      thesisId: post.thesisId,
+      thesisUpdateId: post.thesisId ? crypto.randomUUID() : null,
+      thesisStatus: post.thesisStatus,
+      thesisTopicPrimary: post.thesisTopicPrimary,
+      thesisTopicSecondary: post.thesisTopicSecondary,
+      content: fallbackForumComment(responder, post, marketSnapshotFromPost(post)),
+      stance: stanceFor(responder),
+      confidence: confidenceFor(responder),
+      likeCount: 0,
+      dislikeCount: 0,
+      viewerReaction: null,
+      createdAt: offsetTimestamp(posts.length * 3 + index * 2)
+    };
+
+    comments.push({
+      message,
+      thesisWrite: null
+    });
+  }
+
+  return comments;
+}
+
+function marketSnapshotFromPost(post: AgentMessage): MarketSnapshotPayload {
+  return {
+    provider: "forum-fallback",
+    usedFallback: true,
+    asOf: post.createdAt,
+    headline: post.catalyst || post.title || "Forum update",
+    summary: post.content,
+    prompt: defaultDiscussionPrompt,
+    instruments: [],
+    headlines: []
+  };
+}
+
+function sortAgentsForForum(agents: Agent[]): Agent[] {
+  const sectorOrder = ["Macro", "Rates", "FX", "Equities", "Commodities", "Risk/Sentiment"];
+  return [...agents].sort((left, right) => {
+    const leftIndex = sectorOrder.indexOf(left.sector);
+    const rightIndex = sectorOrder.indexOf(right.sector);
+    return (leftIndex === -1 ? 999 : leftIndex) - (rightIndex === -1 ? 999 : rightIndex);
+  });
+}
+
+function pickCommentResponder(
+  post: AgentMessage,
+  orderedAgents: Agent[],
+  preferredAgents: Agent[],
+  excludedIds: Set<string> = new Set()
+): Agent | null {
+  const preferredIds = new Set(preferredAgents.map((agent) => agent.id));
+  const authoredIndex = orderedAgents.findIndex((agent) => agent.id === post.agentId);
+
+  // First pass: preferred agents who are not excluded and not the author.
+  for (let offset = 1; offset < orderedAgents.length; offset += 1) {
+    const candidate = orderedAgents[(authoredIndex + offset) % orderedAgents.length];
+    if (candidate.id === post.agentId) continue;
+    if (excludedIds.has(candidate.id)) continue;
+    if (preferredIds.size === 0 || preferredIds.has(candidate.id)) {
+      return candidate;
+    }
+  }
+
+  // Second pass: any agent not excluded and not the author (fallback when preferred agents exhausted).
+  for (let offset = 1; offset < orderedAgents.length; offset += 1) {
+    const candidate = orderedAgents[(authoredIndex + offset) % orderedAgents.length];
+    if (candidate.id === post.agentId) continue;
+    if (excludedIds.has(candidate.id)) continue;
+    return candidate;
+  }
+
+  return null;
+}
+
+function buildSnapshotDeltaSummary(
+  previousSnapshot: MarketSnapshotPayload | null,
+  nextSnapshot: MarketSnapshotPayload
+): string[] {
+  if (!previousSnapshot) {
+    return ["No prior snapshot is available, so this is the first forum update in the current comparison window."];
+  }
+
+  const previousMap = new Map(previousSnapshot.instruments.map((instrument) => [instrument.key, instrument]));
+  const deltas = nextSnapshot.instruments
+    .map((instrument) => {
+      const previousInstrument = previousMap.get(instrument.key);
+
+      if (!previousInstrument) {
+        return `- ${instrument.label} is newly tracked at ${instrument.value}${instrument.change ? ` (${instrument.change})` : ""}.`;
+      }
+
+      if (
+        previousInstrument.value === instrument.value &&
+        (previousInstrument.change || "") === (instrument.change || "") &&
+        previousInstrument.status === instrument.status
+      ) {
+        return null;
+      }
+
+      return `- ${instrument.label}: was ${previousInstrument.value}${previousInstrument.change ? ` (${previousInstrument.change})` : ""}, now ${instrument.value}${instrument.change ? ` (${instrument.change})` : ""}.`;
+    })
+    .filter((value): value is string => Boolean(value));
+
+  return deltas.length > 0
+    ? deltas.slice(0, 6)
+    : [];
+}
+
+function dedupeHeadlines(headlines: SnapshotHeadline[]): SnapshotHeadline[] {
+  const seen = new Set<string>();
+  return headlines.filter((headline) => {
+    const key = `${headline.title}|${headline.source}`;
+
+    if (seen.has(key)) {
+      return false;
+    }
+
+    seen.add(key);
+    return true;
+  });
+}
+
+function scoreHeadlineForKeywords(headline: SnapshotHeadline, keywords: string[]): number {
+  const text = `${headline.title} ${headline.source}`.toLowerCase();
+  return keywords.reduce((score, keyword) => score + (text.includes(keyword) ? 1 : 0), 0);
+}
+
+function compareHeadlineTimes(left: SnapshotHeadline, right: SnapshotHeadline): number {
+  return (Date.parse(left.publishedAt || "1970-01-01T00:00:00.000Z") || 0) -
+    (Date.parse(right.publishedAt || "1970-01-01T00:00:00.000Z") || 0);
+}
+
+function truncateText(text: string, maxLength: number): string {
+  const normalized = text.trim();
+  return normalized.length <= maxLength ? normalized : `${normalized.slice(0, maxLength - 1)}…`;
+}
+
+function fallbackForumTitle(
+  agent: Agent,
+  marketSnapshot: MarketSnapshotPayload,
+  topicPlan?: AgentTopicPlan
+): string {
+  const catalyst = topicPlan?.primary.label || fallbackCatalyst(agent, marketSnapshot);
+  return `${agent.sector} view: ${catalyst}`;
+}
+
+function fallbackCatalyst(agent: Agent, marketSnapshot: MarketSnapshotPayload): string {
+  const metrics = snapshotMetricsMap(marketSnapshot);
+
+  switch (agent.sector) {
+    case "Macro":
+      return `Rates, inflation, and policy still dominate`;
+    case "Rates":
+      return `Treasury repricing remains the key signal`;
+    case "FX":
+      return `Dollar direction is steering cross-asset pressure`;
+    case "Equities":
+      return `Leadership breadth is still the equity test`;
+    case "Commodities":
+      return `Oil and metals are driving the inflation impulse`;
+    case "Risk/Sentiment":
+      return `The tape still needs confirmation from positioning`;
+    default:
+      return `Cross-asset moves are still shifting the market map`;
+  }
+}
+
+function fallbackForumPost(
+  agent: Agent,
+  marketSnapshot: MarketSnapshotPayload,
+  previousSnapshot: MarketSnapshotPayload | null
+): string {
+  const deltaSummary = buildSnapshotDeltaSummary(previousSnapshot, marketSnapshot).join(" ");
+  const metrics = snapshotMetricsMap(marketSnapshot);
+
+  switch (agent.sector) {
+    case "Macro":
+      return `US 10Y sits at ${metricValue(metrics, "us10y")}, DXY is ${metricValue(metrics, "dxy")}. ${deltaSummary} The key question is whether incoming inflation, labor, and headline data give central banks room to ease or force them to hold longer. Every rally has to be tested against that constraint. Watch the next CPI print and whether the curve is repricing the terminal rate lower or higher — that is what separates a policy pivot from a pause.`;
+    case "Rates":
+      return `The 10Y yield at ${metricValue(metrics, "us10y")} is the rate the market is pricing against. ${deltaSummary} Duration pressure can tighten financial conditions even when equity headlines look calm. The key question is whether the long end is moving on inflation fears, growth reassessment, or supply concerns — each implies a different trade. Watch auction demand and whether breakevens are leading or lagging the nominal move.`;
+    case "FX":
+      return `DXY is at ${metricValue(metrics, "dxy")}. ${deltaSummary} The dollar is acting as the cross-asset pressure valve — a firm dollar tightens conditions for EM, commodity-linked currencies, and risk assets simultaneously. The transmission chain to watch is whether the dollar move is being driven by rate differentials or safe-haven demand, because the second one implies the market is pricing a risk event, not just a policy gap.`;
+    case "Equities":
+      return `S&P 500 at ${metricValue(metrics, "sp500")}, Nasdaq at ${metricValue(metrics, "nasdaq")}. ${deltaSummary} The key question is whether the move has sector breadth or is concentrated in a few names. A narrow rally driven by a handful of large-caps is a different signal from broad participation. Watch whether defensives are outperforming or underperforming cyclicals — that tells you whether the market is risk-on or just resilient at the index level.`;
+    case "Commodities":
+      return `WTI at ${metricValue(metrics, "wti")}, gold at ${metricValue(metrics, "gold")}. ${deltaSummary} Commodity moves reveal whether the market is pricing growth, inflation, or a geopolitical risk premium. A firmer energy tape can slow central bank progress on inflation and force tighter-for-longer. The next thing to watch is inventory data and whether the OPEC production discipline is holding — that determines whether the energy bid is structural or temporary.`;
+    case "Risk/Sentiment":
+      return `${deltaSummary} The question is not the direction of the move but whether it is being confirmed by internals: breadth, credit spread direction, and cross-asset correlation. A market that looks calm at the index level while spreads are widening or vol is rising is more fragile than it appears. Watch whether this move is drawing in new buyers or just short covering — that determines the staying power.`;
+    default:
+      return `${agent.name}: ${deltaSummary} Watch for the next data point that either confirms or contradicts this signal before assuming the trend has legs.`;
+  }
+}
+
+function fallbackForumComment(agent: Agent, post: AgentMessage, marketSnapshot: MarketSnapshotPayload): string {
+  const catalyst = post.catalyst || post.title || "the catalyst";
+  const instruments = relevantInstrumentsForAgent(agent, marketSnapshot).slice(0, 1);
+  const metric = instruments.length > 0 ? `${instruments[0].label} at ${instruments[0].value}` : "current market levels";
+  return `${agent.name}: worth checking the ${agent.sector.toLowerCase()} confirmation signal here. ${catalyst} has to show up in ${metric} before the thesis holds. Without that cross, this is directionally interesting but not yet actionable from my seat.`;
+}
+
+function buildAgentInstructions(agent: Agent): string {
+  const knowledgeBaseNote =
+    agent.vectorStoreId
+      ? `You also have access to a curated ${agent.sector} knowledge base through file search. Use it when it adds sector-specific context, frameworks, event playbooks, or house-view guidance.`
+      : null;
+
+  return [
+    agent.systemPrompt,
+    `Agent memory: ${agent.memorySummary}`,
+    `Sector focus: ${sectorFocusFor(agent)}`,
+    `Writing style: ${sectorVoiceFor(agent)}`,
+    knowledgeBaseNote,
+    "Write like a distinct specialist, not a generic market commentator.",
+    "Keep the tone professional, crisp, and suitable for a live market forum, not a bank research PDF.",
+    "Do not open with labels like 'Hypothesis', 'Base case', 'Trade implication', 'Biggest driver', 'Main risk', or 'One thing to watch'.",
+    "Do not write in numbered memo format unless explicitly asked.",
+    "Prefer natural sentences over templated framing. Sound like a sharp human analyst posting in real time.",
+    "Avoid repeating points already made unless you are refining, disagreeing with, or translating them."
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+function sectorFocusFor(agent: Agent): string {
+  switch (agent.sector) {
+    case "Macro":
+      return "Focus on growth, inflation, central banks, policy, liquidity, and cross-asset conditions.";
+    case "Equities":
+      return "Focus on indices, sectors, breadth, earnings expectations, leadership quality, and risk appetite.";
+    case "Commodities":
+      return "Focus on oil, gas, industrial metals, and gold, and tie commodity moves back to the wider market.";
+    case "FX":
+      return "Focus on the dollar, major crosses, policy divergence, carry, and how currencies transmit macro pressure.";
+    case "Rates":
+      return "Focus on Treasury yields, duration, curve shape, inflation expectations, and policy repricing.";
+    case "Risk/Sentiment":
+      return "Focus on positioning, crowding, defensiveness, momentum, and whether the tape looks resilient or fragile.";
+    default:
+      return "Focus on the most relevant part of the snapshot for your sector.";
+  }
+}
+
+function sectorVoiceFor(agent: Agent): string {
+  switch (agent.sector) {
+    case "Macro":
+      return "Sound like a macro strategist who can simplify regime shifts without sounding academic.";
+    case "Equities":
+      return "Sound like a fundamental investor watching tape quality, breadth, and earnings revision risk.";
+    case "Commodities":
+      return "Sound like a trader-analyst who thinks in flows, inventories, supply risk, and transmission into inflation.";
+    case "FX":
+      return "Sound like an FX strategist who sees regime change through relative rates, carry, and funding stress.";
+    case "Rates":
+      return "Sound like a rates strategist who cares about repricing, curve shape, and cross-asset spillover.";
+    case "Risk/Sentiment":
+      return "Sound like a positioning and tape watcher who cares about fragility, crowding, and follow-through.";
+    default:
+      return "Sound like a practical market specialist, not a generic summarizer.";
+  }
+}
+
+function trimToWordLimit(text: string, maxWords: number): string {
+  const words = text.trim().split(/\s+/);
+
+  if (words.length <= maxWords) {
+    return text.trim();
+  }
+
+  return `${words.slice(0, maxWords).join(" ")}...`;
+}
+
+async function generateTurnBasedDiscussion(
+  env: Env,
+  discussionPlan: DiscussionPlan,
+  marketSnapshot: MarketSnapshotPayload,
+  roomId: string,
+  eventId: string
+): Promise<AgentMessage[]> {
+  const thread: AgentMessage[] = [];
+  const relevantCasesByAgent = new Map<string, Awaited<ReturnType<typeof listRelevantMarketCasesForAgent>>>();
+
+  for (const agent of discussionPlan.selectedAgents) {
+    const relevantCases = await listRelevantMarketCasesForAgent(
+      env,
+      agent,
+      marketSnapshot,
+      discussionPlan.profile
+    );
+    relevantCasesByAgent.set(agent.id, relevantCases);
+  }
+
+  const openerMessage = await generatePrimaryTurn({
+    env,
+    agent: discussionPlan.opener,
+    marketSnapshot,
+    discussionPlan,
+    roomId,
+    eventId,
+    roundLabel: "Round 1",
+    instruction:
+      "Open the thread from your macro lens. Set the main framing for this event profile, state your stance and confidence, and tee up the specialists without trying to cover every asset.",
+    priorMessages: [],
+    relevantCases: relevantCasesByAgent.get(discussionPlan.opener.id) || [],
+    createdAt: offsetTimestamp(0)
+  });
+  thread.push(openerMessage);
+
+  for (const [index, agent] of discussionPlan.roundTwoAgents.entries()) {
+    const reply = await generatePrimaryTurn({
+      env,
+      agent,
+      marketSnapshot,
+      discussionPlan,
+      roomId,
+      eventId,
+      roundLabel: "Round 2",
+      instruction:
+        "Reply after reading the earlier thread. Add your sector-specific angle, reference earlier points where useful, and keep the discussion differentiated rather than repetitive.",
+      priorMessages: thread,
+      relevantCases: relevantCasesByAgent.get(agent.id) || [],
+      createdAt: offsetTimestamp(index + 1)
+    });
+    thread.push(reply);
+  }
+
+  if (discussionPlan.roundThreeAgent) {
+    const finalSpecialist = await generatePrimaryTurn({
+      env,
+      agent: discussionPlan.roundThreeAgent,
+      marketSnapshot,
+      discussionPlan,
+      roomId,
+      eventId,
+      roundLabel: "Round 3",
+      instruction:
+        "Close the first pass of the discussion. Add the missing sector angle, sharpen one important implication, and stay concise.",
+      priorMessages: thread,
+      relevantCases: relevantCasesByAgent.get(discussionPlan.roundThreeAgent.id) || [],
+      createdAt: offsetTimestamp(thread.length)
+    });
+    thread.push(finalSpecialist);
+  }
+
+  return thread;
+}
+
+async function generatePrimaryTurn({
+  env,
+  agent,
+  marketSnapshot,
+  discussionPlan,
+  roomId,
+  eventId,
+  roundLabel,
+  instruction,
+  priorMessages,
+  relevantCases,
+  createdAt
+}: {
+  env: Env;
+  agent: Agent;
+  marketSnapshot: MarketSnapshotPayload;
+  discussionPlan: DiscussionPlan;
+  roomId: string;
+  eventId: string;
+  roundLabel: string;
+  instruction: string;
+  priorMessages: AgentMessage[];
+  relevantCases: import("@market-room/shared").MarketCase[];
+  createdAt: string;
+}): Promise<AgentMessage> {
+  const fallbackContent = fallbackContributionText(agent, marketSnapshot, discussionPlan, priorMessages);
+  const result = await requestStructuredAgentTurn(
+    env,
+    agent,
+    marketSnapshot,
+    discussionPlan,
+    roundLabel,
+    instruction,
+    priorMessages,
+    relevantCases
+  );
+
+  return {
+    id: crypto.randomUUID(),
+    roomId,
+    eventId,
+    agentId: agent.id,
+    agentName: agent.name,
+    sector: agent.sector,
+    role: "assistant",
+    messageType: "post",
+    parentMessageId: null,
+    title: null,
+    catalyst: null,
+    thesisId: null,
+    thesisUpdateId: null,
+    thesisStatus: null,
+    thesisTopicPrimary: null,
+    thesisTopicSecondary: null,
+    content: trimToWordLimit(result?.content || fallbackContent, 120),
+    stance: result?.stance || stanceFor(agent),
+    confidence: result?.confidence ?? confidenceFor(agent),
+    likeCount: 0,
+    dislikeCount: 0,
+    viewerReaction: null,
+    createdAt
+  };
+}
+
+async function requestStructuredAgentTurn(
+  env: Env,
+  agent: Agent,
+  marketSnapshot: MarketSnapshotPayload,
+  discussionPlan: DiscussionPlan,
+  roundLabel: string,
+  instruction: string,
+  priorMessages: AgentMessage[],
+  relevantCases: import("@market-room/shared").MarketCase[]
+): Promise<{
+  content?: string;
+  stance?: string;
+  confidence?: number;
+} | null> {
+  if (!isLlmConfigured(env)) {
+    return null;
+  }
+
+  try {
+    const knowledgeSnippets = await findRelevantKnowledgeSnippets(
+      env,
+      agent,
+      [
+        roundLabel,
+        instruction,
+        marketSnapshot.headline,
+        marketSnapshot.summary
+      ].join("\n"),
+      3
+    );
+
+    const payload = await generateGeminiContent(env, {
+      model: getLlmModel(env),
+      instructions: buildAgentInstructions(agent),
+      prompt: buildTurnPrompt(
+        roundLabel,
+        instruction,
+        marketSnapshot,
+        discussionPlan,
+        priorMessages,
+        relevantCases,
+        knowledgeSnippets
+      ),
+      maxOutputTokens: 300,
+      temperature: 0.25,
+      responseSchema: primaryTurnSchema()
+    });
+
+    return parseStructuredResponseJson<{
+      content?: string;
+      stance?: string;
+      confidence?: number;
+    }>(payload);
+  } catch {
+    return null;
+  }
+}
+
+function generateMockThread(
+  discussionPlan: DiscussionPlan,
+  marketSnapshot: MarketSnapshotPayload,
+  roomId: string,
+  eventId: string
+): AgentMessage[] {
+  const selectedAgents = [
+    discussionPlan.opener,
+    ...discussionPlan.roundTwoAgents,
+    ...(discussionPlan.roundThreeAgent ? [discussionPlan.roundThreeAgent] : [])
+  ].filter((agent, index, list) => list.findIndex((candidate) => candidate.id === agent.id) === index);
+
+  const thread: AgentMessage[] = [];
+
+  for (const [index, agent] of selectedAgents.entries()) {
+    const message: AgentMessage = {
+      id: crypto.randomUUID(),
+      roomId,
+      eventId,
+      agentId: agent.id,
+      agentName: agent.name,
+      sector: agent.sector,
+      role: "assistant",
+      messageType: "post",
+      parentMessageId: null,
+      title: null,
+      catalyst: null,
+      thesisId: null,
+      thesisUpdateId: null,
+      thesisStatus: null,
+      thesisTopicPrimary: null,
+      thesisTopicSecondary: null,
+      content: fallbackContributionText(agent, marketSnapshot, discussionPlan, thread),
+      stance: stanceFor(agent),
+      confidence: confidenceFor(agent),
+      likeCount: 0,
+      dislikeCount: 0,
+      viewerReaction: null,
+      createdAt: offsetTimestamp(index)
+    };
+    thread.push(message);
+  }
+
+  return thread;
+}
+
+function buildTurnPrompt(
+  roundLabel: string,
+  instruction: string,
+  marketSnapshot: MarketSnapshotPayload,
+  discussionPlan: DiscussionPlan,
+  priorMessages: AgentMessage[],
+  relevantCases: import("@market-room/shared").MarketCase[],
+  knowledgeSnippets: LocalKnowledgeSnippet[]
+): string {
+  const availableInstruments = marketSnapshot.instruments.filter(
+    (instrument) => instrument.status !== "unavailable"
+  );
+
+  return [
+    `${roundLabel}`,
+    instruction,
+    `Event profile: ${discussionPlan.profileLabel}`,
+    `Routing reason: ${discussionPlan.routingReason}`,
+    `Selected agents: ${discussionPlan.selectedAgents.map((agent) => `${agent.name} (${agent.sector})`).join(", ")}`,
+    `Snapshot provider: ${marketSnapshot.provider}`,
+    `Snapshot as of: ${marketSnapshot.asOf}`,
+    `Fallback mode: ${marketSnapshot.usedFallback ? "yes" : "no"}`,
+    `Snapshot headline: ${marketSnapshot.headline}`,
+    `Snapshot summary: ${marketSnapshot.summary}`,
+    `User task: ${marketSnapshot.prompt}`,
+    availableInstruments.length > 0 ? "Market metrics:" : "No live market metrics were available.",
+    ...availableInstruments.map(
+      (instrument) =>
+        `- ${instrument.label}: ${instrument.value}${instrument.change ? ` (${instrument.change})` : ""} [${instrument.status}]`
+    ),
+    marketSnapshot.headlines.length > 0 ? "Top financial headlines:" : "No headlines available.",
+    ...marketSnapshot.headlines.slice(0, 3).map((headline, index) => `${index + 1}. ${headline.title} (${headline.source})`),
+    knowledgeSnippets.length > 0 ? "Approved long-term memory snippets:" : "No approved long-term memory snippets available.",
+    ...knowledgeSnippets.map(
+      (snippet, index) => `${index + 1}. ${snippet.title} [${snippet.category}] ${snippet.excerpt}`
+    ),
+    relevantCases.length > 0 ? "Relevant past market cases:" : "No structured analog cases were retrieved for this turn.",
+    ...relevantCases.map(
+      (marketCase, index) =>
+        `${index + 1}. ${marketCase.title} [${marketCase.dateLabel}] tags=${marketCase.regimeTags.join(", ") || "none"} | pattern=${marketCase.patternSummary} | implication=${marketCase.implicationNote} | outcome=${marketCase.outcomeNote}`
+    ),
+    priorMessages.length > 0 ? "Earlier thread messages:" : "No earlier thread messages.",
+    ...priorMessages.map(
+      (message, index) =>
+        `${index + 1}. ${message.agentName} (${message.sector}) said: ${message.content}`
+    )
+  ].join("\n");
+}
+
+function primaryTurnSchema() {
+  return {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      content: {
+        type: "string",
+        description:
+          "A short market-room post under 120 words that interprets the snapshot, references earlier messages when relevant, and states a stance with confidence."
+      },
+      stance: {
+        type: "string"
+      },
+      confidence: {
+        type: "number",
+        minimum: 0,
+        maximum: 1
+      }
+    },
+    required: ["content", "stance", "confidence"]
+  };
+}
+
+function offsetTimestamp(offsetSeconds: number): string {
+  return new Date(Date.now() + offsetSeconds * 1000).toISOString();
+}
+
+function parseSnapshotPayload(snapshot: MarketSnapshot | null): MarketSnapshotPayload | null {
+  if (!snapshot) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(snapshot.payloadJson) as MarketSnapshotPayload;
+  } catch {
+    return null;
+  }
+}
+
+function snapshotMetricsMap(snapshot: MarketSnapshotPayload): Map<string, string> {
+  return new Map(snapshot.instruments.map((instrument) => [instrument.key, instrument.value]));
+}
+
+function metricValue(metrics: Map<string, string>, key: string): string {
+  return metrics.get(key) || "unavailable";
+}
+
+function instrumentFor(snapshot: MarketSnapshotPayload, key: string): SnapshotInstrument | undefined {
+  return snapshot.instruments.find((instrument) => instrument.key === key);
+}
+
+function metricChangeOrValue(snapshot: MarketSnapshotPayload, key: string): string {
+  const instrument = instrumentFor(snapshot, key);
+
+  if (!instrument) {
+    return "is unavailable";
+  }
+
+  return instrument.change || instrument.value;
+}
+
+function absolutePercentChangeFor(snapshot: MarketSnapshotPayload, key: string): number {
+  const instrument = instrumentFor(snapshot, key);
+
+  if (!instrument?.change) {
+    return 0;
+  }
+
+  const match = instrument.change.match(/-?\d+(\.\d+)?/);
+  return match ? Math.abs(Number.parseFloat(match[0])) : 0;
+}
+
+function absoluteBpsChangeFor(snapshot: MarketSnapshotPayload, key: string): number {
+  const instrument = instrumentFor(snapshot, key);
+
+  if (!instrument?.change) {
+    return 0;
+  }
+
+  const match = instrument.change.match(/-?\d+(\.\d+)?/);
+  return match ? Math.abs(Number.parseFloat(match[0])) : 0;
+}
+
+function headlineKeywordScore(snapshot: MarketSnapshotPayload, keywords: string[]): number {
+  const headlineText = snapshot.headlines
+    .slice(0, 3)
+    .map((headline) => headline.title.toLowerCase())
+    .join(" ");
+
+  return keywords.some((keyword) => headlineText.includes(keyword)) ? 1 : 0;
+}

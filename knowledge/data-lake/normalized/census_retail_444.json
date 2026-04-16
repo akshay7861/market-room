@@ -1,0 +1,22 @@
+{
+  "id": "census_retail_444",
+  "source": "census",
+  "label": "Building material and garden equipment dealers",
+  "description": "US Census MRTS monthly retail sales for Building material and garden equipment dealers.",
+  "usageNote": "Useful for housing-linked demand and home-improvement cycles.",
+  "frequency": "monthly",
+  "units": "million_usd",
+  "categoryCode": "444",
+  "observationCount": 0,
+  "coverageStart": null,
+  "coverageEnd": null,
+  "summary": {
+    "latestDate": null,
+    "latestValue": null,
+    "previousDate": null,
+    "previousValue": null,
+    "periodChangePct": null,
+    "annualChangePct": null
+  },
+  "observations": []
+}

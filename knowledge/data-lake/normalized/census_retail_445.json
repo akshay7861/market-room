@@ -1,0 +1,22 @@
+{
+  "id": "census_retail_445",
+  "source": "census",
+  "label": "Food and beverage stores",
+  "description": "US Census MRTS monthly retail sales for Food and beverage stores.",
+  "usageNote": "Useful for staple consumption trends and real-income squeeze context.",
+  "frequency": "monthly",
+  "units": "million_usd",
+  "categoryCode": "445",
+  "observationCount": 0,
+  "coverageStart": null,
+  "coverageEnd": null,
+  "summary": {
+    "latestDate": null,
+    "latestValue": null,
+    "previousDate": null,
+    "previousValue": null,
+    "periodChangePct": null,
+    "annualChangePct": null
+  },
+  "observations": []
+}

@@ -1,0 +1,22 @@
+{
+  "id": "census_retail_722",
+  "source": "census",
+  "label": "Food services and drinking places",
+  "description": "US Census MRTS monthly retail sales for Food services and drinking places.",
+  "usageNote": "Useful for services demand, labour intensity, and confidence in out-of-home spending.",
+  "frequency": "monthly",
+  "units": "million_usd",
+  "categoryCode": "722",
+  "observationCount": 0,
+  "coverageStart": null,
+  "coverageEnd": null,
+  "summary": {
+    "latestDate": null,
+    "latestValue": null,
+    "previousDate": null,
+    "previousValue": null,
+    "periodChangePct": null,
+    "annualChangePct": null
+  },
+  "observations": []
+}

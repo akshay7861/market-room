@@ -1,0 +1,899 @@
+{
+  "generatedAt": "2026-04-05T14:43:48.061Z",
+  "startDate": "1990-01-01",
+  "seriesCount": 55,
+  "failedSeriesCount": 2,
+  "providers": {
+    "fred": {
+      "ok": 44,
+      "error": 2,
+      "skipped": 0,
+      "configured": 0
+    },
+    "eia": {
+      "ok": 3,
+      "error": 0,
+      "skipped": 0,
+      "configured": 0
+    },
+    "alpha_vantage": {
+      "ok": 8,
+      "error": 0,
+      "skipped": 0,
+      "configured": 0
+    },
+    "bea": {
+      "ok": 0,
+      "error": 1,
+      "skipped": 0,
+      "configured": 0
+    },
+    "census": {
+      "ok": 0,
+      "error": 0,
+      "skipped": 0,
+      "configured": 1
+    }
+  },
+  "series": [
+    {
+      "id": "fred_cpi_headline",
+      "label": "Headline CPI",
+      "source": "fred",
+      "frequency": "monthly",
+      "agents": [
+        "macro-agent",
+        "rates-agent",
+        "risk-sentiment-agent"
+      ],
+      "rawFile": "knowledge/data-lake/raw/fred/fred_cpi_headline.json",
+      "normalizedFile": "knowledge/data-lake/normalized/fred_cpi_headline.json",
+      "observationCount": 433,
+      "coverageStart": "1990-01-01",
+      "coverageEnd": "2026-02-01"
+    },
+    {
+      "id": "fred_cpi_core",
+      "label": "Core CPI",
+      "source": "fred",
+      "frequency": "monthly",
+      "agents": [
+        "macro-agent",
+        "rates-agent"
+      ],
+      "rawFile": "knowledge/data-lake/raw/fred/fred_cpi_core.json",
+      "normalizedFile": "knowledge/data-lake/normalized/fred_cpi_core.json",
+      "observationCount": 433,
+      "coverageStart": "1990-01-01",
+      "coverageEnd": "2026-02-01"
+    },
+    {
+      "id": "fred_pce_headline",
+      "label": "Headline PCE",
+      "source": "fred",
+      "frequency": "monthly",
+      "agents": [
+        "macro-agent",
+        "rates-agent"
+      ],
+      "rawFile": "knowledge/data-lake/raw/fred/fred_pce_headline.json",
+      "normalizedFile": "knowledge/data-lake/normalized/fred_pce_headline.json",
+      "observationCount": 433,
+      "coverageStart": "1990-01-01",
+      "coverageEnd": "2026-01-01"
+    },
+    {
+      "id": "fred_pce_core",
+      "label": "Core PCE",
+      "source": "fred",
+      "frequency": "monthly",
+      "agents": [
+        "macro-agent",
+        "rates-agent"
+      ],
+      "rawFile": "knowledge/data-lake/raw/fred/fred_pce_core.json",
+      "normalizedFile": "knowledge/data-lake/normalized/fred_pce_core.json",
+      "observationCount": 433,
+      "coverageStart": "1990-01-01",
+      "coverageEnd": "2026-01-01"
+    },
+    {
+      "id": "fred_unemployment",
+      "label": "Unemployment rate",
+      "source": "fred",
+      "frequency": "monthly",
+      "agents": [
+        "macro-agent",
+        "rates-agent",
+        "risk-sentiment-agent"
+      ],
+      "rawFile": "knowledge/data-lake/raw/fred/fred_unemployment.json",
+      "normalizedFile": "knowledge/data-lake/normalized/fred_unemployment.json",
+      "observationCount": 434,
+      "coverageStart": "1990-01-01",
+      "coverageEnd": "2026-03-01"
+    },
+    {
+      "id": "fred_nonfarm_payrolls",
+      "label": "Nonfarm payrolls",
+      "source": "fred",
+      "frequency": "monthly",
+      "agents": [
+        "macro-agent",
+        "equities-agent",
+        "risk-sentiment-agent"
+      ],
+      "rawFile": "knowledge/data-lake/raw/fred/fred_nonfarm_payrolls.json",
+      "normalizedFile": "knowledge/data-lake/normalized/fred_nonfarm_payrolls.json",
+      "observationCount": 435,
+      "coverageStart": "1990-01-01",
+      "coverageEnd": "2026-03-01"
+    },
+    {
+      "id": "fred_retail_sales",
+      "label": "Retail sales",
+      "source": "fred",
+      "frequency": "monthly",
+      "agents": [
+        "macro-agent",
+        "equities-agent",
+        "risk-sentiment-agent"
+      ],
+      "rawFile": "knowledge/data-lake/raw/fred/fred_retail_sales.json",
+      "normalizedFile": "knowledge/data-lake/normalized/fred_retail_sales.json",
+      "observationCount": 410,
+      "coverageStart": "1992-01-01",
+      "coverageEnd": "2026-02-01"
+    },
+    {
+      "id": "fred_industrial_production",
+      "label": "Industrial production",
+      "source": "fred",
+      "frequency": "monthly",
+      "agents": [
+        "macro-agent",
+        "commodities-agent",
+        "equities-agent"
+      ],
+      "rawFile": "knowledge/data-lake/raw/fred/fred_industrial_production.json",
+      "normalizedFile": "knowledge/data-lake/normalized/fred_industrial_production.json",
+      "observationCount": 434,
+      "coverageStart": "1990-01-01",
+      "coverageEnd": "2026-02-01"
+    },
+    {
+      "id": "fred_gdp",
+      "label": "Real GDP proxy",
+      "source": "fred",
+      "frequency": "quarterly",
+      "agents": [
+        "macro-agent",
+        "equities-agent"
+      ],
+      "rawFile": "knowledge/data-lake/raw/fred/fred_gdp.json",
+      "normalizedFile": "knowledge/data-lake/normalized/fred_gdp.json",
+      "observationCount": 144,
+      "coverageStart": "1990-01-01",
+      "coverageEnd": "2025-10-01"
+    },
+    {
+      "id": "fred_fedfunds",
+      "label": "Fed funds rate",
+      "source": "fred",
+      "frequency": "monthly",
+      "agents": [
+        "macro-agent",
+        "rates-agent",
+        "fx-agent",
+        "risk-sentiment-agent"
+      ],
+      "rawFile": "knowledge/data-lake/raw/fred/fred_fedfunds.json",
+      "normalizedFile": "knowledge/data-lake/normalized/fred_fedfunds.json",
+      "observationCount": 435,
+      "coverageStart": "1990-01-01",
+      "coverageEnd": "2026-03-01"
+    },
+    {
+      "id": "fred_us2y",
+      "label": "US 2Y yield",
+      "source": "fred",
+      "frequency": "daily",
+      "agents": [
+        "macro-agent",
+        "rates-agent",
+        "fx-agent"
+      ],
+      "rawFile": "knowledge/data-lake/raw/fred/fred_us2y.json",
+      "normalizedFile": "knowledge/data-lake/normalized/fred_us2y.json",
+      "observationCount": 9068,
+      "coverageStart": "1990-01-02",
+      "coverageEnd": "2026-04-02"
+    },
+    {
+      "id": "fred_us10y",
+      "label": "US 10Y yield",
+      "source": "fred",
+      "frequency": "daily",
+      "agents": [
+        "macro-agent",
+        "rates-agent",
+        "equities-agent",
+        "risk-sentiment-agent"
+      ],
+      "rawFile": "knowledge/data-lake/raw/fred/fred_us10y.json",
+      "normalizedFile": "knowledge/data-lake/normalized/fred_us10y.json",
+      "observationCount": 9068,
+      "coverageStart": "1990-01-02",
+      "coverageEnd": "2026-04-02"
+    },
+    {
+      "id": "fred_curve_10y2y",
+      "label": "10Y minus 2Y curve",
+      "source": "fred",
+      "frequency": "daily",
+      "agents": [
+        "macro-agent",
+        "rates-agent",
+        "risk-sentiment-agent"
+      ],
+      "rawFile": "knowledge/data-lake/raw/fred/fred_curve_10y2y.json",
+      "normalizedFile": "knowledge/data-lake/normalized/fred_curve_10y2y.json",
+      "observationCount": 9069,
+      "coverageStart": "1990-01-02",
+      "coverageEnd": "2026-04-03"
+    },
+    {
+      "id": "fred_breakeven_10y",
+      "label": "10Y breakeven inflation",
+      "source": "fred",
+      "frequency": "daily",
+      "agents": [
+        "macro-agent",
+        "rates-agent",
+        "commodities-agent"
+      ],
+      "rawFile": "knowledge/data-lake/raw/fred/fred_breakeven_10y.json",
+      "normalizedFile": "knowledge/data-lake/normalized/fred_breakeven_10y.json",
+      "observationCount": 5817,
+      "coverageStart": "2003-01-02",
+      "coverageEnd": "2026-04-03"
+    },
+    {
+      "id": "fred_vix",
+      "label": "VIX",
+      "source": "fred",
+      "frequency": "daily",
+      "agents": [
+        "equities-agent",
+        "risk-sentiment-agent",
+        "macro-agent"
+      ],
+      "rawFile": "knowledge/data-lake/raw/fred/fred_vix.json",
+      "normalizedFile": "knowledge/data-lake/normalized/fred_vix.json",
+      "observationCount": 9156,
+      "coverageStart": "1990-01-02",
+      "coverageEnd": "2026-04-01"
+    },
+    {
+      "id": "fred_high_yield_spread",
+      "label": "US high-yield spread",
+      "source": "fred",
+      "frequency": "daily",
+      "agents": [
+        "risk-sentiment-agent",
+        "macro-agent",
+        "equities-agent"
+      ],
+      "rawFile": "knowledge/data-lake/raw/fred/fred_high_yield_spread.json",
+      "normalizedFile": "knowledge/data-lake/normalized/fred_high_yield_spread.json",
+      "observationCount": 7639,
+      "coverageStart": "1996-12-31",
+      "coverageEnd": "2026-04-02"
+    },
+    {
+      "id": "fred_broad_dollar",
+      "label": "Broad trade-weighted dollar",
+      "source": "fred",
+      "frequency": "daily",
+      "agents": [
+        "fx-agent",
+        "macro-agent",
+        "risk-sentiment-agent"
+      ],
+      "rawFile": "knowledge/data-lake/raw/fred/fred_broad_dollar.json",
+      "normalizedFile": "knowledge/data-lake/normalized/fred_broad_dollar.json",
+      "observationCount": 5072,
+      "coverageStart": "2006-01-02",
+      "coverageEnd": "2026-03-27"
+    },
+    {
+      "id": "fred_copper",
+      "label": "Copper spot",
+      "source": "fred",
+      "frequency": "daily",
+      "agents": [
+        "commodities-agent",
+        "macro-agent",
+        "equities-agent"
+      ],
+      "rawFile": "knowledge/data-lake/raw/fred/fred_copper.json",
+      "normalizedFile": "knowledge/data-lake/normalized/fred_copper.json",
+      "observationCount": 410,
+      "coverageStart": "1992-01-01",
+      "coverageEnd": "2026-02-01"
+    },
+    {
+      "id": "fred_nat_gas",
+      "label": "Henry Hub natural gas",
+      "source": "fred",
+      "frequency": "daily",
+      "agents": [
+        "commodities-agent",
+        "macro-agent"
+      ],
+      "rawFile": "knowledge/data-lake/raw/fred/fred_nat_gas.json",
+      "normalizedFile": "knowledge/data-lake/normalized/fred_nat_gas.json",
+      "observationCount": 7339,
+      "coverageStart": "1997-01-07",
+      "coverageEnd": "2026-03-30"
+    },
+    {
+      "id": "eia_wti_monthly",
+      "label": "WTI crude spot",
+      "source": "eia",
+      "frequency": "monthly",
+      "agents": [
+        "commodities-agent",
+        "macro-agent",
+        "risk-sentiment-agent"
+      ],
+      "rawFile": "knowledge/data-lake/raw/eia/eia_wti_monthly.json",
+      "normalizedFile": "knowledge/data-lake/normalized/eia_wti_monthly.json",
+      "observationCount": 435,
+      "coverageStart": "1990-01",
+      "coverageEnd": "2026-03"
+    },
+    {
+      "id": "eia_brent_monthly",
+      "label": "Brent crude spot",
+      "source": "eia",
+      "frequency": "monthly",
+      "agents": [
+        "commodities-agent",
+        "macro-agent"
+      ],
+      "rawFile": "knowledge/data-lake/raw/eia/eia_brent_monthly.json",
+      "normalizedFile": "knowledge/data-lake/normalized/eia_brent_monthly.json",
+      "observationCount": 435,
+      "coverageStart": "1990-01",
+      "coverageEnd": "2026-03"
+    },
+    {
+      "id": "eia_us_crude_stocks",
+      "label": "US crude oil ending stocks",
+      "source": "eia",
+      "frequency": "weekly",
+      "agents": [
+        "commodities-agent",
+        "macro-agent"
+      ],
+      "rawFile": "knowledge/data-lake/raw/eia/eia_us_crude_stocks.json",
+      "normalizedFile": "knowledge/data-lake/normalized/eia_us_crude_stocks.json",
+      "observationCount": 1891,
+      "coverageStart": "1990-01-05",
+      "coverageEnd": "2026-03-27"
+    },
+    {
+      "id": "av_gld_monthly",
+      "label": "GLD monthly",
+      "source": "alpha_vantage",
+      "frequency": "monthly",
+      "agents": [
+        "commodities-agent",
+        "macro-agent",
+        "risk-sentiment-agent"
+      ],
+      "rawFile": "knowledge/data-lake/raw/alpha_vantage/av_gld_monthly.json",
+      "normalizedFile": "knowledge/data-lake/normalized/av_gld_monthly.json",
+      "observationCount": 257,
+      "coverageStart": "2004-12-31",
+      "coverageEnd": "2026-04-02"
+    },
+    {
+      "id": "av_spy_monthly",
+      "label": "SPY monthly",
+      "source": "alpha_vantage",
+      "frequency": "monthly",
+      "agents": [
+        "equities-agent",
+        "risk-sentiment-agent",
+        "macro-agent"
+      ],
+      "rawFile": "knowledge/data-lake/raw/alpha_vantage/av_spy_monthly.json",
+      "normalizedFile": "knowledge/data-lake/normalized/av_spy_monthly.json",
+      "observationCount": 317,
+      "coverageStart": "1999-12-31",
+      "coverageEnd": "2026-04-02"
+    },
+    {
+      "id": "av_qqq_monthly",
+      "label": "QQQ monthly",
+      "source": "alpha_vantage",
+      "frequency": "monthly",
+      "agents": [
+        "equities-agent",
+        "risk-sentiment-agent"
+      ],
+      "rawFile": "knowledge/data-lake/raw/alpha_vantage/av_qqq_monthly.json",
+      "normalizedFile": "knowledge/data-lake/normalized/av_qqq_monthly.json",
+      "observationCount": 317,
+      "coverageStart": "1999-12-31",
+      "coverageEnd": "2026-04-02"
+    },
+    {
+      "id": "av_iwm_monthly",
+      "label": "IWM monthly",
+      "source": "alpha_vantage",
+      "frequency": "monthly",
+      "agents": [
+        "equities-agent",
+        "risk-sentiment-agent",
+        "macro-agent"
+      ],
+      "rawFile": "knowledge/data-lake/raw/alpha_vantage/av_iwm_monthly.json",
+      "normalizedFile": "knowledge/data-lake/normalized/av_iwm_monthly.json",
+      "observationCount": 311,
+      "coverageStart": "2000-06-30",
+      "coverageEnd": "2026-04-02"
+    },
+    {
+      "id": "av_xle_monthly",
+      "label": "XLE monthly",
+      "source": "alpha_vantage",
+      "frequency": "monthly",
+      "agents": [
+        "equities-agent",
+        "commodities-agent"
+      ],
+      "rawFile": "knowledge/data-lake/raw/alpha_vantage/av_xle_monthly.json",
+      "normalizedFile": "knowledge/data-lake/normalized/av_xle_monthly.json",
+      "observationCount": 317,
+      "coverageStart": "1999-12-31",
+      "coverageEnd": "2026-04-02"
+    },
+    {
+      "id": "av_xlf_monthly",
+      "label": "XLF monthly",
+      "source": "alpha_vantage",
+      "frequency": "monthly",
+      "agents": [
+        "equities-agent",
+        "rates-agent",
+        "risk-sentiment-agent"
+      ],
+      "rawFile": "knowledge/data-lake/raw/alpha_vantage/av_xlf_monthly.json",
+      "normalizedFile": "knowledge/data-lake/normalized/av_xlf_monthly.json",
+      "observationCount": 317,
+      "coverageStart": "1999-12-31",
+      "coverageEnd": "2026-04-02"
+    },
+    {
+      "id": "av_xlk_monthly",
+      "label": "XLK monthly",
+      "source": "alpha_vantage",
+      "frequency": "monthly",
+      "agents": [
+        "equities-agent",
+        "risk-sentiment-agent",
+        "rates-agent"
+      ],
+      "rawFile": "knowledge/data-lake/raw/alpha_vantage/av_xlk_monthly.json",
+      "normalizedFile": "knowledge/data-lake/normalized/av_xlk_monthly.json",
+      "observationCount": 317,
+      "coverageStart": "1999-12-31",
+      "coverageEnd": "2026-04-02"
+    },
+    {
+      "id": "av_btc_monthly",
+      "label": "BTCUSD monthly",
+      "source": "alpha_vantage",
+      "frequency": "monthly",
+      "agents": [
+        "risk-sentiment-agent",
+        "macro-agent"
+      ],
+      "rawFile": "knowledge/data-lake/raw/alpha_vantage/av_btc_monthly.json",
+      "normalizedFile": "knowledge/data-lake/normalized/av_btc_monthly.json",
+      "observationCount": 189,
+      "coverageStart": "2010-08-31",
+      "coverageEnd": "2026-04-05"
+    },
+    {
+      "id": "fred_eurusd",
+      "label": "EUR/USD",
+      "source": "fred",
+      "frequency": "daily",
+      "agents": [
+        "fx-agent",
+        "macro-agent"
+      ],
+      "rawFile": "knowledge/data-lake/raw/fred/fred_eurusd.json",
+      "normalizedFile": "knowledge/data-lake/normalized/fred_eurusd.json",
+      "observationCount": 6829,
+      "coverageStart": "1999-01-04",
+      "coverageEnd": "2026-03-27"
+    },
+    {
+      "id": "fred_gbpusd",
+      "label": "GBP/USD",
+      "source": "fred",
+      "frequency": "daily",
+      "agents": [
+        "fx-agent",
+        "rates-agent"
+      ],
+      "rawFile": "knowledge/data-lake/raw/fred/fred_gbpusd.json",
+      "normalizedFile": "knowledge/data-lake/normalized/fred_gbpusd.json",
+      "observationCount": 9093,
+      "coverageStart": "1990-01-02",
+      "coverageEnd": "2026-03-27"
+    },
+    {
+      "id": "fred_usdjpy",
+      "label": "USD/JPY",
+      "source": "fred",
+      "frequency": "daily",
+      "agents": [
+        "fx-agent",
+        "risk-sentiment-agent",
+        "macro-agent"
+      ],
+      "rawFile": "knowledge/data-lake/raw/fred/fred_usdjpy.json",
+      "normalizedFile": "knowledge/data-lake/normalized/fred_usdjpy.json",
+      "observationCount": 9093,
+      "coverageStart": "1990-01-02",
+      "coverageEnd": "2026-03-27"
+    },
+    {
+      "id": "fred_audusd",
+      "label": "AUD/USD",
+      "source": "fred",
+      "frequency": "daily",
+      "agents": [
+        "fx-agent",
+        "risk-sentiment-agent",
+        "commodities-agent"
+      ],
+      "rawFile": "knowledge/data-lake/raw/fred/fred_audusd.json",
+      "normalizedFile": "knowledge/data-lake/normalized/fred_audusd.json",
+      "observationCount": 9093,
+      "coverageStart": "1990-01-02",
+      "coverageEnd": "2026-03-27"
+    },
+    {
+      "id": "fred_usdcad",
+      "label": "USD/CAD",
+      "source": "fred",
+      "frequency": "daily",
+      "agents": [
+        "fx-agent",
+        "commodities-agent"
+      ],
+      "rawFile": "knowledge/data-lake/raw/fred/fred_usdcad.json",
+      "normalizedFile": "knowledge/data-lake/normalized/fred_usdcad.json",
+      "observationCount": 9093,
+      "coverageStart": "1990-01-02",
+      "coverageEnd": "2026-03-27"
+    },
+    {
+      "id": "fred_usdchf",
+      "label": "USD/CHF",
+      "source": "fred",
+      "frequency": "daily",
+      "agents": [
+        "fx-agent",
+        "risk-sentiment-agent"
+      ],
+      "rawFile": "knowledge/data-lake/raw/fred/fred_usdchf.json",
+      "normalizedFile": "knowledge/data-lake/normalized/fred_usdchf.json",
+      "observationCount": 9093,
+      "coverageStart": "1990-01-02",
+      "coverageEnd": "2026-03-27"
+    },
+    {
+      "id": "fred_nzdusd",
+      "label": "NZD/USD",
+      "source": "fred",
+      "frequency": "daily",
+      "agents": [
+        "fx-agent"
+      ],
+      "rawFile": "knowledge/data-lake/raw/fred/fred_nzdusd.json",
+      "normalizedFile": "knowledge/data-lake/normalized/fred_nzdusd.json",
+      "observationCount": 9093,
+      "coverageStart": "1990-01-02",
+      "coverageEnd": "2026-03-27"
+    },
+    {
+      "id": "fred_nokusd",
+      "label": "NOK/USD",
+      "source": "fred",
+      "frequency": "daily",
+      "agents": [
+        "fx-agent",
+        "commodities-agent"
+      ],
+      "rawFile": "knowledge/data-lake/raw/fred/fred_nokusd.json",
+      "normalizedFile": "knowledge/data-lake/normalized/fred_nokusd.json",
+      "observationCount": 9093,
+      "coverageStart": "1990-01-02",
+      "coverageEnd": "2026-03-27"
+    },
+    {
+      "id": "fred_sekusd",
+      "label": "SEK/USD",
+      "source": "fred",
+      "frequency": "daily",
+      "agents": [
+        "fx-agent"
+      ],
+      "rawFile": "knowledge/data-lake/raw/fred/fred_sekusd.json",
+      "normalizedFile": "knowledge/data-lake/normalized/fred_sekusd.json",
+      "observationCount": 9093,
+      "coverageStart": "1990-01-02",
+      "coverageEnd": "2026-03-27"
+    },
+    {
+      "id": "fred_us3m",
+      "label": "US 3M yield",
+      "source": "fred",
+      "frequency": "daily",
+      "agents": [
+        "rates-agent",
+        "macro-agent"
+      ],
+      "rawFile": "knowledge/data-lake/raw/fred/fred_us3m.json",
+      "normalizedFile": "knowledge/data-lake/normalized/fred_us3m.json",
+      "observationCount": 9068,
+      "coverageStart": "1990-01-02",
+      "coverageEnd": "2026-04-02"
+    },
+    {
+      "id": "fred_us1y",
+      "label": "US 1Y yield",
+      "source": "fred",
+      "frequency": "daily",
+      "agents": [
+        "rates-agent",
+        "macro-agent"
+      ],
+      "rawFile": "knowledge/data-lake/raw/fred/fred_us1y.json",
+      "normalizedFile": "knowledge/data-lake/normalized/fred_us1y.json",
+      "observationCount": 9068,
+      "coverageStart": "1990-01-02",
+      "coverageEnd": "2026-04-02"
+    },
+    {
+      "id": "fred_us5y",
+      "label": "US 5Y yield",
+      "source": "fred",
+      "frequency": "daily",
+      "agents": [
+        "rates-agent",
+        "macro-agent"
+      ],
+      "rawFile": "knowledge/data-lake/raw/fred/fred_us5y.json",
+      "normalizedFile": "knowledge/data-lake/normalized/fred_us5y.json",
+      "observationCount": 9068,
+      "coverageStart": "1990-01-02",
+      "coverageEnd": "2026-04-02"
+    },
+    {
+      "id": "fred_us7y",
+      "label": "US 7Y yield",
+      "source": "fred",
+      "frequency": "daily",
+      "agents": [
+        "rates-agent"
+      ],
+      "rawFile": "knowledge/data-lake/raw/fred/fred_us7y.json",
+      "normalizedFile": "knowledge/data-lake/normalized/fred_us7y.json",
+      "observationCount": 9068,
+      "coverageStart": "1990-01-02",
+      "coverageEnd": "2026-04-02"
+    },
+    {
+      "id": "fred_us20y",
+      "label": "US 20Y yield",
+      "source": "fred",
+      "frequency": "daily",
+      "agents": [
+        "rates-agent"
+      ],
+      "rawFile": "knowledge/data-lake/raw/fred/fred_us20y.json",
+      "normalizedFile": "knowledge/data-lake/normalized/fred_us20y.json",
+      "observationCount": 8129,
+      "coverageStart": "1993-10-01",
+      "coverageEnd": "2026-04-02"
+    },
+    {
+      "id": "fred_us30y",
+      "label": "US 30Y yield",
+      "source": "fred",
+      "frequency": "daily",
+      "agents": [
+        "rates-agent",
+        "macro-agent",
+        "risk-sentiment-agent"
+      ],
+      "rawFile": "knowledge/data-lake/raw/fred/fred_us30y.json",
+      "normalizedFile": "knowledge/data-lake/normalized/fred_us30y.json",
+      "observationCount": 9068,
+      "coverageStart": "1990-01-02",
+      "coverageEnd": "2026-04-02"
+    },
+    {
+      "id": "fred_tips_5y",
+      "label": "5Y TIPS real yield",
+      "source": "fred",
+      "frequency": "daily",
+      "agents": [
+        "rates-agent",
+        "macro-agent"
+      ],
+      "rawFile": "knowledge/data-lake/raw/fred/fred_tips_5y.json",
+      "normalizedFile": "knowledge/data-lake/normalized/fred_tips_5y.json",
+      "observationCount": 5816,
+      "coverageStart": "2003-01-02",
+      "coverageEnd": "2026-04-02"
+    },
+    {
+      "id": "fred_tips_10y",
+      "label": "10Y TIPS real yield",
+      "source": "fred",
+      "frequency": "daily",
+      "agents": [
+        "rates-agent",
+        "macro-agent"
+      ],
+      "rawFile": "knowledge/data-lake/raw/fred/fred_tips_10y.json",
+      "normalizedFile": "knowledge/data-lake/normalized/fred_tips_10y.json",
+      "observationCount": 5816,
+      "coverageStart": "2003-01-02",
+      "coverageEnd": "2026-04-02"
+    },
+    {
+      "id": "fred_ig_oas",
+      "label": "ICE BofA IG OAS",
+      "source": "fred",
+      "frequency": "daily",
+      "agents": [
+        "rates-agent",
+        "risk-sentiment-agent"
+      ],
+      "rawFile": "knowledge/data-lake/raw/fred/fred_ig_oas.json",
+      "normalizedFile": "knowledge/data-lake/normalized/fred_ig_oas.json",
+      "observationCount": 7638,
+      "coverageStart": "1996-12-31",
+      "coverageEnd": "2026-04-02"
+    },
+    {
+      "id": "fred_bbb_oas",
+      "label": "ICE BofA BBB OAS",
+      "source": "fred",
+      "frequency": "daily",
+      "agents": [
+        "rates-agent",
+        "risk-sentiment-agent"
+      ],
+      "rawFile": "knowledge/data-lake/raw/fred/fred_bbb_oas.json",
+      "normalizedFile": "knowledge/data-lake/normalized/fred_bbb_oas.json",
+      "observationCount": 7639,
+      "coverageStart": "1996-12-31",
+      "coverageEnd": "2026-04-02"
+    },
+    {
+      "id": "fred_wti_daily",
+      "label": "WTI crude daily",
+      "source": "fred",
+      "frequency": "daily",
+      "agents": [
+        "commodities-agent",
+        "macro-agent",
+        "risk-sentiment-agent"
+      ],
+      "rawFile": "knowledge/data-lake/raw/fred/fred_wti_daily.json",
+      "normalizedFile": "knowledge/data-lake/normalized/fred_wti_daily.json",
+      "observationCount": 9110,
+      "coverageStart": "1990-01-02",
+      "coverageEnd": "2026-03-30"
+    },
+    {
+      "id": "fred_brent_daily",
+      "label": "Brent crude daily",
+      "source": "fred",
+      "frequency": "daily",
+      "agents": [
+        "commodities-agent"
+      ],
+      "rawFile": "knowledge/data-lake/raw/fred/fred_brent_daily.json",
+      "normalizedFile": "knowledge/data-lake/normalized/fred_brent_daily.json",
+      "observationCount": 9192,
+      "coverageStart": "1990-01-02",
+      "coverageEnd": "2026-03-30"
+    },
+    {
+      "id": "fred_aluminum",
+      "label": "Aluminum",
+      "source": "fred",
+      "frequency": "monthly",
+      "agents": [
+        "commodities-agent"
+      ],
+      "rawFile": "knowledge/data-lake/raw/fred/fred_aluminum.json",
+      "normalizedFile": "knowledge/data-lake/normalized/fred_aluminum.json",
+      "observationCount": 410,
+      "coverageStart": "1992-01-01",
+      "coverageEnd": "2026-02-01"
+    },
+    {
+      "id": "fred_wheat",
+      "label": "Wheat",
+      "source": "fred",
+      "frequency": "monthly",
+      "agents": [
+        "commodities-agent",
+        "macro-agent"
+      ],
+      "rawFile": "knowledge/data-lake/raw/fred/fred_wheat.json",
+      "normalizedFile": "knowledge/data-lake/normalized/fred_wheat.json",
+      "observationCount": 410,
+      "coverageStart": "1992-01-01",
+      "coverageEnd": "2026-02-01"
+    },
+    {
+      "id": "fred_ted_spread",
+      "label": "TED spread",
+      "source": "fred",
+      "frequency": "daily",
+      "agents": [
+        "risk-sentiment-agent",
+        "macro-agent"
+      ],
+      "rawFile": "knowledge/data-lake/raw/fred/fred_ted_spread.json",
+      "normalizedFile": "knowledge/data-lake/normalized/fred_ted_spread.json",
+      "observationCount": 7869,
+      "coverageStart": "1990-01-02",
+      "coverageEnd": "2022-01-21"
+    },
+    {
+      "id": "fred_vxvcls",
+      "label": "VIX near-term (9-day)",
+      "source": "fred",
+      "frequency": "daily",
+      "agents": [
+        "risk-sentiment-agent",
+        "equities-agent"
+      ],
+      "rawFile": "knowledge/data-lake/raw/fred/fred_vxvcls.json",
+      "normalizedFile": "knowledge/data-lake/normalized/fred_vxvcls.json",
+      "observationCount": 4610,
+      "coverageStart": "2007-12-04",
+      "coverageEnd": "2026-04-01"
+    }
+  ],
+  "failures": [
+    {
+      "id": "fred_gold_daily",
+      "label": "Gold spot daily",
+      "source": "fred",
+      "error": "HTTP 400"
+    },
+    {
+      "id": "fred_silver",
+      "label": "Silver spot",
+      "source": "fred",
+      "error": "HTTP 400"
+    }
+  ]
+}

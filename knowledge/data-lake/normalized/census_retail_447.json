@@ -1,0 +1,22 @@
+{
+  "id": "census_retail_447",
+  "source": "census",
+  "label": "Gasoline stations",
+  "description": "US Census MRTS monthly retail sales for Gasoline stations.",
+  "usageNote": "Useful for energy pass-through and nominal consumer spending distortions.",
+  "frequency": "monthly",
+  "units": "million_usd",
+  "categoryCode": "447",
+  "observationCount": 0,
+  "coverageStart": null,
+  "coverageEnd": null,
+  "summary": {
+    "latestDate": null,
+    "latestValue": null,
+    "previousDate": null,
+    "previousValue": null,
+    "periodChangePct": null,
+    "annualChangePct": null
+  },
+  "observations": []
+}

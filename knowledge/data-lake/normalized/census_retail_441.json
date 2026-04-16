@@ -1,0 +1,22 @@
+{
+  "id": "census_retail_441",
+  "source": "census",
+  "label": "Motor vehicle and parts dealers",
+  "description": "US Census MRTS monthly retail sales for Motor vehicle and parts dealers.",
+  "usageNote": "Useful for auto demand, consumer financing sensitivity, and cyclical spending.",
+  "frequency": "monthly",
+  "units": "million_usd",
+  "categoryCode": "441",
+  "observationCount": 0,
+  "coverageStart": null,
+  "coverageEnd": null,
+  "summary": {
+    "latestDate": null,
+    "latestValue": null,
+    "previousDate": null,
+    "previousValue": null,
+    "periodChangePct": null,
+    "annualChangePct": null
+  },
+  "observations": []
+}

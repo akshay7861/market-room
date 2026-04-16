@@ -1,0 +1,22 @@
+{
+  "id": "census_retail_454",
+  "source": "census",
+  "label": "Nonstore retailers",
+  "description": "US Census MRTS monthly retail sales for Nonstore retailers.",
+  "usageNote": "Useful for ecommerce strength and distribution-channel shifts.",
+  "frequency": "monthly",
+  "units": "million_usd",
+  "categoryCode": "454",
+  "observationCount": 0,
+  "coverageStart": null,
+  "coverageEnd": null,
+  "summary": {
+    "latestDate": null,
+    "latestValue": null,
+    "previousDate": null,
+    "previousValue": null,
+    "periodChangePct": null,
+    "annualChangePct": null
+  },
+  "observations": []
+}

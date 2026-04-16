@@ -1,0 +1,34 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "market-room-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-04-04",
+  "observability": {
+    "enabled": true
+  },
+  "triggers": {
+    // Check every hour and let the app decide whether a discussion is warranted.
+    "crons": ["0 * * * *"]
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "market-room-db",
+      "database_id": "7073e147-ea95-4ce9-b9c7-16f2179f0c0f",
+      "migrations_dir": "../../database/migrations"
+    }
+  ],
+  "vars": {
+    "APP_NAME": "Market Room",
+    "SCHEDULED_DISCUSSIONS_ENABLED": "true",
+    "SCHEDULED_DISCUSSION_REQUIRE_MATERIALITY": "false",
+    "SCHEDULED_DISCUSSION_PROMPT": "Discuss the biggest market drivers right now, the main risk, and one thing investors should watch next.",
+    "SCHEDULED_DISCUSSION_COOLDOWN_MINUTES": "50",
+    "SCHEDULED_MATERIALITY_INDEX_MOVE_PCT": "1",
+    "SCHEDULED_MATERIALITY_COMMODITY_MOVE_PCT": "2",
+    "SCHEDULED_MATERIALITY_DXY_MOVE_PCT": "0.5",
+    "SCHEDULED_MATERIALITY_US10Y_BPS": "8",
+    "SCHEDULED_HEADLINE_CHANGE_COUNT": "2",
+    "ADMIN_API_ENABLED": "false"
+  }
+}

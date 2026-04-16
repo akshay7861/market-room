@@ -1,0 +1,24 @@
+{
+  "name": "market-room",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:web": "npm run dev --workspace @market-room/web",
+    "dev:api": "npm run dev --workspace @market-room/api",
+    "dev:api:scheduled": "npm run dev:scheduled --workspace @market-room/api",
+    "data:download:starter": "node ./scripts/download-historical-data.mjs",
+    "data:download:twelvedata-equities": "node ./scripts/download-twelvedata-equities.mjs",
+    "data:download:census-retail": "node ./scripts/download-census-retail-history.mjs",
+    "data:download:reports": "node ./scripts/download-public-report-library.mjs",
+    "data:queue:starter": "node ./scripts/queue-generated-knowledge.mjs",
+    "build": "npm run build --workspaces",
+    "check": "npm run check --workspaces",
+    "typecheck": "npm run typecheck --workspaces",
+    "db:init:local": "bash ./scripts/init-d1-local.sh",
+    "db:init:remote": "bash ./scripts/init-d1-remote.sh"
+  }
+}

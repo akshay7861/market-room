@@ -1,0 +1,109 @@
+{
+  "generatedAt": "2026-04-04T09:51:52.060Z",
+  "fileCount": 11,
+  "entries": [
+    {
+      "source": "federal-reserve",
+      "label": "FOMC historical materials index",
+      "url": "https://www.federalreserve.gov/monetarypolicy/fomc_historical.htm",
+      "file": "knowledge/report-library/raw/federal-reserve/fomc-historical-index.md"
+    },
+    {
+      "source": "federal-reserve",
+      "label": "FOMC strategy statement history",
+      "url": "https://www.federalreserve.gov/monetarypolicy/historical-statements-on-longer-run-goals-and-monetary-policy-strategy.htm",
+      "file": "knowledge/report-library/raw/federal-reserve/fomc-strategy-history.md"
+    },
+    {
+      "source": "federal-reserve",
+      "label": "FOMC calendars and statements page",
+      "url": "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm",
+      "file": "knowledge/report-library/raw/federal-reserve/fomc-calendars.md"
+    },
+    {
+      "source": "eia",
+      "label": "EIA Short-Term Energy Outlook index",
+      "url": "https://www.eia.gov/outlooks/steo/",
+      "file": "knowledge/report-library/raw/eia/steo-index.md"
+    },
+    {
+      "source": "eia",
+      "label": "EIA STEO archive Feb26",
+      "url": "https://www.eia.gov/outlooks/steo/archives/Feb26.pdf",
+      "file": "knowledge/report-library/raw/eia/Feb26.pdf"
+    },
+    {
+      "source": "eia",
+      "label": "EIA STEO archive Jan26",
+      "url": "https://www.eia.gov/outlooks/steo/archives/Jan26.pdf",
+      "file": "knowledge/report-library/raw/eia/Jan26.pdf"
+    },
+    {
+      "source": "eia",
+      "label": "EIA STEO archive Dec25",
+      "url": "https://www.eia.gov/outlooks/steo/archives/Dec25.pdf",
+      "file": "knowledge/report-library/raw/eia/Dec25.pdf"
+    },
+    {
+      "source": "eia",
+      "label": "EIA STEO archive Nov25",
+      "url": "https://www.eia.gov/outlooks/steo/archives/Nov25.pdf",
+      "file": "knowledge/report-library/raw/eia/Nov25.pdf"
+    },
+    {
+      "source": "eia",
+      "label": "EIA STEO archive Oct25",
+      "url": "https://www.eia.gov/outlooks/steo/archives/Oct25.pdf",
+      "file": "knowledge/report-library/raw/eia/Oct25.pdf"
+    },
+    {
+      "source": "bls",
+      "label": "BLS CPI archive",
+      "url": "https://www.bls.gov/bls/news-release/cpi.htm",
+      "file": "knowledge/report-library/raw/bls/cpi-archive-status.md"
+    },
+    {
+      "source": "bls",
+      "label": "BLS Employment Situation archive",
+      "url": "https://www.bls.gov/bls/news-release/empsit.htm",
+      "file": "knowledge/report-library/raw/bls/employment-situation-archive-status.md"
+    }
+  ],
+  "providers": [
+    {
+      "source": "federal-reserve",
+      "status": "ok",
+      "note": "Downloaded FOMC historical materials index."
+    },
+    {
+      "source": "federal-reserve",
+      "status": "ok",
+      "note": "Downloaded FOMC strategy statement history."
+    },
+    {
+      "source": "federal-reserve",
+      "status": "ok",
+      "note": "Downloaded FOMC calendars and statements page."
+    },
+    {
+      "source": "eia",
+      "status": "ok",
+      "note": "Downloaded the EIA STEO index page."
+    },
+    {
+      "source": "eia",
+      "status": "ok",
+      "note": "Downloaded 5 STEO archive PDFs."
+    },
+    {
+      "source": "bls",
+      "status": "ok",
+      "note": "Downloaded BLS CPI archive."
+    },
+    {
+      "source": "bls",
+      "status": "ok",
+      "note": "Downloaded BLS Employment Situation archive."
+    }
+  ]
+}

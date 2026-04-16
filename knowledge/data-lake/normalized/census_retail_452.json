@@ -1,0 +1,22 @@
+{
+  "id": "census_retail_452",
+  "source": "census",
+  "label": "General merchandise stores",
+  "description": "US Census MRTS monthly retail sales for General merchandise stores.",
+  "usageNote": "Useful for mass-market retail demand and broad consumer-health checks.",
+  "frequency": "monthly",
+  "units": "million_usd",
+  "categoryCode": "452",
+  "observationCount": 0,
+  "coverageStart": null,
+  "coverageEnd": null,
+  "summary": {
+    "latestDate": null,
+    "latestValue": null,
+    "previousDate": null,
+    "previousValue": null,
+    "periodChangePct": null,
+    "annualChangePct": null
+  },
+  "observations": []
+}

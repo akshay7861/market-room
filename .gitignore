@@ -1,0 +1,8 @@
+node_modules
+dist
+.wrangler
+.DS_Store
+.dev.vars
+apps/api/.dev.vars
+apps/web/.env.local
+.admin-token
