@@ -23,6 +23,7 @@ import {
   buildEquityQuotePromptBlock,
   type EquityQuoteContext
 } from "./equityQuoteService";
+import { buildHistoricalDataPromptBlock } from "./historicalDataContextService";
 
 type RoutingBreakdown = {
   agent: Agent;
@@ -210,6 +211,7 @@ async function selectAgentForFollowUp(
     winner.contributions.includes("explicit-agent") ||
     winner.contributions.includes("explicit-sector") ||
     winner.contributions.includes("asked-sector-frame") ||
+    winner.contributions.includes("commodity-agent-request") ||
     winner.contributions.includes("equity-quote-intent");
   const strongSpecialistPivot = winner.score >= 8 && marginVsCurrent >= 3;
 
@@ -400,6 +402,9 @@ async function heuristicAgentMatch(env: Env, agents: Agent[], question: string):
     {
       sector: "Commodities",
       weightedTerms: [
+        { term: "commodity", score: 2.5 },
+        { term: "commodities", score: 3 },
+        { term: "crude", score: 3 },
         { term: "oil", score: 2.5 },
         { term: "wti", score: 3 },
         { term: "brent", score: 3 },
@@ -412,6 +417,14 @@ async function heuristicAgentMatch(env: Env, agents: Agent[], question: string):
         { term: "refinery", score: 3 }
       ],
       weightedPhrases: [
+        { phrase: "commodity agent", score: 10 },
+        { phrase: "commodities agent", score: 10 },
+        { phrase: "wti prices", score: 5 },
+        { phrase: "wti price", score: 5 },
+        { phrase: "oil prices", score: 4 },
+        { phrase: "historical patterns in wti", score: 7 },
+        { phrase: "middle east wars", score: 6 },
+        { phrase: "gulf war", score: 5 },
         { phrase: "crude draw", score: 4 },
         { phrase: "petroleum report", score: 4 },
         { phrase: "physical tightness", score: 3.5 },
@@ -506,7 +519,7 @@ async function heuristicAgentMatch(env: Env, agents: Agent[], question: string):
 
     const negatedSectorFrame = hasNegatedSectorFrame(text, agent.sector);
 
-    if (!negatedSectorFrame && new RegExp(`\\b${escapeRegex(agent.sector.toLowerCase())}\\b`).test(text)) {
+    if (!negatedSectorFrame && sectorAliases(agent.sector).some((alias) => new RegExp(`\\b${escapeRegex(alias)}\\b`).test(text))) {
       score += 6;
       contributions.push("explicit-sector");
     }
@@ -565,6 +578,11 @@ async function heuristicAgentMatch(env: Env, agents: Agent[], question: string):
       contributions.push("-specialist-non-equity-intent");
     }
 
+    if (agent.sector === "Commodities" && /\b(commodity|commodities)\s+agent\b/.test(text)) {
+      score += 12;
+      contributions.push("commodity-agent-request");
+    }
+
     const knowledgePool = knowledgePools.find((entry) => entry.agent.id === agent.id)?.documents || [];
     const knowledgeScore = scoreKnowledgeRoutingMatch(knowledgePool, question);
     if (knowledgeScore > 0) {
@@ -601,7 +619,8 @@ function hasExplicitRoutingSignal(entry: RoutingBreakdown): boolean {
   return (
     entry.contributions.includes("explicit-agent") ||
     entry.contributions.includes("explicit-sector") ||
-    entry.contributions.includes("asked-sector-frame")
+    entry.contributions.includes("asked-sector-frame") ||
+    entry.contributions.includes("commodity-agent-request")
   );
 }
 
@@ -677,15 +696,7 @@ function hasStrongNonEquityIntent(question: string): boolean {
 }
 
 function hasAskedSectorFrame(text: string, sector: string): boolean {
-  const normalizedSector = sector.toLowerCase();
-  const aliases =
-    normalizedSector === "risk/sentiment"
-      ? ["risk/sentiment", "risk sentiment"]
-      : normalizedSector === "commodities"
-        ? ["commodities", "commodity"]
-        : normalizedSector === "equities"
-          ? ["equities", "equity"]
-          : [normalizedSector];
+  const aliases = sectorAliases(sector);
 
   return aliases.some((alias) => {
     const escaped = escapeRegex(alias);
@@ -694,6 +705,14 @@ function hasAskedSectorFrame(text: string, sector: string): boolean {
       new RegExp(`\\bfrom\\s+(an?\\s+)?${escaped}\\s+(perspective|standpoint|lens)\\b`).test(text)
     );
   });
+}
+
+function sectorAliases(sector: string): string[] {
+  const normalizedSector = sector.toLowerCase();
+  if (normalizedSector === "risk/sentiment") return ["risk/sentiment", "risk sentiment"];
+  if (normalizedSector === "commodities") return ["commodities", "commodity"];
+  if (normalizedSector === "equities") return ["equities", "equity"];
+  return [normalizedSector];
 }
 
 function hasPhysicalCommodityIntent(question: string): boolean {
@@ -851,6 +870,8 @@ async function requestAgentQuestionReply(
         "Treat user messages as sentiment, curiosity, or hypothesis, not as established facts.",
         "If the user premise is wrong, correct it gently using current market data, fresh headlines, and historical analogs.",
         "Use actual available market context before agreeing with the user.",
+        "Do not claim another agent is working behind the scenes. If a different specialist is needed, answer only if you are that selected agent; otherwise say the thread should be routed to that specialist.",
+        "Do not invent exact correlations, charts, or backtest numbers. Use only supplied historical-data context for exact statistics, and say when a requested series is not currently available.",
         "Be conversational and helpful, not defensive or robotic.",
         "Keep the reply under 220 words and end with one follow-up prompt or one next thing to watch."
       ].join("\n"),
@@ -888,6 +909,7 @@ function buildQuestionThreadPrompt(
     headlines.length > 0 ? "Relevant headlines:" : "No fresh headlines available.",
     ...headlines.map((headline, index) => `${index + 1}. ${headline.title} (${headline.source})`),
     buildEquityQuotePromptBlock(equityQuoteContext),
+    buildHistoricalDataPromptBlock(latestUserMessage),
     stockIdeaMode ? buildStockIdeaAnswerModeBlock(latestUserMessage) : "",
     buildDynamicMemoryPromptBlock(agent, dynamicMemory),
     knowledgeSnippets.length > 0 ? "Relevant long-term memory snippets:" : "No approved long-term memory snippets available.",
