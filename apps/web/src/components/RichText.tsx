@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { formatDisplayNumberText } from "../lib/formatting";
+import { ChartBlock, type ChartData } from "./ChartBlock";
 
 type RichTextProps = {
   content: string;
@@ -12,6 +13,10 @@ export function RichText({ content, className = "" }: RichTextProps) {
   return (
     <div className={`rich-text ${className}`.trim()}>
       {blocks.map((block, index) => {
+        if (block.type === "chart") {
+          return <ChartBlock key={`chart-${index}`} data={block.data} />;
+        }
+
         if (block.type === "heading") {
           return <h4 key={`${block.type}-${index}`}>{renderInline(block.text)}</h4>;
         }
@@ -35,7 +40,8 @@ export function RichText({ content, className = "" }: RichTextProps) {
 type RichTextBlock =
   | { type: "heading"; text: string }
   | { type: "paragraph"; text: string }
-  | { type: "list"; items: string[] };
+  | { type: "list"; items: string[] }
+  | { type: "chart"; data: ChartData };
 
 function parseBlocks(content: string): RichTextBlock[] {
   const lines = cleanMarkdown(content).split("\n");
@@ -63,6 +69,19 @@ function parseBlocks(content: string): RichTextBlock[] {
     if (!line) {
       flushParagraph();
       flushList();
+      continue;
+    }
+
+    const chartMatch = line.match(/^\[CHART_JSON:(.+)\]$/);
+    if (chartMatch) {
+      flushParagraph();
+      flushList();
+      try {
+        const data = JSON.parse(chartMatch[1]) as ChartData;
+        blocks.push({ type: "chart", data });
+      } catch {
+        // malformed — skip
+      }
       continue;
     }
 

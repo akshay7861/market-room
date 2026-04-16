@@ -23,7 +23,7 @@ import {
   buildEquityQuotePromptBlock,
   type EquityQuoteContext
 } from "./equityQuoteService";
-import { buildHistoricalDataPromptBlock } from "./historicalDataContextService";
+import { buildHistoricalDataPromptBlock, buildChartDataFromQuestion } from "./historicalDataContextService";
 
 type RoutingBreakdown = {
   agent: Agent;
@@ -837,6 +837,9 @@ async function generateAgentQuestionReply(
       ? await requestAgentQuestionReply(env, agent, messages, marketSnapshot, headlines, relevantCases, knowledgeSnippets, dynamicMemory, equityQuoteContext)
       : fallbackQuestionReply(agent, marketSnapshot, latestQuestion);
 
+  const chartData = buildChartDataFromQuestion(latestQuestion);
+  const finalContent = chartData ? `${content}\n[CHART_JSON:${JSON.stringify(chartData)}]` : content;
+
   return {
     id: crypto.randomUUID(),
     threadId: messages[0]?.threadId || crypto.randomUUID(),
@@ -844,7 +847,7 @@ async function generateAgentQuestionReply(
     agentId: agent.id,
     agentName: agent.name,
     agentSector: agent.sector,
-    content,
+    content: finalContent,
     createdAt: new Date().toISOString()
   };
 }

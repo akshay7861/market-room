@@ -215,3 +215,90 @@ function formatCorrelation(value: number): string {
   const sign = value >= 0 ? "+" : "";
   return `${sign}${value.toFixed(2)}`;
 }
+
+// ── Chart data ────────────────────────────────────────────────────────────────
+
+type ChartSeries = { key: string; label: string; color: string };
+type ChartPoint = { date: string; [key: string]: number | string };
+
+export type ChartData = {
+  title: string;
+  series: ChartSeries[];
+  data: ChartPoint[];
+};
+
+export function buildChartDataFromQuestion(question: string): ChartData | null {
+  const lower = question.toLowerCase();
+  const asksForCorrelation = /\b(correlation|correlat|relationship|similarity|regression|chart|plot)\b/.test(lower);
+  const mentionsOil = /\b(wti|crude|oil)\b/.test(lower);
+  const mentionsInflation = /\b(cpi|inflation|headline inflation)\b/.test(lower);
+  const mentionsMoneySupply = /\b(m1|money supply|liquidity)\b/.test(lower);
+  const mentionsCrisis = /\b(2008|crisis|gfc|war|middle east|gulf war|iraq|iran|conflict)\b/.test(lower);
+
+  const windowStart = mentionsCrisis ? "2007-01" : tenYearsAgo();
+  const windowEnd = mentionsCrisis ? "2009-12" : undefined;
+  const windowLabel = mentionsCrisis ? "2007–2009 crisis window" : "last 10 years";
+
+  if (asksForCorrelation && mentionsOil && mentionsInflation) {
+    const points = alignedWtiCpiYoYPoints(windowStart, windowEnd);
+    if (points.length < 6) return null;
+    return {
+      title: `WTI YoY% vs CPI YoY% — ${windowLabel}`,
+      series: [
+        { key: "wtiYoY", label: "WTI YoY%", color: "#d97706" },
+        { key: "cpiYoY", label: "CPI YoY%", color: "#2563eb" }
+      ],
+      data: points.map((p) => ({ date: p.date.slice(0, 7), wtiYoY: +p.left.toFixed(1), cpiYoY: +p.right.toFixed(1) }))
+    };
+  }
+
+  if (asksForCorrelation && mentionsMoneySupply && mentionsInflation) {
+    const points = alignedM1CpiYoYPoints(windowStart, windowEnd);
+    if (points.length < 6) return null;
+    return {
+      title: `M1 YoY% vs CPI YoY% — ${windowLabel}`,
+      series: [
+        { key: "m1YoY", label: "M1 YoY%", color: "#059669" },
+        { key: "cpiYoY", label: "CPI YoY%", color: "#2563eb" }
+      ],
+      data: points.map((p) => ({ date: p.date.slice(0, 7), m1YoY: +p.left.toFixed(1), cpiYoY: +p.right.toFixed(1) }))
+    };
+  }
+
+  return null;
+}
+
+function alignedWtiCpiYoYPoints(start: string, end?: string): AlignedPoint[] {
+  const wtiByMonth = toMonthlyMap(wtiMonthlySeries().observations);
+  const cpiByMonth = toMonthlyMap(cpiHeadlineSeries().observations);
+  const wtiYoY = yoyMap(wtiByMonth);
+  const cpiYoY = yoyMap(cpiByMonth);
+  const points: AlignedPoint[] = [];
+  for (const [month, w] of wtiYoY) {
+    if (month < start) continue;
+    if (end && month > end) continue;
+    const c = cpiYoY.get(month);
+    if (typeof c === "number") points.push({ date: month, left: w, right: c });
+  }
+  return points;
+}
+
+function alignedM1CpiYoYPoints(start: string, end?: string): AlignedPoint[] {
+  const m1ByMonth = toMonthlyMap(m1MonthlySeries().observations);
+  const cpiByMonth = toMonthlyMap(cpiHeadlineSeries().observations);
+  const m1YoY = yoyMap(m1ByMonth);
+  const cpiYoY = yoyMap(cpiByMonth);
+  const points: AlignedPoint[] = [];
+  for (const [month, m] of m1YoY) {
+    if (month < start) continue;
+    if (end && month > end) continue;
+    const c = cpiYoY.get(month);
+    if (typeof c === "number") points.push({ date: month, left: m, right: c });
+  }
+  return points;
+}
+
+function tenYearsAgo(): string {
+  const d = new Date();
+  return `${d.getUTCFullYear() - 10}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+}
