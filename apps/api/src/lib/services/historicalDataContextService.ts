@@ -507,6 +507,22 @@ export type SnapshotSignal = {
   dxyLevel?: number;    // FX fallback (DXY index level)
 };
 
+// ─── 0. Series preprocessors ──────────────────────────────────────────────
+
+// Converts a monthly level series to month-over-month absolute changes.
+// Required for NFP which is stored as total-employment level (~158,000K)
+// but headline values are monthly additions (e.g. +178K).
+function monthOverMonthDiff(monthly: Map<string, number>): Map<string, number> {
+  const sorted = [...monthly.entries()].sort(([a], [b]) => a.localeCompare(b));
+  const result = new Map<string, number>();
+  for (let i = 1; i < sorted.length; i++) {
+    const [month, cur] = sorted[i];
+    const [, prev] = sorted[i - 1];
+    result.set(month, cur - prev);
+  }
+  return result;
+}
+
 // ─── 1. Analog period finder ───────────────────────────────────────────────
 
 function findAnalogPeriods(
@@ -624,6 +640,8 @@ type IndicatorSignal = {
   seriesGetter: () => HistoricalSeries;
   mode: "yoy" | "level";
   forwardReturnMode: "pct_change" | "level_change";
+  // Optional: transform raw monthly level before YoY/level matching (e.g. MoM diff for NFP)
+  preprocessor?: (monthly: Map<string, number>) => Map<string, number>;
 };
 
 const INDICATOR_CONFIG: Record<IndicatorKind, Omit<IndicatorSignal, "kind" | "value" | "label">> = {
@@ -634,7 +652,9 @@ const INDICATOR_CONFIG: Record<IndicatorKind, Omit<IndicatorSignal, "kind" | "va
   fedfunds:     { toleranceAbs: 0.25, mode: "level", forwardReturnMode: "level_change", seriesGetter: fedFundsSeries },
   oil:          { toleranceAbs: 5.0,  mode: "level", forwardReturnMode: "pct_change",  seriesGetter: wtiMonthlySeries },
   us10y:        { toleranceAbs: 0.25, mode: "level", forwardReturnMode: "level_change", seriesGetter: us10ySeries },
-  nfp:          { toleranceAbs: 30,   mode: "level", forwardReturnMode: "level_change", seriesGetter: nonfarmPayrollsSeries },
+  // NFP series stores total nonfarm employment LEVEL (~158,000K). Headlines report monthly additions (+178K).
+  // Apply monthOverMonthDiff so analog matching compares apples-to-apples.
+  nfp:          { toleranceAbs: 30,   mode: "level", forwardReturnMode: "level_change", seriesGetter: nonfarmPayrollsSeries, preprocessor: monthOverMonthDiff },
 };
 
 function extractHeadlineIndicator(headlineTitle: string): IndicatorSignal | null {
@@ -644,27 +664,34 @@ function extractHeadlineIndicator(headlineTitle: string): IndicatorSignal | null
       kind: "cpi",
       label: (v) => `CPI YoY ${v.toFixed(1)}%`,
       regexes: [
-        /\bCPI\b[^%\d]*?([+-]?\d+\.?\d*)\s*%/i,
+        /\bCPI\b.*?([+-]?\d+\.?\d*)\s*%/i,
         /([+-]?\d+\.?\d*)\s*%[^%]*?\bCPI\b/i,
-        /\bconsumer price[^%\d]*?([+-]?\d+\.?\d*)\s*%/i
+        /\bconsumer price.*?([+-]?\d+\.?\d*)\s*%/i
       ]
     },
     {
       kind: "pce_core",
       label: (v) => `Core PCE YoY ${v.toFixed(1)}%`,
-      regexes: [/\bcore\s*PCE\b[^%\d]*?([+-]?\d+\.?\d*)\s*%/i, /([+-]?\d+\.?\d*)\s*%[^%]*?\bcore\s*PCE\b/i]
+      regexes: [/\bcore\s*PCE\b.*?([+-]?\d+\.?\d*)\s*%/i, /([+-]?\d+\.?\d*)\s*%[^%]*?\bcore\s*PCE\b/i]
     },
     {
       kind: "pce",
       label: (v) => `PCE YoY ${v.toFixed(1)}%`,
-      regexes: [/\bPCE\b[^%\d]*?([+-]?\d+\.?\d*)\s*%/i, /([+-]?\d+\.?\d*)\s*%[^%]*?\bPCE\b/i]
+      regexes: [/\bPCE\b.*?([+-]?\d+\.?\d*)\s*%/i, /([+-]?\d+\.?\d*)\s*%[^%]*?\bPCE\b/i]
+    },
+    // NFP before unemployment: payroll releases always mention unemployment rate too — NFP must win
+    {
+      kind: "nfp",
+      label: (v) => `NFP +${v.toFixed(0)}K`,
+      regexes: [/\b(?:NFP|nonfarm payroll).*?[+\-]?\s*(\d+)\s*[Kk]\b/i],
+      transform: (v) => v  // already in thousands from the regex
     },
     {
       kind: "unemployment",
       label: (v) => `Unemployment ${v.toFixed(1)}%`,
       regexes: [
-        /\bunemployment\b[^%\d]*?(\d+\.?\d*)\s*%/i,
-        /\bjobless\s*rate\b[^%\d]*?(\d+\.?\d*)\s*%/i,
+        /\bunemployment\b.*?(\d+\.?\d*)\s*%/i,
+        /\bjobless\s*rate\b.*?(\d+\.?\d*)\s*%/i,
         /(\d+\.?\d*)\s*%[^%]*?\bunemployment\b/i
       ]
     },
@@ -672,22 +699,16 @@ function extractHeadlineIndicator(headlineTitle: string): IndicatorSignal | null
       kind: "fedfunds",
       label: (v) => `Fed Funds ${v.toFixed(2)}%`,
       regexes: [
-        /\bfed\s*funds?\b[^%\d]*?(\d+\.?\d*)\s*%/i,
-        /\bFFR\b[^%\d]*?(\d+\.?\d*)\s*%/i,
-        /\bpolicy\s*rate\b[^%\d]*?(\d+\.?\d*)\s*%/i
+        /\bfed\s*funds?\b.*?(\d+\.?\d*)\s*%/i,
+        /\bFFR\b.*?(\d+\.?\d*)\s*%/i,
+        /\bpolicy\s*rate\b.*?(\d+\.?\d*)\s*%/i
       ]
-    },
-    {
-      kind: "nfp",
-      label: (v) => `NFP +${v.toFixed(0)}K`,
-      regexes: [/\b(?:NFP|nonfarm payroll)[^+\-\d]*?[+\-]?\s*(\d+)\s*[Kk]\b/i],
-      transform: (v) => v  // already in thousands from the regex
     },
     {
       kind: "oil",
       label: (v) => `WTI $${v.toFixed(2)}/bbl`,
       regexes: [
-        /\b(?:WTI|crude oil)\b[^$\d]*?\$(\d+\.?\d*)/i,
+        /\b(?:WTI|crude oil)\b.*?\$(\d+\.?\d*)/i,
         /\$(\d+\.?\d*)[^%]*?\b(?:WTI|crude|oil)\b/i,
         /\boil\b.*?at\s*\$(\d+\.?\d*)/i
       ]
@@ -696,9 +717,9 @@ function extractHeadlineIndicator(headlineTitle: string): IndicatorSignal | null
       kind: "us10y",
       label: (v) => `10Y yield ${v.toFixed(2)}%`,
       regexes: [
-        /\b10[-\s]?[Yy](?:ear)?\b[^%\d]*?(\d+\.?\d*)\s*%/i,
+        /\b10[-\s]?[Yy](?:ear)?\b.*?(\d+\.?\d*)\s*%/i,
         /(\d+\.?\d*)\s*%[^%]*?\b10[-\s]?[Yy]/i,
-        /\bTreasury[^%\d]*?(\d+\.?\d*)\s*%/i
+        /\bTreasury.*?(\d+\.?\d*)\s*%/i
       ]
     }
   ];
@@ -726,6 +747,7 @@ type ForwardSeries = {
   monthlyGetter: () => Map<string, number>;
   returnMode: "pct_change" | "level_change";
   unit: string;  // display unit suffix, e.g. "%" or "bps" or "pp"
+  isAlreadyYoY?: boolean; // true when monthlyGetter already returns YoY-transformed data — prevents double-apply in lag computation
 };
 
 function getSectorForwardSeries(sector: string): ForwardSeries[] {
@@ -737,8 +759,8 @@ function getSectorForwardSeries(sector: string): ForwardSeries[] {
   const vix: ForwardSeries   = { label: "VIX",              monthlyGetter: () => toMonthlyMap(vixSeries().observations),                     returnMode: "level_change", unit: "pts" };
   const hy: ForwardSeries    = { label: "HY spread",        monthlyGetter: () => toMonthlyMap(highYieldSpreadSeries().observations),         returnMode: "level_change", unit: "bps" };
   const unemp: ForwardSeries = { label: "Unemployment",     monthlyGetter: () => toMonthlyMap(unemploymentSeries().observations),            returnMode: "level_change", unit: "pp" };
-  const retail: ForwardSeries = { label: "Retail Sales YoY",monthlyGetter: () => yoyMap(toMonthlyMap(retailSalesSeries().observations)),    returnMode: "level_change", unit: "pp" };
-  const ip: ForwardSeries    = { label: "Industrial Prod YoY",monthlyGetter: () => yoyMap(toMonthlyMap(industrialProductionSeries().observations)), returnMode: "level_change", unit: "pp" };
+  const retail: ForwardSeries = { label: "Retail Sales YoY",   monthlyGetter: () => yoyMap(toMonthlyMap(retailSalesSeries().observations)),               returnMode: "level_change", unit: "pp", isAlreadyYoY: true };
+  const ip: ForwardSeries    = { label: "Industrial Prod YoY", monthlyGetter: () => yoyMap(toMonthlyMap(industrialProductionSeries().observations)),           returnMode: "level_change", unit: "pp", isAlreadyYoY: true };
   const be: ForwardSeries    = { label: "10Y Breakeven",    monthlyGetter: () => toMonthlyMap(breakeven10ySeries().observations),            returnMode: "level_change", unit: "bps" };
 
   // us10y returnMode note: level_change is in % points — multiply by 100 for bps at display time
@@ -788,9 +810,11 @@ export function buildAnalogContextBlock(
 
   if (!signal) return "";
 
-  // Step 3: get the indicator's monthly data (apply YoY if needed)
+  // Step 3: get the indicator's monthly data
+  // Apply optional preprocessor first (e.g. MoM diff for NFP), then YoY if mode requires it
   const rawMonthly = toMonthlyMap(signal.seriesGetter().observations);
-  const matchData = signal.mode === "yoy" ? yoyMap(rawMonthly) : rawMonthly;
+  const preprocessed = signal.preprocessor ? signal.preprocessor(rawMonthly) : rawMonthly;
+  const matchData = signal.mode === "yoy" ? yoyMap(preprocessed) : preprocessed;
 
   // Step 4: find analog periods
   const analogMonths = findAnalogPeriods(matchData, signal.value, signal.toleranceAbs);
@@ -799,7 +823,7 @@ export function buildAnalogContextBlock(
   // Step 5: compute forward returns per series
   const forwardSeries = getSectorForwardSeries(sector);
   const lines: string[] = [];
-  const indicatorYoY = signal.mode === "yoy" ? matchData : yoyMap(rawMonthly);
+  const indicatorYoY = signal.mode === "yoy" ? matchData : yoyMap(preprocessed);
 
   for (const fs of forwardSeries) {
     const seriesData = fs.monthlyGetter();
@@ -810,8 +834,9 @@ export function buildAnalogContextBlock(
     const parts = results.map((r) => formatForwardReturn(r, fs.unit, isYield));
 
     // Compute peak lag vs indicator (only report if lag > 0 and |corr| > 0.35)
-    const seriesYoY = yoyMap(seriesData);
-    const lagResult = computePeakLag(indicatorYoY, seriesYoY);
+    // Use pre-YoY data directly if series is already YoY-transformed; otherwise apply yoyMap
+    const seriesForLag = fs.isAlreadyYoY ? seriesData : yoyMap(seriesData);
+    const lagResult = computePeakLag(indicatorYoY, seriesForLag);
     const lagNote =
       lagResult && lagResult.lag > 0 && Math.abs(lagResult.correlation) > 0.35
         ? `  [peak lag ${lagResult.lag}m, r=${formatCorrelation(lagResult.correlation)}]`
