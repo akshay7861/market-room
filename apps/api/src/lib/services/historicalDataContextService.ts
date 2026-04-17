@@ -6,6 +6,10 @@ import fredBroadDollar from "../../../../../knowledge/data-lake/normalized/fred_
 import avSpyMonthly from "../../../../../knowledge/data-lake/normalized/av_spy_monthly.json";
 import fredVix from "../../../../../knowledge/data-lake/normalized/fred_vix.json";
 import fredHighYieldSpread from "../../../../../knowledge/data-lake/normalized/fred_high_yield_spread.json";
+import fredUs10y from "../../../../../knowledge/data-lake/normalized/fred_us10y.json";
+import fredUs2y from "../../../../../knowledge/data-lake/normalized/fred_us2y.json";
+import fredCurve10y2y from "../../../../../knowledge/data-lake/normalized/fred_curve_10y2y.json";
+import fredBreakeven10y from "../../../../../knowledge/data-lake/normalized/fred_breakeven_10y.json";
 
 type HistoricalObservation = {
   date: string;
@@ -38,8 +42,9 @@ export function buildHistoricalDataPromptBlock(question: string): string {
   const mentionsFX = /\b(dollar|dxy|usd|fx|currency|eurusd|usdjpy|yen|euro|sterling|gbp|jpy)\b/.test(lower);
   const mentionsEquities = /\b(spy|s&p|spx|equities|stocks|equity|stock market)\b/.test(lower);
   const mentionsRisk = /\b(vix|volatility|risk|credit spread|high.?yield|spread)\b/.test(lower);
+  const mentionsRates = /\b(yield|treasury|treasuries|rates|rate|duration|curve|10y|2y|bps|basis.?point|fed.?fund|policy.?rate|steepen|invert)\b/.test(lower);
 
-  if (!mentionsOil && !mentionsInflation && !mentionsMoneySupply && !mentionsFX && !mentionsEquities && !mentionsRisk && !asksForCorrelation) {
+  if (!mentionsOil && !mentionsInflation && !mentionsMoneySupply && !mentionsFX && !mentionsEquities && !mentionsRisk && !mentionsRates && !asksForCorrelation) {
     return "";
   }
 
@@ -53,7 +58,11 @@ export function buildHistoricalDataPromptBlock(question: string): string {
     availableSeriesLine(broadDollarSeries()),
     availableSeriesLine(spyMonthlySeries()),
     availableSeriesLine(vixSeries()),
-    availableSeriesLine(highYieldSpreadSeries())
+    availableSeriesLine(highYieldSpreadSeries()),
+    availableSeriesLine(us10ySeries()),
+    availableSeriesLine(us2ySeries()),
+    availableSeriesLine(curve10y2ySeries()),
+    availableSeriesLine(breakeven10ySeries())
   ];
 
   if (asksForCorrelation && mentionsOil && mentionsInflation) {
@@ -137,6 +146,26 @@ export function buildHistoricalDataPromptBlock(question: string): string {
     }
   }
 
+  if (asksForCorrelation && mentionsRates) {
+    const ratesStats = computeRatesCpiStats();
+    if (ratesStats) {
+      blocks.push(
+        [
+          `Computed stored-data check — US 10Y Yield vs CPI YoY (full overlapping monthly sample):`,
+          `- observations: ${ratesStats.count}`,
+          `- 10Y yield level vs CPI YoY correlation: ${formatCorrelation(ratesStats.yieldVsCpiCorrelation)}`,
+          `- 10Y yield historical range: ${ratesStats.yieldMin.toFixed(2)}% to ${ratesStats.yieldMax.toFixed(2)}%`,
+          ratesStats.spreadMin !== null && ratesStats.spreadMax !== null
+            ? `- 10Y-2Y spread historical range: ${(ratesStats.spreadMin * 100).toFixed(0)}bps to ${(ratesStats.spreadMax * 100).toFixed(0)}bps`
+            : null,
+          ratesStats.breakevenMin !== null && ratesStats.breakevenMax !== null
+            ? `- 10Y breakeven inflation historical range: ${ratesStats.breakevenMin.toFixed(2)}% to ${ratesStats.breakevenMax.toFixed(2)}%`
+            : null
+        ].filter(Boolean).join("\n")
+      );
+    }
+  }
+
   blocks.push(
     "Answering rule: if exact data is unavailable, say so plainly and offer the closest available stored-data calculation instead of approximating from model memory."
   );
@@ -178,6 +207,66 @@ function vixSeries(): HistoricalSeries {
 
 function highYieldSpreadSeries(): HistoricalSeries {
   return fredHighYieldSpread as HistoricalSeries;
+}
+
+function us10ySeries(): HistoricalSeries {
+  return fredUs10y as HistoricalSeries;
+}
+
+function us2ySeries(): HistoricalSeries {
+  return fredUs2y as HistoricalSeries;
+}
+
+function curve10y2ySeries(): HistoricalSeries {
+  return fredCurve10y2y as HistoricalSeries;
+}
+
+function breakeven10ySeries(): HistoricalSeries {
+  return fredBreakeven10y as HistoricalSeries;
+}
+
+function computeRatesCpiStats(start?: string, end?: string) {
+  const us10yByMonth = toMonthlyMap(us10ySeries().observations);
+  const cpiByMonth = toMonthlyMap(cpiHeadlineSeries().observations);
+  const cpiYoYByMonth = yoyMap(cpiByMonth);
+  const curveByMonth = toMonthlyMap(curve10y2ySeries().observations);
+  const breakevenByMonth = toMonthlyMap(breakeven10ySeries().observations);
+
+  // 10Y yield level vs CPI YoY (both expressed as %)
+  const yieldVsCpiPoints: AlignedPoint[] = [];
+  for (const [month, yieldValue] of us10yByMonth) {
+    if (start && month < start) continue;
+    if (end && month > end) continue;
+    const cpiYoY = cpiYoYByMonth.get(month);
+    if (typeof cpiYoY === "number") {
+      yieldVsCpiPoints.push({ date: month, left: yieldValue, right: cpiYoY });
+    }
+  }
+
+  if (yieldVsCpiPoints.length < 6) return null;
+
+  // 10Y-2Y spread range (spread is stored in % — multiply by 100 for bps at display time)
+  const curveValues = [...curveByMonth.entries()]
+    .filter(([m]) => (!start || m >= start) && (!end || m <= end))
+    .map(([, v]) => v);
+
+  // Breakeven range
+  const breakevenValues = [...breakevenByMonth.entries()]
+    .filter(([m]) => (!start || m >= start) && (!end || m <= end))
+    .map(([, v]) => v);
+
+  return {
+    count: yieldVsCpiPoints.length,
+    yieldVsCpiCorrelation: pearson(yieldVsCpiPoints),
+    yieldMin: Math.min(...yieldVsCpiPoints.map((p) => p.left)),
+    yieldMax: Math.max(...yieldVsCpiPoints.map((p) => p.left)),
+    cpiYoYMin: Math.min(...yieldVsCpiPoints.map((p) => p.right)),
+    cpiYoYMax: Math.max(...yieldVsCpiPoints.map((p) => p.right)),
+    spreadMin: curveValues.length > 0 ? Math.min(...curveValues) : null,
+    spreadMax: curveValues.length > 0 ? Math.max(...curveValues) : null,
+    breakevenMin: breakevenValues.length > 0 ? Math.min(...breakevenValues) : null,
+    breakevenMax: breakevenValues.length > 0 ? Math.max(...breakevenValues) : null
+  };
 }
 
 function computeWtiCpiStats(start?: string, end?: string) {

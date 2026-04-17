@@ -2463,7 +2463,7 @@ function buildMarketRoomHistoricalContext(
         : "wti oil inflation correlation";
       break;
     case "Rates":
-      query = "wti oil inflation correlation";
+      query = "yield treasury rates inflation correlation 10y 2y curve bps duration";
       break;
     case "FX":
       query = "dollar fx currency wti oil correlation";
@@ -3288,6 +3288,22 @@ function buildSectorSpecificInstructions(agent: Agent): string | null {
         "EQUITY SPECIFICITY RULE: Index-level moves alone (e.g. 'SPY up 1%') are not sufficient anchors.",
         "Every post must cite at least one equity-specific metric: an earnings result, P/E or valuation multiple, sector relative performance vs. the index, a revenue beat/miss, or a named company's specific move and why it matters.",
         "Generic index commentary is what a news terminal provides. Analyst work names the stock, the multiple, or the earnings driver.",
+      ].join("\n");
+    case "FX":
+      return [
+        "FX DATA CITATION RULE: The prompt contains a computed Broad Dollar YoY% vs WTI YoY% correlation from stored data.",
+        "You MUST reference this figure — state its sign, magnitude, and what it means for the cross you are analysing.",
+        "Example: 'Stored data shows Broad Dollar YoY% vs WTI YoY% correlation of -0.42 — dollar strength here structurally pressures commodity FX (AUD, CAD, NOK).'",
+        "Name at least one specific cross (e.g. EUR/USD, USD/JPY, AUD/USD) and state whether current price action aligns with or contradicts the stored dollar/oil relationship.",
+        "A post that describes dollar direction without citing the stored correlation figure has not met the data grounding standard.",
+      ].join("\n");
+    case "Rates":
+      return [
+        "RATES DATA CITATION RULE: The prompt contains a computed 10Y yield vs CPI YoY correlation and historical yield/spread ranges from stored data.",
+        "You MUST cite at least one of these figures explicitly: the 10Y/CPI correlation coefficient, the historical 10Y yield range, or the 10Y-2Y spread range.",
+        "Example: 'Per stored data, 10Y yield vs CPI YoY correlation is +0.XX across XXX monthly observations — inflation persistence is structurally bullish for long yields and confirms duration pressure is not mean-reverting quickly.'",
+        "Name a specific yield level or spread as your data anchor — e.g. '10Y at 4.26%, in the upper half of the post-1990 stored range of X%–Y%' — not a qualitative description of rates being 'elevated'.",
+        "A Rates post that does not cite a stored figure from the historical context block has failed the data grounding standard.",
       ].join("\n");
     default:
       return null;
