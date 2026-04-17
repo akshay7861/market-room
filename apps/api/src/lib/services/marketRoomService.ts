@@ -3323,6 +3323,13 @@ function buildSectorSpecificInstructions(agent: Agent): string | null {
         "Example: 'Stored data shows Broad Dollar YoY% vs WTI YoY% correlation of -0.42 — dollar strength here structurally pressures commodity FX (AUD, CAD, NOK).'",
         "Name at least one specific cross (e.g. EUR/USD, USD/JPY, AUD/USD) and state whether current price action aligns with or contradicts the stored dollar/oil relationship.",
         "A post that describes dollar direction without citing the stored correlation figure has not met the data grounding standard.",
+        "",
+        "CARRY MECHANICS PRECISION — be exact about directionality:",
+        "  • High US real yields = USD attractive = EM-funded carry trades (short USD, long EM high-yielder) get UNWOUND. This is USD bullish, EM FX bearish.",
+        "  • 'Carry compression' means the EM-USD yield spread is NARROWING — either US yields rise faster than EM, or EM yields fall. State which is happening.",
+        "  • High US yields do NOT compress carry by themselves — they expand the US-side of the spread. Compression only occurs when the EM yield fails to keep up or when risk sentiment forces carry unwind.",
+        "  • If you are bearish EM FX, state it as: 'bearish EM FX / USD bullish' — not as 'bearish USD carry' (which would mean bearish on holding USD).",
+        "  • Avoid saying yields 'compress carry' without specifying the EM side of the spread. State the mechanism precisely.",
       ].join("\n");
     case "Rates":
       return [
