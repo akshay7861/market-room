@@ -115,13 +115,98 @@ export function buildDynamicMemoryPromptBlock(agent: Agent, context: DynamicMemo
     `[memory-inject:${agent.name}] injected blocks: house_view, open_theses, strong_topics, weak_topics, calibration`
   );
 
+  // Build calibration enforcement: make it a mandatory rule, not just a metric
+  const calibrationBlock = buildCalibrationEnforcementBlock(context.calibration);
+
   return [
     "## Dynamic Memory",
     `- Current house view: ${context.houseView}`,
     `- Open theses: ${context.openTheses}`,
     `- Known strong topics: ${context.strongTopics}`,
     `- Known weak topics: ${context.weakTopics}`,
-    `- Recent forecasting calibration: ${context.calibration}`
+    calibrationBlock
+  ].join("\n");
+}
+
+function buildCalibrationEnforcementBlock(calibration: string): string {
+  if (calibration.includes("Not enough")) {
+    return `- Forecast calibration: ${calibration} — default to qualified language ("likely", "suggests") until track record is established.`;
+  }
+
+  // Parse accuracy from the calibration string (format: "Accuracy NN% on last N resolved calls")
+  const accuracyMatch = calibration.match(/Accuracy\s+(\d+)%/);
+  const biasMatch = calibration.match(/Bias\s+([+-]?\d+\.\d+)/);
+  const accuracy = accuracyMatch ? parseInt(accuracyMatch[1], 10) : null;
+  const bias = biasMatch ? parseFloat(biasMatch[1]) : null;
+
+  const lines: string[] = [`- CALIBRATION ENFORCEMENT — ${calibration}`];
+
+  if (accuracy !== null && accuracy < 55) {
+    lines.push(
+      "  Your recent accuracy is below 55%. RULE: qualify every directional call with the specific condition that would prove it wrong. Do not use words like 'clearly', 'certainly', or 'obviously'. Prefer 'the data suggests' or 'the risk is skewed toward'."
+    );
+  } else if (accuracy !== null && accuracy < 65) {
+    lines.push(
+      "  Your recent accuracy is moderate. RULE: name one concrete invalidation condition for your directional call. Do not project high conviction without cross-asset confirmation."
+    );
+  } else if (accuracy !== null) {
+    lines.push(
+      "  Your recent accuracy is solid. Maintain discipline: still name the specific level or data point that would change your view."
+    );
+  }
+
+  if (bias !== null && bias > 0.1) {
+    lines.push(
+      `  Overconfidence bias detected (+${bias.toFixed(2)}). RULE: reduce expressed certainty by one level — 'expect' becomes 'lean toward', 'will' becomes 'likely'. Demand stronger confirmation before committing to high conviction.`
+    );
+  } else if (bias !== null && bias < -0.1) {
+    lines.push(
+      `  Underconfidence bias detected (${bias.toFixed(2)}). When evidence aligns across multiple signals, trust your conviction and state it clearly.`
+    );
+  }
+
+  return lines.join("\n");
+}
+
+// ─── Cross-agent macro view ────────────────────────────────────────────────
+
+/**
+ * Returns the Macro Agent's current open theses for injection into non-Macro
+ * agent prompts. Creates coherent multi-agent reasoning by anchoring every
+ * sector view to the shared macro baseline.
+ */
+export async function buildCrossAgentMacroView(env: Env, agent: Agent): Promise<string> {
+  // Macro agent does not need to see its own theses as a "house view" — it IS the source
+  if (agent.id === "macro-agent") return "";
+
+  const repositories = createRepositories(env);
+  const macroTheses = await repositories.theses.listActiveByOwner("macro-agent");
+
+  if (macroTheses.length === 0) {
+    // Fall back to the Macro Agent's memory summary if no open theses
+    const macroAgent = await repositories.agents.getById("macro-agent");
+    if (!macroAgent?.memorySummary) return "";
+    return [
+      "HOUSE MACRO VIEW (Macro Agent baseline — anchor your sector argument to this):",
+      `  ${macroAgent.memorySummary}`,
+      "If your sector view contradicts this macro baseline, state the mechanism that overrides it. If it aligns, add the sector-specific evidence the macro agent cannot see."
+    ].join("\n");
+  }
+
+  const thesisSummaries = macroTheses
+    .slice(0, 3)
+    .map((thesis) => {
+      const confidence = thesis.confidenceCurrent != null ? `${Math.round(thesis.confidenceCurrent * 100)}% confidence` : "";
+      const claim = thesis.canonicalClaim || thesis.title;
+      const status = thesis.status;
+      return `  • [${status}${confidence ? `, ${confidence}` : ""}] ${claim}`;
+    })
+    .join("\n");
+
+  return [
+    "HOUSE MACRO VIEW (Macro Agent's live theses — anchor your sector view to this baseline):",
+    thesisSummaries,
+    "RULE: your post must either (a) align with the house macro view and add sector-specific evidence the macro agent cannot see, or (b) explicitly push back with a counter-mechanism rooted in your sector's data. Silent divergence is not allowed."
   ].join("\n");
 }
 

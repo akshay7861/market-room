@@ -35,7 +35,7 @@ import { buildHistoricalDataPromptBlock, buildAnalogContextBlock, type SnapshotS
 import { fetchYahooFinanceBriefing } from "./yahooFinanceNewsService";
 import { fetchMarketauxBriefing } from "./marketauxNewsService";
 import { analyzeTopHeadlinesForAgent, type HeadlineAnalysis } from "./headlineAnalysisService";
-import { buildDynamicMemoryContext, buildDynamicMemoryPromptBlock, refreshDynamicHouseViews } from "./dynamicMemoryService";
+import { buildCrossAgentMacroView, buildDynamicMemoryContext, buildDynamicMemoryPromptBlock, refreshDynamicHouseViews } from "./dynamicMemoryService";
 
 const defaultDiscussionPrompt =
   "Discuss the biggest market drivers right now, the main risk, and one thing investors should watch next.";
@@ -2232,10 +2232,13 @@ async function requestStructuredForumPost({
   try {
     const historicalContext = buildMarketRoomHistoricalContext(agent, generalHeadlines, sectorHeadlines);
 
-    // Analog block: headline number → historical periods → forward returns + lag
+    // Analog block + cross-agent macro view — run in parallel
     const topHeadlineTitle = sectorHeadlines[0]?.title ?? generalHeadlines[0]?.title ?? "";
     const snapshotSignal = extractSnapshotSignal(marketSnapshot);
-    const analogBlock = buildAnalogContextBlock(topHeadlineTitle, agent.sector, snapshotSignal);
+    const [analogBlock, crossAgentView] = await Promise.all([
+      Promise.resolve(buildAnalogContextBlock(topHeadlineTitle, agent.sector, snapshotSignal)),
+      buildCrossAgentMacroView(env, agent)
+    ]);
 
     // Build the prompt once — used by both passes
     const postPrompt = buildForumPostPrompt(
@@ -2256,7 +2259,8 @@ async function requestStructuredForumPost({
       thisRunPosts,
       headlineAnalysis,
       historicalContext,
-      analogBlock
+      analogBlock,
+      crossAgentView
     );
 
     // ── Pass 1: View crystallisation ────────────────────────────────────────
@@ -2528,7 +2532,8 @@ function buildForumPostPrompt(
   thisRunPosts: AgentMessage[] = [],
   headlineAnalysis: HeadlineAnalysis | null = null,
   historicalContext: string = "",
-  analogBlock: string = ""
+  analogBlock: string = "",
+  crossAgentView: string = ""
 ): string {
   const availableInstruments = relevantInstrumentsForAgent(agent, marketSnapshot);
   const mergedHeadlines = relevantHeadlinesForAgent(agent, [
@@ -2641,6 +2646,7 @@ function buildForumPostPrompt(
       : "No heavy coverage warning.",
     buildRoomConsensusBlock(thisRunPosts, priorRoomThreads) ?? "",
     buildDynamicMemoryPromptBlock(agent, dynamicMemory),
+    ...(crossAgentView ? [crossAgentView] : []),
     ...(agentState ? [buildStatePromptBlock(agentState)] : []),
     ...(roomCoverage ? [buildRoomCoveragePromptBlock(roomCoverage)] : []),
     ...(historicalContext ? [historicalContext] : []),
