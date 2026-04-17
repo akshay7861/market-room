@@ -31,7 +31,7 @@ import { listRelevantMarketCasesForAgent } from "./marketCaseService";
 import { findRelevantKnowledgeSnippets, type LocalKnowledgeSnippet } from "./knowledgeSnippetService";
 import { recordDiscussionLearning } from "./learningService";
 import { fetchOfficialCatalystLayer } from "./officialCatalystService";
-import { buildHistoricalDataPromptBlock } from "./historicalDataContextService";
+import { buildHistoricalDataPromptBlock, buildAnalogContextBlock, type SnapshotSignal } from "./historicalDataContextService";
 import { fetchYahooFinanceBriefing } from "./yahooFinanceNewsService";
 import { fetchMarketauxBriefing } from "./marketauxNewsService";
 import { analyzeTopHeadlinesForAgent, type HeadlineAnalysis } from "./headlineAnalysisService";
@@ -2232,6 +2232,11 @@ async function requestStructuredForumPost({
   try {
     const historicalContext = buildMarketRoomHistoricalContext(agent, generalHeadlines, sectorHeadlines);
 
+    // Analog block: headline number → historical periods → forward returns + lag
+    const topHeadlineTitle = sectorHeadlines[0]?.title ?? generalHeadlines[0]?.title ?? "";
+    const snapshotSignal = extractSnapshotSignal(marketSnapshot);
+    const analogBlock = buildAnalogContextBlock(topHeadlineTitle, agent.sector, snapshotSignal);
+
     // Build the prompt once — used by both passes
     const postPrompt = buildForumPostPrompt(
       agent,
@@ -2250,7 +2255,8 @@ async function requestStructuredForumPost({
       roomCoverage,
       thisRunPosts,
       headlineAnalysis,
-      historicalContext
+      historicalContext,
+      analogBlock
     );
 
     // ── Pass 1: View crystallisation ────────────────────────────────────────
@@ -2485,6 +2491,25 @@ function buildMarketRoomHistoricalContext(
   return buildHistoricalDataPromptBlock(query);
 }
 
+/** Extract the primary numeric indicator values from the market snapshot instruments array.
+ *  Values are stored as display strings ("$82.40/bbl", "4.30%") — strip non-numeric chars. */
+function extractSnapshotSignal(snapshot: MarketSnapshotPayload): SnapshotSignal {
+  const parseInstrumentValue = (value: string): number | undefined => {
+    const match = value.replace(/,/g, "").match(/[\d.]+/);
+    const n = match ? parseFloat(match[0]) : NaN;
+    return isNaN(n) ? undefined : n;
+  };
+  const get = (key: string): number | undefined => {
+    const inst = snapshot.instruments.find((i) => i.key === key);
+    return inst ? parseInstrumentValue(inst.value) : undefined;
+  };
+  return {
+    wtiPrice: get("wti"),
+    us10yYield: get("us10y"),
+    dxyLevel: get("dxy")
+  };
+}
+
 function buildForumPostPrompt(
   agent: Agent,
   marketSnapshot: MarketSnapshotPayload,
@@ -2502,7 +2527,8 @@ function buildForumPostPrompt(
   roomCoverage: RoomCoverageState | null,
   thisRunPosts: AgentMessage[] = [],
   headlineAnalysis: HeadlineAnalysis | null = null,
-  historicalContext: string = ""
+  historicalContext: string = "",
+  analogBlock: string = ""
 ): string {
   const availableInstruments = relevantInstrumentsForAgent(agent, marketSnapshot);
   const mergedHeadlines = relevantHeadlinesForAgent(agent, [
@@ -2618,6 +2644,7 @@ function buildForumPostPrompt(
     ...(agentState ? [buildStatePromptBlock(agentState)] : []),
     ...(roomCoverage ? [buildRoomCoveragePromptBlock(roomCoverage)] : []),
     ...(historicalContext ? [historicalContext] : []),
+    ...(analogBlock ? [analogBlock] : []),
     knowledgeSnippets.length > 0 ? "Approved long-term memory snippets:" : "No approved long-term memory snippets were retrieved for this post.",
     ...knowledgeSnippets.map(
       (snippet, index) => `${index + 1}. ${snippet.title} [${snippet.category}] ${snippet.excerpt}`

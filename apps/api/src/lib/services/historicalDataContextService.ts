@@ -10,6 +10,13 @@ import fredUs10y from "../../../../../knowledge/data-lake/normalized/fred_us10y.
 import fredUs2y from "../../../../../knowledge/data-lake/normalized/fred_us2y.json";
 import fredCurve10y2y from "../../../../../knowledge/data-lake/normalized/fred_curve_10y2y.json";
 import fredBreakeven10y from "../../../../../knowledge/data-lake/normalized/fred_breakeven_10y.json";
+import fredUnemployment from "../../../../../knowledge/data-lake/normalized/fred_unemployment.json";
+import fredRetailSales from "../../../../../knowledge/data-lake/normalized/fred_retail_sales.json";
+import fredIndustrialProduction from "../../../../../knowledge/data-lake/normalized/fred_industrial_production.json";
+import fredFedFunds from "../../../../../knowledge/data-lake/normalized/fred_fedfunds.json";
+import fredPceHeadline from "../../../../../knowledge/data-lake/normalized/fred_pce_headline.json";
+import fredPceCore from "../../../../../knowledge/data-lake/normalized/fred_pce_core.json";
+import fredNonfarmPayrolls from "../../../../../knowledge/data-lake/normalized/fred_nonfarm_payrolls.json";
 
 type HistoricalObservation = {
   date: string;
@@ -62,7 +69,15 @@ export function buildHistoricalDataPromptBlock(question: string): string {
     availableSeriesLine(us10ySeries()),
     availableSeriesLine(us2ySeries()),
     availableSeriesLine(curve10y2ySeries()),
-    availableSeriesLine(breakeven10ySeries())
+    availableSeriesLine(breakeven10ySeries()),
+    availableSeriesLine(unemploymentSeries()),
+    availableSeriesLine(retailSalesSeries()),
+    availableSeriesLine(industrialProductionSeries()),
+    availableSeriesLine(fedFundsSeries()),
+    availableSeriesLine(pceHeadlineSeries()),
+    availableSeriesLine(pceCoreSeriesFn()),
+    availableSeriesLine(nonfarmPayrollsSeries())
+    // Note: ISM Manufacturing PMI is NOT in the data lake — sourcing from FRED ISM endpoint is a future addition
   ];
 
   if (asksForCorrelation && mentionsOil && mentionsInflation) {
@@ -223,6 +238,34 @@ function curve10y2ySeries(): HistoricalSeries {
 
 function breakeven10ySeries(): HistoricalSeries {
   return fredBreakeven10y as HistoricalSeries;
+}
+
+function unemploymentSeries(): HistoricalSeries {
+  return fredUnemployment as HistoricalSeries;
+}
+
+function retailSalesSeries(): HistoricalSeries {
+  return fredRetailSales as HistoricalSeries;
+}
+
+function industrialProductionSeries(): HistoricalSeries {
+  return fredIndustrialProduction as HistoricalSeries;
+}
+
+function fedFundsSeries(): HistoricalSeries {
+  return fredFedFunds as HistoricalSeries;
+}
+
+function pceHeadlineSeries(): HistoricalSeries {
+  return fredPceHeadline as HistoricalSeries;
+}
+
+function pceCoreSeriesFn(): HistoricalSeries {
+  return fredPceCore as HistoricalSeries;
+}
+
+function nonfarmPayrollsSeries(): HistoricalSeries {
+  return fredNonfarmPayrolls as HistoricalSeries;
 }
 
 function computeRatesCpiStats(start?: string, end?: string) {
@@ -451,6 +494,344 @@ function pearson(points: AlignedPoint[]): number {
 function formatCorrelation(value: number): string {
   const sign = value >= 0 ? "+" : "";
   return `${sign}${value.toFixed(2)}`;
+}
+
+// ── Analog Engine ─────────────────────────────────────────────────────────────
+// Given a current indicator value (e.g. CPI at 3.8%), find historical periods
+// where it was at a similar level, then compute how other assets responded in the
+// 1, 3, and 6 months that followed — and whether the response was lagged.
+
+export type SnapshotSignal = {
+  wtiPrice?: number;    // Commodities / Macro fallback
+  us10yYield?: number;  // Rates / Equities fallback
+  dxyLevel?: number;    // FX fallback (DXY index level)
+};
+
+// ─── 1. Analog period finder ───────────────────────────────────────────────
+
+function findAnalogPeriods(
+  monthlyData: Map<string, number>,
+  targetValue: number,
+  toleranceAbs: number,
+  minCount: number = 4
+): string[] {
+  // Exclude last 6 months — no reliable forward data yet
+  const cutoffMonth = shiftMonth(
+    new Date().toISOString().slice(0, 7),
+    -6
+  );
+
+  const match = (tol: number) =>
+    [...monthlyData.entries()]
+      .filter(([month, value]) => month <= cutoffMonth && Math.abs(value - targetValue) <= tol)
+      .map(([month]) => month)
+      .sort();
+
+  const first = match(toleranceAbs);
+  if (first.length >= minCount) return first;
+
+  // Widen by 50% and retry once
+  const second = match(toleranceAbs * 1.5);
+  return second.length >= minCount ? second : [];
+}
+
+// ─── 2. Forward return calculator ─────────────────────────────────────────
+
+type ForwardReturnResult = {
+  horizon: number;
+  median: number;
+  min: number;
+  max: number;
+  positiveCount: number;
+  totalCount: number;
+};
+
+function medianOf(arr: number[]): number {
+  if (arr.length === 0) return 0;
+  const sorted = [...arr].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
+}
+
+function computeForwardReturns(
+  analogMonths: string[],
+  targetMonthlyData: Map<string, number>,
+  horizons: number[],
+  mode: "pct_change" | "level_change"
+): ForwardReturnResult[] {
+  return horizons.map((h) => {
+    const outcomes: number[] = [];
+    for (const t of analogMonths) {
+      const valueAtT = targetMonthlyData.get(t);
+      const valueAtTH = targetMonthlyData.get(shiftMonth(t, h));
+      if (typeof valueAtT !== "number" || typeof valueAtTH !== "number") continue;
+      if (valueAtT === 0 && mode === "pct_change") continue;
+      const outcome =
+        mode === "pct_change"
+          ? ((valueAtTH - valueAtT) / Math.abs(valueAtT)) * 100
+          : valueAtTH - valueAtT;
+      outcomes.push(outcome);
+    }
+    if (outcomes.length < 3) return null;
+    return {
+      horizon: h,
+      median: medianOf(outcomes),
+      min: Math.min(...outcomes),
+      max: Math.max(...outcomes),
+      positiveCount: outcomes.filter((v) => v > 0).length,
+      totalCount: outcomes.length
+    };
+  }).filter((r): r is ForwardReturnResult => r !== null);
+}
+
+// ─── 3. Peak-lag detector ──────────────────────────────────────────────────
+
+type LagResult = {
+  lag: number;
+  correlation: number;
+};
+
+function computePeakLag(
+  seriesA: Map<string, number>, // leading series (YoY)
+  seriesB: Map<string, number>, // lagging series (YoY)
+  maxLag: number = 6
+): LagResult | null {
+  let best: LagResult | null = null;
+  for (let lag = 0; lag <= maxLag; lag++) {
+    const points: AlignedPoint[] = [];
+    for (const [month, aVal] of seriesA) {
+      const bVal = seriesB.get(shiftMonth(month, lag));
+      if (typeof bVal === "number") points.push({ date: month, left: aVal, right: bVal });
+    }
+    if (points.length < 12) continue;
+    const corr = pearson(points);
+    if (best === null || Math.abs(corr) > Math.abs(best.correlation)) {
+      best = { lag, correlation: corr };
+    }
+  }
+  return best;
+}
+
+// ─── 4. Headline indicator extraction ─────────────────────────────────────
+
+type IndicatorKind = "cpi" | "pce" | "pce_core" | "unemployment" | "fedfunds" | "oil" | "us10y" | "nfp";
+
+type IndicatorSignal = {
+  kind: IndicatorKind;
+  value: number;
+  label: string;
+  toleranceAbs: number;
+  seriesGetter: () => HistoricalSeries;
+  mode: "yoy" | "level";
+  forwardReturnMode: "pct_change" | "level_change";
+};
+
+const INDICATOR_CONFIG: Record<IndicatorKind, Omit<IndicatorSignal, "kind" | "value" | "label">> = {
+  cpi:          { toleranceAbs: 0.3,  mode: "yoy",   forwardReturnMode: "pct_change", seriesGetter: cpiHeadlineSeries },
+  pce:          { toleranceAbs: 0.3,  mode: "yoy",   forwardReturnMode: "pct_change", seriesGetter: pceHeadlineSeries },
+  pce_core:     { toleranceAbs: 0.25, mode: "yoy",   forwardReturnMode: "pct_change", seriesGetter: pceCoreSeriesFn },
+  unemployment: { toleranceAbs: 0.2,  mode: "level", forwardReturnMode: "level_change", seriesGetter: unemploymentSeries },
+  fedfunds:     { toleranceAbs: 0.25, mode: "level", forwardReturnMode: "level_change", seriesGetter: fedFundsSeries },
+  oil:          { toleranceAbs: 5.0,  mode: "level", forwardReturnMode: "pct_change",  seriesGetter: wtiMonthlySeries },
+  us10y:        { toleranceAbs: 0.25, mode: "level", forwardReturnMode: "level_change", seriesGetter: us10ySeries },
+  nfp:          { toleranceAbs: 30,   mode: "level", forwardReturnMode: "level_change", seriesGetter: nonfarmPayrollsSeries },
+};
+
+function extractHeadlineIndicator(headlineTitle: string): IndicatorSignal | null {
+  // Patterns tested in priority order — first match wins
+  const patterns: Array<{ kind: IndicatorKind; label: (v: number) => string; regexes: RegExp[]; transform?: (v: number) => number }> = [
+    {
+      kind: "cpi",
+      label: (v) => `CPI YoY ${v.toFixed(1)}%`,
+      regexes: [
+        /\bCPI\b[^%\d]*?([+-]?\d+\.?\d*)\s*%/i,
+        /([+-]?\d+\.?\d*)\s*%[^%]*?\bCPI\b/i,
+        /\bconsumer price[^%\d]*?([+-]?\d+\.?\d*)\s*%/i
+      ]
+    },
+    {
+      kind: "pce_core",
+      label: (v) => `Core PCE YoY ${v.toFixed(1)}%`,
+      regexes: [/\bcore\s*PCE\b[^%\d]*?([+-]?\d+\.?\d*)\s*%/i, /([+-]?\d+\.?\d*)\s*%[^%]*?\bcore\s*PCE\b/i]
+    },
+    {
+      kind: "pce",
+      label: (v) => `PCE YoY ${v.toFixed(1)}%`,
+      regexes: [/\bPCE\b[^%\d]*?([+-]?\d+\.?\d*)\s*%/i, /([+-]?\d+\.?\d*)\s*%[^%]*?\bPCE\b/i]
+    },
+    {
+      kind: "unemployment",
+      label: (v) => `Unemployment ${v.toFixed(1)}%`,
+      regexes: [
+        /\bunemployment\b[^%\d]*?(\d+\.?\d*)\s*%/i,
+        /\bjobless\s*rate\b[^%\d]*?(\d+\.?\d*)\s*%/i,
+        /(\d+\.?\d*)\s*%[^%]*?\bunemployment\b/i
+      ]
+    },
+    {
+      kind: "fedfunds",
+      label: (v) => `Fed Funds ${v.toFixed(2)}%`,
+      regexes: [
+        /\bfed\s*funds?\b[^%\d]*?(\d+\.?\d*)\s*%/i,
+        /\bFFR\b[^%\d]*?(\d+\.?\d*)\s*%/i,
+        /\bpolicy\s*rate\b[^%\d]*?(\d+\.?\d*)\s*%/i
+      ]
+    },
+    {
+      kind: "nfp",
+      label: (v) => `NFP +${v.toFixed(0)}K`,
+      regexes: [/\b(?:NFP|nonfarm payroll)[^+\-\d]*?[+\-]?\s*(\d+)\s*[Kk]\b/i],
+      transform: (v) => v  // already in thousands from the regex
+    },
+    {
+      kind: "oil",
+      label: (v) => `WTI $${v.toFixed(2)}/bbl`,
+      regexes: [
+        /\b(?:WTI|crude oil)\b[^$\d]*?\$(\d+\.?\d*)/i,
+        /\$(\d+\.?\d*)[^%]*?\b(?:WTI|crude|oil)\b/i,
+        /\boil\b.*?at\s*\$(\d+\.?\d*)/i
+      ]
+    },
+    {
+      kind: "us10y",
+      label: (v) => `10Y yield ${v.toFixed(2)}%`,
+      regexes: [
+        /\b10[-\s]?[Yy](?:ear)?\b[^%\d]*?(\d+\.?\d*)\s*%/i,
+        /(\d+\.?\d*)\s*%[^%]*?\b10[-\s]?[Yy]/i,
+        /\bTreasury[^%\d]*?(\d+\.?\d*)\s*%/i
+      ]
+    }
+  ];
+
+  for (const { kind, label, regexes, transform } of patterns) {
+    for (const regex of regexes) {
+      const m = headlineTitle.match(regex);
+      if (m?.[1]) {
+        const raw = parseFloat(m[1]);
+        if (!isNaN(raw) && raw > 0) {
+          const value = transform ? transform(raw) : raw;
+          const config = INDICATOR_CONFIG[kind];
+          return { kind, value, label: label(value), ...config };
+        }
+      }
+    }
+  }
+  return null;
+}
+
+// ─── 5. Sector forward-return series map ──────────────────────────────────
+
+type ForwardSeries = {
+  label: string;
+  monthlyGetter: () => Map<string, number>;
+  returnMode: "pct_change" | "level_change";
+  unit: string;  // display unit suffix, e.g. "%" or "bps" or "pp"
+};
+
+function getSectorForwardSeries(sector: string): ForwardSeries[] {
+  const spy: ForwardSeries  = { label: "SPY",               monthlyGetter: () => toMonthlyMap(spyMonthlySeries().observations),              returnMode: "pct_change",   unit: "%" };
+  const wti: ForwardSeries  = { label: "WTI crude",         monthlyGetter: () => toMonthlyMap(wtiMonthlySeries().observations),              returnMode: "pct_change",   unit: "%" };
+  const us10y: ForwardSeries = { label: "10Y yield",        monthlyGetter: () => toMonthlyMap(us10ySeries().observations),                   returnMode: "level_change", unit: "bps", };
+  const us2y: ForwardSeries  = { label: "2Y yield",         monthlyGetter: () => toMonthlyMap(us2ySeries().observations),                    returnMode: "level_change", unit: "bps" };
+  const dollar: ForwardSeries = { label: "Broad Dollar",    monthlyGetter: () => toMonthlyMap(broadDollarSeries().observations),             returnMode: "pct_change",   unit: "%" };
+  const vix: ForwardSeries   = { label: "VIX",              monthlyGetter: () => toMonthlyMap(vixSeries().observations),                     returnMode: "level_change", unit: "pts" };
+  const hy: ForwardSeries    = { label: "HY spread",        monthlyGetter: () => toMonthlyMap(highYieldSpreadSeries().observations),         returnMode: "level_change", unit: "bps" };
+  const unemp: ForwardSeries = { label: "Unemployment",     monthlyGetter: () => toMonthlyMap(unemploymentSeries().observations),            returnMode: "level_change", unit: "pp" };
+  const retail: ForwardSeries = { label: "Retail Sales YoY",monthlyGetter: () => yoyMap(toMonthlyMap(retailSalesSeries().observations)),    returnMode: "level_change", unit: "pp" };
+  const ip: ForwardSeries    = { label: "Industrial Prod YoY",monthlyGetter: () => yoyMap(toMonthlyMap(industrialProductionSeries().observations)), returnMode: "level_change", unit: "pp" };
+  const be: ForwardSeries    = { label: "10Y Breakeven",    monthlyGetter: () => toMonthlyMap(breakeven10ySeries().observations),            returnMode: "level_change", unit: "bps" };
+
+  // us10y returnMode note: level_change is in % points — multiply by 100 for bps at display time
+  switch (sector) {
+    case "Macro":          return [spy, wti, us10y, unemp, retail, ip];
+    case "Rates":          return [us10y, us2y, be, spy, hy];
+    case "FX":             return [dollar, wti, spy, vix];
+    case "Commodities":    return [wti, dollar, ip, spy];
+    case "Equities":       return [spy, us10y, vix, hy, retail];
+    case "Risk/Sentiment": return [vix, hy, spy, us10y];
+    default:               return [spy, wti, us10y];
+  }
+}
+
+// ─── 6. Block formatter ────────────────────────────────────────────────────
+
+function formatForwardReturn(r: ForwardReturnResult, unit: string, isYield: boolean): string {
+  // Yields stored as % — convert level_change to bps for display
+  const scale = isYield && unit === "bps" ? 100 : 1;
+  const sign = (v: number) => (v >= 0 ? "+" : "");
+  const fmt = (v: number) => {
+    const scaled = v * scale;
+    return `${sign(scaled)}${scaled.toFixed(unit === "bps" || unit === "pp" ? 0 : 1)}${unit}`;
+  };
+  const dir = r.positiveCount > r.totalCount / 2 ? "pos" : "neg";
+  return `+${r.horizon}m: ${fmt(r.median)} (${r.positiveCount}/${r.totalCount} ${dir})`;
+}
+
+// ─── 7. Main exported orchestrator ────────────────────────────────────────
+
+export function buildAnalogContextBlock(
+  headlineTitle: string,
+  sector: string,
+  snapshotSignal?: SnapshotSignal
+): string {
+  // Step 1: try to extract a parseable indicator from the headline
+  let signal = extractHeadlineIndicator(headlineTitle);
+
+  // Step 2: fall back to snapshot primary indicator for the sector
+  if (!signal && snapshotSignal) {
+    if ((sector === "Commodities" || sector === "Macro") && snapshotSignal.wtiPrice) {
+      signal = { kind: "oil", value: snapshotSignal.wtiPrice, label: `WTI $${snapshotSignal.wtiPrice.toFixed(2)}/bbl`, ...INDICATOR_CONFIG.oil };
+    } else if ((sector === "Rates" || sector === "Equities") && snapshotSignal.us10yYield) {
+      signal = { kind: "us10y", value: snapshotSignal.us10yYield, label: `10Y yield ${snapshotSignal.us10yYield.toFixed(2)}%`, ...INDICATOR_CONFIG.us10y };
+    }
+  }
+
+  if (!signal) return "";
+
+  // Step 3: get the indicator's monthly data (apply YoY if needed)
+  const rawMonthly = toMonthlyMap(signal.seriesGetter().observations);
+  const matchData = signal.mode === "yoy" ? yoyMap(rawMonthly) : rawMonthly;
+
+  // Step 4: find analog periods
+  const analogMonths = findAnalogPeriods(matchData, signal.value, signal.toleranceAbs);
+  if (analogMonths.length < 4) return "";
+
+  // Step 5: compute forward returns per series
+  const forwardSeries = getSectorForwardSeries(sector);
+  const lines: string[] = [];
+  const indicatorYoY = signal.mode === "yoy" ? matchData : yoyMap(rawMonthly);
+
+  for (const fs of forwardSeries) {
+    const seriesData = fs.monthlyGetter();
+    const results = computeForwardReturns(analogMonths, seriesData, [1, 3, 6], fs.returnMode);
+    if (results.length === 0) continue;
+
+    const isYield = fs.label.includes("yield") || fs.label.includes("Breakeven");
+    const parts = results.map((r) => formatForwardReturn(r, fs.unit, isYield));
+
+    // Compute peak lag vs indicator (only report if lag > 0 and |corr| > 0.35)
+    const seriesYoY = yoyMap(seriesData);
+    const lagResult = computePeakLag(indicatorYoY, seriesYoY);
+    const lagNote =
+      lagResult && lagResult.lag > 0 && Math.abs(lagResult.correlation) > 0.35
+        ? `  [peak lag ${lagResult.lag}m, r=${formatCorrelation(lagResult.correlation)}]`
+        : "";
+
+    lines.push(`  ${fs.label.padEnd(20)} ${parts.join("  ")}${lagNote}`);
+  }
+
+  if (lines.length === 0) return "";
+
+  const sampleNote = analogMonths.length < 8 ? "  (small sample — treat as directional signal)" : "";
+  const analogList = analogMonths.slice(0, 6).join(", ") + (analogMonths.length > 6 ? `, +${analogMonths.length - 6} more` : "");
+
+  return [
+    `HISTORICAL ANALOG ANALYSIS — ${signal.label}:`,
+    `Matched ${analogMonths.length} historical periods (1990–present): ${analogList}${sampleNote}`,
+    "Median forward returns across analog periods:",
+    ...lines,
+    "Use these figures as your data anchor — cite the median return and lag where relevant to your directional call."
+  ].join("\n");
 }
 
 // ── Chart data ────────────────────────────────────────────────────────────────
