@@ -584,7 +584,9 @@ export type PostingReasonCode =
   | "stale_headline_no_thesis"
   | "stale_headline_thesis_update"
   | "headline_routed_to_comment"
-  | "run_catalyst_claimed";
+  | "run_catalyst_claimed"
+  // Macro materiality gate — agent silenced due to low novelty within cooldown window
+  | "macro_low_novelty_cooldown";
 
 export type PostingDecision = {
   actionType: "new_post" | "update_existing" | "comment_only" | "stay_silent";

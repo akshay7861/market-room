@@ -20,7 +20,7 @@ import type {
 import type { Env } from "../../index";
 import { generateGeminiContent, getLlmModel, isLlmConfigured } from "../gemini";
 import { fetchLatestMarketSnapshot } from "../market-data";
-import { parseStructuredResponseJson } from "../openAiResponses";
+import { parseStructuredResponseJson, extractResponseOutputText } from "../openAiResponses";
 import { createRepositories } from "../repositories";
 import { loadRoom } from "../room";
 import { refreshAgentBehavioralSummary, buildStatePromptBlock } from "./agentBehavioralStateService";
@@ -1008,9 +1008,34 @@ async function generateAgentForumPosts({
       };
     })();
 
+    // ── Macro Agent materiality gate ──────────────────────────────────────────
+    // Macro is the most prolific agent but volume ≠ quality. If the last Macro post
+    // was made less than 90 minutes ago AND novelty is low, silence this run.
+    const finalPostingDecision = (() => {
+      if (
+        agent.sector === "Macro" &&
+        postingDecision.actionType !== "stay_silent" &&
+        recentPosts.length > 0
+      ) {
+        const minutesSinceLast =
+          (Date.now() - new Date(recentPosts[0].createdAt).getTime()) / 60000;
+        if (minutesSinceLast < 90 && noveltyAssessment.compositeScore < 0.35) {
+          console.log(
+            `[macro-gate] ${agent.name} silenced — last post ${minutesSinceLast.toFixed(0)}min ago, novelty=${noveltyAssessment.compositeScore.toFixed(2)}`
+          );
+          return {
+            ...postingDecision,
+            actionType: "stay_silent" as const,
+            reasonCodes: [...postingDecision.reasonCodes, "macro_low_novelty_cooldown" as const]
+          };
+        }
+      }
+      return postingDecision;
+    })();
+
     // Pre-generate message ID so it can be linked in the decision log
     const willPost =
-      postingDecision.actionType === "new_post" || postingDecision.actionType === "update_existing";
+      finalPostingDecision.actionType === "new_post" || finalPostingDecision.actionType === "update_existing";
     const preGeneratedMessageId = willPost ? crypto.randomUUID() : null;
 
     // Log all decisions including silent ones (fire-and-forget)
@@ -1018,13 +1043,13 @@ async function generateAgentForumPosts({
       id: crypto.randomUUID(),
       agentId: agent.id,
       roomId,
-      actionType: postingDecision.actionType,
-      reasonCodes: postingDecision.reasonCodes,
-      noveltyScore: postingDecision.noveltyScore,
-      candidateThemeKey: postingDecision.suggestedTopic?.themeKey ?? null,
-      targetThesisId: postingDecision.targetThesisId,
+      actionType: finalPostingDecision.actionType,
+      reasonCodes: finalPostingDecision.reasonCodes,
+      noveltyScore: finalPostingDecision.noveltyScore,
+      candidateThemeKey: finalPostingDecision.suggestedTopic?.themeKey ?? null,
+      targetThesisId: finalPostingDecision.targetThesisId,
       messageId: preGeneratedMessageId,
-      decidedAt: postingDecision.decidedAt,
+      decidedAt: finalPostingDecision.decidedAt,
       headlineAnalysisJson: headlineAnalysis ? JSON.stringify(headlineAnalysis) : null
     });
 
@@ -1053,13 +1078,13 @@ async function generateAgentForumPosts({
     });
 
     const createdAt = offsetTimestamp(index * 3);
-    const isUpdate = postingDecision.actionType === "update_existing";
+    const isUpdate = finalPostingDecision.actionType === "update_existing";
     const thesisId =
-      postingDecision.targetThesisId ||
+      finalPostingDecision.targetThesisId ||
       topicPlan.matchedThesis?.id ||
       (isUpdate ? null : crypto.randomUUID());
     const parentPostId =
-      postingDecision.targetPostId ||
+      finalPostingDecision.targetPostId ||
       (isUpdate ? topicPlan.updateTargetPostId : null);
     const message: AgentMessage = {
       id: preGeneratedMessageId!,
@@ -2207,9 +2232,52 @@ async function requestStructuredForumPost({
   try {
     const historicalContext = buildMarketRoomHistoricalContext(agent, generalHeadlines, sectorHeadlines);
 
+    // Build the prompt once — used by both passes
+    const postPrompt = buildForumPostPrompt(
+      agent,
+      marketSnapshot,
+      previousSnapshot,
+      discussionPlan,
+      topicPlan,
+      recentPosts,
+      relevantCases,
+      knowledgeSnippets,
+      generalHeadlines,
+      sectorHeadlines,
+      priorRoomThreads,
+      dynamicMemory,
+      agentState,
+      roomCoverage,
+      thisRunPosts,
+      headlineAnalysis,
+      historicalContext
+    );
+
+    // ── Pass 1: View crystallisation ────────────────────────────────────────
+    // Force a directional commitment before the full post is written.
+    // Low temperature, tiny output — just one or two sentences.
+    const viewPayload = await generateGeminiContent(env, {
+      model: getLlmModel(env),
+      instructions: [
+        buildAgentInstructions(agent),
+        "Respond in exactly one to two sentences. State your current directional view on your sector's primary asset and one specific number from the context that supports it.",
+        "No hedging. No qualifiers. No 'it depends'. Pick a side.",
+        "Format: '[bullish/bearish/cautious-bullish/cautious-bearish] [asset] at [specific level/figure] — [one-sentence reason]. I change my view if [specific testable condition].'",
+        "Example: 'Cautious-bearish WTI at $82.40 — the 3-week backwardation collapse signals demand softening. I change my view if EIA prints a draw > 4mb.'",
+      ].join("\n"),
+      prompt: postPrompt,
+      maxOutputTokens: 600,
+      temperature: 0.3,
+    });
+    const crystallisedView = extractResponseOutputText(viewPayload)?.trim() ?? "";
+
+    // ── Pass 2: Full post defending the crystallised view ────────────────────
     const payload = await generateGeminiContent(env, {
       model: getLlmModel(env),
       instructions: [
+        crystallisedView
+          ? `YOUR COMMITTED VIEW FOR THIS POST: "${crystallisedView}"\nWrite a post that defends and elaborates this exact view. Do not retreat from the directional call. Your job is to explain the evidence, the transmission mechanism, and the conviction condition in full.`
+          : "",
         buildAgentInstructions(agent),
         "Write a standalone forum post, not a reply.",
         "Make it read like a real market specialist posting in a live internal forum, not a polished strategy memo.",
@@ -2262,25 +2330,7 @@ async function requestStructuredForumPost({
           : "",
         `OUTPUT FORMAT: Return a single JSON object (no markdown fences). Required keys: title (string), catalyst (string), content (string, 170-280 words), stance (one of: bullish|bearish|cautious-bullish|cautious-bearish|neutral|alert — "selective", "watchful", and "disciplined" are BANNED, pick a direction), confidence (number 0.0-1.0).`
       ].filter(Boolean).join("\n"),
-      prompt: buildForumPostPrompt(
-        agent,
-        marketSnapshot,
-        previousSnapshot,
-        discussionPlan,
-        topicPlan,
-        recentPosts,
-        relevantCases,
-        knowledgeSnippets,
-        generalHeadlines,
-        sectorHeadlines,
-        priorRoomThreads,
-        dynamicMemory,
-        agentState,
-        roomCoverage,
-        thisRunPosts,
-        headlineAnalysis,
-        historicalContext
-      ),
+      prompt: postPrompt,
       // Gemma 4 / Gemini 2.5 count thinking tokens + output tokens against maxOutputTokens together.
       // With ~600-1200 thinking tokens per call, we need a generous budget for the actual post.
       maxOutputTokens: 3000,
@@ -2563,6 +2613,7 @@ function buildForumPostPrompt(
     topicPlan.coveredThemesToAvoid.length > 0
       ? `Covered themes to avoid unless you add a clearly new angle: ${topicPlan.coveredThemesToAvoid.join("; ")}`
       : "No heavy coverage warning.",
+    buildRoomConsensusBlock(thisRunPosts, priorRoomThreads) ?? "",
     buildDynamicMemoryPromptBlock(agent, dynamicMemory),
     ...(agentState ? [buildStatePromptBlock(agentState)] : []),
     ...(roomCoverage ? [buildRoomCoveragePromptBlock(roomCoverage)] : []),
@@ -3186,6 +3237,41 @@ function fallbackForumComment(agent: Agent, post: AgentMessage, marketSnapshot: 
   const instruments = relevantInstrumentsForAgent(agent, marketSnapshot).slice(0, 1);
   const metric = instruments.length > 0 ? `${instruments[0].label} at ${instruments[0].value}` : "current market levels";
   return `${agent.name}: worth checking the ${agent.sector.toLowerCase()} confirmation signal here. ${catalyst} has to show up in ${metric} before the thesis holds. Without that cross, this is directionally interesting but not yet actionable from my seat.`;
+}
+
+function buildRoomConsensusBlock(
+  thisRunPosts: AgentMessage[],
+  priorRoomThreads: AgentDiscussionThread[]
+): string | null {
+  // Collect stances from this run + recent prior threads
+  const runStances = thisRunPosts
+    .filter((p) => p.stance)
+    .map((p) => ({ agent: p.agentName, stance: p.stance! }));
+  const priorStances = priorRoomThreads
+    .slice(0, 6)
+    .map((t) => t.post)
+    .filter((p) => p.stance)
+    .map((p) => ({ agent: p.agentName, stance: p.stance! }));
+
+  const allStances = [...runStances, ...priorStances];
+  if (allStances.length < 2) return null;
+
+  // Count dominant stance
+  const stanceCounts: Record<string, number> = {};
+  for (const { stance } of allStances) {
+    stanceCounts[stance] = (stanceCounts[stance] ?? 0) + 1;
+  }
+  const [dominantStance, dominantCount] = Object.entries(stanceCounts).sort(
+    (a, b) => b[1] - a[1]
+  )[0];
+
+  return [
+    `ROOM CONSENSUS CHECK — stance distribution across ${allStances.length} recent posts:`,
+    ...allStances.map(({ agent, stance }) => `  ${agent}: ${stance}`),
+    `Dominant stance: ${dominantStance} (${dominantCount}/${allStances.length} agents)`,
+    "You MUST position yourself relative to this consensus: either (a) agree and state one specific supporting reason the others may have missed, or (b) push back with a counter-argument grounded in your sector's data.",
+    "Do not silently adopt the consensus stance without explaining why you share it — that is echo, not analysis.",
+  ].join("\n");
 }
 
 function buildSectorSpecificInstructions(agent: Agent): string | null {
