@@ -2241,10 +2241,23 @@ async function requestStructuredForumPost({
           "   - 'the market is pricing in' (without naming the specific mechanism)",
           "   - Any sentence starting 'As a [sector] specialist, I see...' without a specific new observation."
         ].join("\n"),
+        [
+          "VIEW PROTOCOL — every post MUST contain all three of these elements. Missing any one makes the post analytically worthless:",
+          "1. DIRECTIONAL CALL: State explicitly bullish, bearish, cautious-bullish, or cautious-bearish on your sector's primary risk asset.",
+          "   'Selective', 'watchful', and 'disciplined' are not directional calls — they are refusals to have a view.",
+          "   Name the asset and your direction. Example: 'bearish WTI near-term', 'cautious-bullish on 10Y', 'bearish USD vs JPY'.",
+          "2. DATA ANCHOR: Cite at least one specific number from the data provided in this prompt.",
+          "   Use a price level, yield, percentage move, bps, or a stored correlation figure.",
+          "   Do NOT assert statistical relationships from memory — use the data in front of you.",
+          "   Example: 'WTI at $82.40', '10Y at 4.28%', 'WTI/CPI YoY correlation +0.53 from stored data'.",
+          "3. CONVICTION CONDITION: One sentence stating exactly what would change your view.",
+          "   Must be specific and testable. 'If macro conditions change' is NOT acceptable.",
+          "   Good: 'I change my view if 10Y breaks above 4.5%' or 'I flip bullish on WTI if EIA shows a draw > 3mb'.",
+        ].join("\n"),
         thisRunPosts.length > 0
           ? `CRITICAL — these angles are already covered by other agents this session. Do NOT echo them. Take a genuinely different angle:\n${thisRunPosts.map((p) => `• ${p.agentName} (${p.sector}): "${p.title || "Untitled"}" — ${truncateText(p.content, 90)}`).join("\n")}`
           : "",
-        `OUTPUT FORMAT: Return a single JSON object (no markdown fences). Required keys: title (string), catalyst (string), content (string, 170-280 words), stance (one of: bullish|bearish|neutral|cautious|selective|alert|disciplined|watchful), confidence (number 0.0-1.0).`
+        `OUTPUT FORMAT: Return a single JSON object (no markdown fences). Required keys: title (string), catalyst (string), content (string, 170-280 words), stance (one of: bullish|bearish|cautious-bullish|cautious-bearish|neutral|alert — "selective", "watchful", and "disciplined" are BANNED, pick a direction), confidence (number 0.0-1.0).`
       ].filter(Boolean).join("\n"),
       prompt: buildForumPostPrompt(
         agent,
@@ -2272,13 +2285,21 @@ async function requestStructuredForumPost({
       responseJson: true  // JSON mime type without schema — avoids schema-truncation bugs
     });
 
-    return parseStructuredResponseJson<{
+    const parsed = parseStructuredResponseJson<{
       title?: string;
       content?: string;
       stance?: string;
       confidence?: number;
       catalyst?: string;
     }>(payload);
+
+    // Normalise banned stances — safety net in case the model slips through
+    const BANNED_STANCES = ["selective", "watchful", "disciplined", "cautious"];
+    if (parsed?.stance && BANNED_STANCES.includes(parsed.stance)) {
+      parsed.stance = "cautious-bullish";
+    }
+
+    return parsed;
   } catch {
     return null;
   }
@@ -2515,10 +2536,20 @@ function buildForumPostPrompt(
     mergedHeadlines.length > 0 ? "Additional sector headlines (context only — your primary focus is the headline above):" : "No current headlines available.",
     ...mergedHeadlines.map((headline, index) => `${index + 1}. ${headline.title} (${headline.source})`),
     `Catalyst discipline: ${ownedCatalystGuard}`,
-    recentPosts.length > 0 ? "Your most recent posts, avoid repeating them:" : "You do not have recent posts yet.",
-    ...recentPosts.map(
+    recentPosts.length > 0
+      ? [
+          "PRIOR VIEW ACCOUNTABILITY — your most recent post and call:",
+          `  Date: ${recentPosts[0].createdAt} | Stance: ${recentPosts[0].stance ?? "unknown"}`,
+          `  Title: ${recentPosts[0].title ?? "Untitled"}`,
+          `  Summary: ${truncateText(recentPosts[0].content, 200)}`,
+          "Before writing: was this prior call correct, partially right, or wrong given what has happened since?",
+          "Your new post MUST reference this assessment — do not silently abandon your prior view without explanation.",
+        ].join("\n")
+      : "No prior post found — this is your first directional call. State it clearly.",
+    recentPosts.length > 1 ? "Earlier posts (context — do not repeat these angles):" : "",
+    ...recentPosts.slice(1).map(
       (message, index) =>
-        `${index + 1}. ${message.createdAt} | ${message.title || "Untitled"} | ${truncateText(message.content, 240)}`
+        `${index + 2}. ${message.createdAt} | ${message.title ?? "Untitled"} | ${truncateText(message.content, 120)}`
     ),
     topicPlan.recentAgentThemes.length > 0
       ? `Your recently used themes: ${topicPlan.recentAgentThemes.join("; ")}`
