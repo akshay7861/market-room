@@ -2254,6 +2254,9 @@ async function requestStructuredForumPost({
           "   Must be specific and testable. 'If macro conditions change' is NOT acceptable.",
           "   Good: 'I change my view if 10Y breaks above 4.5%' or 'I flip bullish on WTI if EIA shows a draw > 3mb'.",
         ].join("\n"),
+        "DATA GROUNDING RULE: If the prompt contains an 'Available Historical Data Context' section with stored correlations or computed statistics, you MUST cite at least one specific figure from it in your post (e.g. 'WTI/CPI YoY correlation +0.53 from stored data covering 180 observations'). Do not describe a correlation qualitatively when a computed number is sitting in front of you.",
+        "CROSS-ASSET LINK: Your post must name at least one transmission effect into another asset class beyond your own sector. Example: 'This WTI move implies X for CPI → rates', or 'Dollar strength here pressures EM equities'. Staying entirely within your own sector lane is not sufficient analysis.",
+        buildSectorSpecificInstructions(agent),
         thisRunPosts.length > 0
           ? `CRITICAL — these angles are already covered by other agents this session. Do NOT echo them. Take a genuinely different angle:\n${thisRunPosts.map((p) => `• ${p.agentName} (${p.sector}): "${p.title || "Untitled"}" — ${truncateText(p.content, 90)}`).join("\n")}`
           : "",
@@ -3183,6 +3186,26 @@ function fallbackForumComment(agent: Agent, post: AgentMessage, marketSnapshot: 
   const instruments = relevantInstrumentsForAgent(agent, marketSnapshot).slice(0, 1);
   const metric = instruments.length > 0 ? `${instruments[0].label} at ${instruments[0].value}` : "current market levels";
   return `${agent.name}: worth checking the ${agent.sector.toLowerCase()} confirmation signal here. ${catalyst} has to show up in ${metric} before the thesis holds. Without that cross, this is directionally interesting but not yet actionable from my seat.`;
+}
+
+function buildSectorSpecificInstructions(agent: Agent): string | null {
+  switch (agent.sector) {
+    case "Risk/Sentiment":
+      return [
+        "REGIME CALL REQUIRED: Your primary job is to call the current risk regime — not describe it.",
+        "Every post must state explicitly: risk-on or risk-off — right now, because of [one specific observable reason].",
+        "If the regime is genuinely ambiguous, state the exact signal that would resolve it. Do not leave it open-ended.",
+        "A permanently cautious or watchful stance is not a regime call. Pick risk-on or risk-off and defend it.",
+      ].join("\n");
+    case "Equities":
+      return [
+        "EQUITY SPECIFICITY RULE: Index-level moves alone (e.g. 'SPY up 1%') are not sufficient anchors.",
+        "Every post must cite at least one equity-specific metric: an earnings result, P/E or valuation multiple, sector relative performance vs. the index, a revenue beat/miss, or a named company's specific move and why it matters.",
+        "Generic index commentary is what a news terminal provides. Analyst work names the stock, the multiple, or the earnings driver.",
+      ].join("\n");
+    default:
+      return null;
+  }
 }
 
 function buildAgentInstructions(agent: Agent): string {
