@@ -1,359 +1,109 @@
-# Macro historical starter pack
+# Macro Agent — Market Frameworks & Playbooks
 
-_Auto-generated historical context pack._
+_Last updated: 2026-04-17. Sector memory for the Macro Agent. Use these frameworks to reason about regime, policy, and cross-asset transmission — not just to describe what happened._
 
-Generated: 2026-04-05T14:43:48.061Z
-Historical floor: 1990-01-01
+---
 
-## Why this exists
+## Inflation Regime Thresholds
 
-Inflation, labour, growth, policy, and recession-regime context that helps the macro agent compare today with prior tightening, easing, and slowdown phases.
+The macro regime is primarily defined by the intersection of inflation and growth signals. Use these thresholds as anchors:
 
-Use this pack as durable sector memory. It is meant to help the agent compare current conditions with older cycles, squeezes, disinflations, inventory shocks, valuation resets, and recovery phases.
+- **Tightening regime**: CPI YoY >4% AND unemployment <4.0%. Fed is reactive, not proactive. Duration is cheap to short. Dollar supported by real yield premium.
+- **Stagflation zone**: CPI YoY >3.5% AND unemployment rising >0.3pp over 3 months. The worst policy environment — Fed cannot cut without reigniting inflation, cannot hike without accelerating unemployment. Equities typically underperform for 6–12 months.
+- **Easing inflection**: Core PCE falling toward 2.5% AND NFP additions below 150K/month for 2+ consecutive months. Fed historically begins pivot language (not yet cuts) within 1–2 meetings of this combination.
+- **Restrictive real rates**: 10Y TIPS real yield above +2.0% = definitively restrictive. P/E multiples have historically compressed 2–3 turns within 6 months at sustained real yields above 2%.
+- **Accommodative real rates**: 10Y TIPS real yield below 0% = financial conditions loose enough for risk asset expansion. Gold, EM, and long-duration equities outperform in this zone.
 
-## How to use it
+---
 
-- Upload this markdown into the relevant agent memory after a quick human review.
-- Pair it with event playbooks, policy reports, and post-mortems rather than treating it as a standalone forecast engine.
-- Refresh it periodically so new regimes get added without losing the long historical anchors.
+## Fed Reaction Function Playbook
 
-## Series included
+The Fed does not move on one data point. The sequence that historically precedes a pivot:
 
-### Headline CPI
-- Source: FRED
-- Coverage: 1990-01-01 to 2026-02-01 (433 observations)
-- Latest: 327.46 lin on 2026-02-01
-- Change versus previous observation: +0.27%
-- Approximate one-year change: +2.66%
-- Why it matters: Use for inflation regime changes, policy pressure, and real-income squeeze context.
-- Local normalized data file: knowledge/data-lake/normalized/fred_cpi_headline.json
+1. **Pause trigger**: Inflation trending lower for 3 consecutive months (not just one) AND either unemployment rising 0.3pp from cycle low OR financial conditions tightening sharply (HY spreads >500bps).
+2. **First cut**: Core PCE below 3.0% YoY AND unemployment above 4.3% OR credit stress signal (HY OAS >500bps). Single data points do not move the Fed.
+3. **Easing cycle**: Once the first cut happens, the historical median cutting cycle has delivered 200–250bps of cuts over 12–18 months — far more than markets price at the first cut.
+4. **Tightening resume**: If core PCE re-accelerates above 3.5% after cuts begin, the Fed historically pauses the cycle mid-cut — this happened in 1998 and was the setup for the 2000 peak.
 
-### Core CPI
-- Source: FRED
-- Coverage: 1990-01-01 to 2026-02-01 (433 observations)
-- Latest: 333.51 lin on 2026-02-01
-- Change versus previous observation: +0.22%
-- Approximate one-year change: +2.73%
-- Why it matters: Use for sticky inflation persistence, policy credibility, and valuation stress context.
-- Local normalized data file: knowledge/data-lake/normalized/fred_cpi_core.json
+**Never extrapolate one FOMC meeting as a trend. The signal is the median of the last 3 policy communications, not the most recent.**
 
-### Headline PCE
-- Source: FRED
-- Coverage: 1990-01-01 to 2026-01-01 (433 observations)
-- Latest: 128.97 lin on 2026-01-01
-- Change versus previous observation: +0.28%
-- Approximate one-year change: +2.83%
-- Why it matters: Use for Fed-sensitive inflation framing and long-cycle disinflation or reflation shifts.
-- Local normalized data file: knowledge/data-lake/normalized/fred_pce_headline.json
+---
 
-### Core PCE
-- Source: FRED
-- Coverage: 1990-01-01 to 2026-01-01 (433 observations)
-- Latest: 128.39 lin on 2026-01-01
-- Change versus previous observation: +0.36%
-- Approximate one-year change: +3.06%
-- Why it matters: Use for Fed reaction function analogs and inflation stickiness analysis.
-- Local normalized data file: knowledge/data-lake/normalized/fred_pce_core.json
+## Sahm Rule — Recession Timing
 
-### Unemployment rate
-- Source: FRED
-- Coverage: 1990-01-01 to 2026-03-01 (434 observations)
-- Latest: 4.30 lin on 2026-03-01
-- Change versus previous observation: -2.27%
-- Approximate one-year change: +2.38%
-- Why it matters: Use for recession risk, labour slack, and growth-scare analogs.
-- Local normalized data file: knowledge/data-lake/normalized/fred_unemployment.json
+When the 3-month moving average of the unemployment rate rises 0.5pp above its prior 12-month low, a recession has historically already begun. This rule has triggered before or at the NBER recession start date in every post-1970 cycle.
 
-### Nonfarm payrolls
-- Source: FRED
-- Coverage: 1990-01-01 to 2026-03-01 (435 observations)
-- Latest: 158,637 lin on 2026-03-01
-- Change versus previous observation: +0.11%
-- Approximate one-year change: +0.16%
-- Why it matters: Use for labour momentum, soft-landing versus recession comparisons, and policy durability.
-- Local normalized data file: knowledge/data-lake/normalized/fred_nonfarm_payrolls.json
+- Unemployment at 4.0% → watch for 4.5% as the Sahm threshold trigger at current levels.
+- By the time unemployment moves 0.5pp, equities have historically already sold off 10–15% from their peak.
+- **Action**: do not wait for Sahm to trigger to de-risk. The leading signal is claims trending above 250K/week for 3+ consecutive weeks COMBINED with ISM Manufacturing below 49 for 2+ months.
 
-### Retail sales
-- Source: FRED
-- Coverage: 1992-01-01 to 2026-02-01 (410 observations)
-- Latest: 738,366 lin on 2026-02-01
-- Change versus previous observation: +0.60%
-- Approximate one-year change: +3.71%
-- Why it matters: Use for consumer-strength, demand rotation, and growth breadth context.
-- Local normalized data file: knowledge/data-lake/normalized/fred_retail_sales.json
+---
 
-### Industrial production
-- Source: FRED
-- Coverage: 1990-01-01 to 2026-02-01 (434 observations)
-- Latest: 102.55 lin on 2026-02-01
-- Change versus previous observation: +0.15%
-- Approximate one-year change: +1.44%
-- Why it matters: Use for cyclical growth, manufacturing regime, and commodity-demand analogs.
-- Local normalized data file: knowledge/data-lake/normalized/fred_industrial_production.json
+## Yield Curve Recession Playbook
 
-### Real GDP proxy
-- Source: FRED
-- Coverage: 1990-01-01 to 2025-10-01 (144 observations)
-- Latest: 31,442.48 lin on 2025-10-01
-- Change versus previous observation: +1.11%
-- Approximate one-year change: +5.42%
-- Why it matters: Use for long-cycle growth regime comparisons and macro narrative anchoring.
-- Local normalized data file: knowledge/data-lake/normalized/fred_gdp.json
+The 2Y-10Y curve inversion is the most reliable long-lead recession indicator, but timing matters:
 
-### Fed funds rate
-- Source: FRED
-- Coverage: 1990-01-01 to 2026-03-01 (435 observations)
-- Latest: 3.64 lin on 2026-03-01
-- Change versus previous observation: +0.00%
-- Approximate one-year change: -15.94%
-- Why it matters: Use for tightening and easing cycle analogs, discount-rate framing, and carry context.
-- Local normalized data file: knowledge/data-lake/normalized/fred_fedfunds.json
+- **Inversion signal**: 2Y-10Y inverts (2Y > 10Y) → median 15 months to NBER recession start across post-1970 cycles. Minimum lag has been 6 months; maximum was 24 months.
+- **Equity behaviour after inversion**: S&P 500 has historically rallied 10–20% from the month of initial inversion before the eventual bear market begins. Selling immediately on inversion has been wrong more than right.
+- **Steepening into recession**: the curve typically re-steepens (bull steepening — 2Y falling faster) 3–6 months before recession is officially declared. This steepening is NOT a "recovery" signal — it's the market pricing rapid Fed cuts.
+- **Current context (2026)**: curve re-steepened to +53bps (10Y–2Y). This re-steepening post-inversion pattern historically precedes recession confirmation within 6–12 months.
 
-### US 2Y yield
-- Source: FRED
-- Coverage: 1990-01-02 to 2026-04-02 (9068 observations)
-- Latest: 3.79 lin on 2026-04-02
-- Change versus previous observation: -0.52%
-- Approximate one-year change: -2.57%
-- Why it matters: Use for front-end repricing, policy path sensitivity, and FX rate-differential context.
-- Local normalized data file: knowledge/data-lake/normalized/fred_us2y.json
+---
 
-### US 10Y yield
-- Source: FRED
-- Coverage: 1990-01-02 to 2026-04-02 (9068 observations)
-- Latest: 4.31 lin on 2026-04-02
-- Change versus previous observation: -0.46%
-- Approximate one-year change: +0.94%
-- Why it matters: Use for duration shock analogs, equity multiple pressure, and macro discount-rate context.
-- Local normalized data file: knowledge/data-lake/normalized/fred_us10y.json
+## Cross-Asset Transmission Chains
 
-### 10Y minus 2Y curve
-- Source: FRED
-- Coverage: 1990-01-02 to 2026-04-03 (9069 observations)
-- Latest: 0.51 lin on 2026-04-03
-- Change versus previous observation: -1.92%
-- Approximate one-year change: +50.00%
-- Why it matters: Use for curve inversion or steepening analogs and recession timing context.
-- Local normalized data file: knowledge/data-lake/normalized/fred_curve_10y2y.json
+These are the documented transmission paths from macro signals to asset prices. Use these to explain WHY a macro data point matters, not just WHAT it is.
 
-### 10Y breakeven inflation
-- Source: FRED
-- Coverage: 2003-01-02 to 2026-04-03 (5817 observations)
-- Latest: 2.36 lin on 2026-04-03
-- Change versus previous observation: +0.85%
-- Approximate one-year change: -0.84%
-- Why it matters: Use for inflation expectations and real-rate regime comparisons.
-- Local normalized data file: knowledge/data-lake/normalized/fred_breakeven_10y.json
+**CPI beat (inflation surprise higher) →**
+- 2Y yield rises 10–20bps (most reactive tenor — policy-sensitive)
+- 10Y rises 5–15bps (less, because growth concerns dampen the long end)
+- USD strengthens (higher-for-longer expectation)
+- Equities fall 0.5–1.5% (valuation discount rate rises)
+- Gold sells off (real yield rises)
+- EM FX weakens (dollar bid + risk-off)
+- Lag to CPI: 2Y reprices same day; gold and EM follow within 3 days
 
-### VIX
-- Source: FRED
-- Coverage: 1990-01-02 to 2026-04-01 (9156 observations)
-- Latest: 24.54 lin on 2026-04-01
-- Change versus previous observation: -2.81%
-- Approximate one-year change: -27.01%
-- Why it matters: Use for volatility spikes, de-risking episodes, and sentiment washout analogs.
-- Local normalized data file: knowledge/data-lake/normalized/fred_vix.json
+**NFP miss (payrolls below 100K or negative) →**
+- 2Y yield falls 15–30bps (most reactive — pricing faster cuts)
+- 10Y falls 5–15bps
+- Dollar weakens 0.5–1%
+- Equities: ambiguous — can rally on "bad news is good news" (faster cuts) or sell if recession fear dominates
+- The key separator: if HY spreads WIDEN on an NFP miss → recession fear is dominating → equities sell. If HY TIGHTENS → market buying the dip on cut expectations → equities rally.
 
-### US high-yield spread
-- Source: FRED
-- Coverage: 1996-12-31 to 2026-04-02 (7639 observations)
-- Latest: 3.17 lin on 2026-04-02
-- Change versus previous observation: +0.32%
-- Approximate one-year change: -21.14%
-- Why it matters: Use for credit stress, financing conditions, and cross-asset risk-off confirmation.
-- Local normalized data file: knowledge/data-lake/normalized/fred_high_yield_spread.json
+**M2 growth above 8% YoY →**
+- Historically precedes CPI acceleration by 12–18 months (2020–2021 episode: M2 grew 26% → CPI peaked at 9.1% 18 months later)
+- Not a direct trading signal — too slow — but changes the macro narrative from "transitory" to "structural"
 
-### Broad trade-weighted dollar
-- Source: FRED
-- Coverage: 2006-01-02 to 2026-03-27 (5072 observations)
-- Latest: 120.89 lin on 2026-03-27
-- Change versus previous observation: +0.41%
-- Approximate one-year change: -4.10%
-- Why it matters: Use for dollar squeeze, global liquidity, and policy-divergence regime comparisons.
-- Local normalized data file: knowledge/data-lake/normalized/fred_broad_dollar.json
+---
 
-### Copper spot
-- Source: FRED
-- Coverage: 1992-01-01 to 2026-02-01 (410 observations)
-- Latest: 12,951.35 lin on 2026-02-01
-- Change versus previous observation: -0.27%
-- Approximate one-year change: +298.86%
-- Why it matters: Use for industrial cycle strength and China-sensitive growth analogs.
-- Local normalized data file: knowledge/data-lake/normalized/fred_copper.json
+## Failure Modes to Avoid
 
-### Henry Hub natural gas
-- Source: FRED
-- Coverage: 1997-01-07 to 2026-03-30 (7339 observations)
-- Latest: 2.88 lin on 2026-03-30
-- Change versus previous observation: -3.68%
-- Approximate one-year change: -26.72%
-- Why it matters: Use for energy inflation, utility pressure, and supply-shock analogs.
-- Local normalized data file: knowledge/data-lake/normalized/fred_nat_gas.json
+**1. Over-weighting a single CPI print.** Inflation is volatile month-to-month. A single hot or cool print has historically generated overreaction in rates and equities that reverses within 2–4 weeks. The Fed and markets care about the 3-month annualised trend, not the headline monthly number.
 
-### WTI crude spot
-- Source: EIA
-- Coverage: 1990-01 to 2026-03 (435 observations)
-- Latest: 90.84 $/BBL on 2026-03
-- Change versus previous observation: +40.82%
-- Approximate one-year change: +33.12%
-- Why it matters: Use for commodity inflation regimes and crude-demand versus policy interactions.
-- Local normalized data file: knowledge/data-lake/normalized/eia_wti_monthly.json
+**2. Anchoring too long on "soft landing" narrative when unemployment starts rising.** Once unemployment rises 0.3pp from its cycle low, the soft landing probability drops significantly. The unemployment rate is a lagging indicator — if it's moving, the slowdown has already been underway for 3–6 months. Do not wait for a headline recession to change the view.
 
-### Brent crude spot
-- Source: EIA
-- Coverage: 1990-01 to 2026-03 (435 observations)
-- Latest: 102.01 $/BBL on 2026-03
-- Change versus previous observation: +43.90%
-- Approximate one-year change: +40.26%
-- Why it matters: Use for global oil shock comparisons and crude benchmark spread framing.
-- Local normalized data file: knowledge/data-lake/normalized/eia_brent_monthly.json
+**3. Treating money supply as a short-term signal.** M1/M2 growth moves are structural regime signals with 12–18 month transmission lags. They are not relevant to this week's trade.
 
-### US crude oil ending stocks
-- Source: EIA
-- Coverage: 1990-01-05 to 2026-03-27 (1891 observations)
-- Latest: 876,700 MBBL on 2026-03-27
-- Change versus previous observation: +0.58%
-- Approximate one-year change: +4.84%
-- Why it matters: Use for inventory tightness, supply cushion, and commodity-scarcity regime analogs.
-- Local normalized data file: knowledge/data-lake/normalized/eia_us_crude_stocks.json
+---
 
-### GLD monthly
-- Source: Alpha Vantage
-- Coverage: 2004-12-31 to 2026-04-02 (257 observations)
-- Latest: 429.41 on 2026-04-02
-- Change versus previous observation: -0.20%
-- Approximate one-year change: +41.36%
-- Why it matters: Use for gold-risk, real-yield tension, and inflation-hedge analogs when spot history is not available from a stable free feed.
-- Local normalized data file: knowledge/data-lake/normalized/av_gld_monthly.json
+## Series Reference
 
-### SPY monthly
-- Source: Alpha Vantage
-- Coverage: 1999-12-31 to 2026-04-02 (317 observations)
-- Latest: 655.83 on 2026-04-02
-- Change versus previous observation: +0.84%
-- Approximate one-year change: +19.62%
-- Why it matters: Use for broad US equity trend, drawdown analogs, and cross-asset comparison.
-- Local normalized data file: knowledge/data-lake/normalized/av_spy_monthly.json
+| Series | Key level / current | What it tells you |
+|--------|-------------------|-------------------|
+| Headline CPI YoY | ~3.3% | Inflation regime gate — >4% = tightening mode |
+| Core PCE YoY | ~2.97% | Fed's preferred measure — >3% = no cuts |
+| Unemployment | 4.3% | Sahm threshold is ~4.5% at current cycle low |
+| NFP monthly | ~158K level | Watch MoM additions; <150K/month = easing case builds |
+| 10Y TIPS real yield | ~1.89% | >2% = restrictive for equities and growth |
+| 10Y-2Y curve | +0.53% | Re-steepening after inversion — watch closely |
+| Fed Funds | 3.64% | 150–200bps above neutral rate estimates |
+| 10Y breakeven | 2.39% | Above 2.5% = Fed cannot cut |
 
-### IWM monthly
-- Source: Alpha Vantage
-- Coverage: 2000-06-30 to 2026-04-02 (311 observations)
-- Latest: 251.29 on 2026-04-02
-- Change versus previous observation: +1.33%
-- Approximate one-year change: +30.35%
-- Why it matters: Use for domestic cyclicality, breadth, and financing-condition sensitivity.
-- Local normalized data file: knowledge/data-lake/normalized/av_iwm_monthly.json
+---
 
-### BTCUSD monthly
-- Source: Alpha Vantage
-- Coverage: 2010-08-31 to 2026-04-05 (189 observations)
-- Latest: 67,219.98 on 2026-04-05
-- Change versus previous observation: -1.47%
-- Approximate one-year change: -28.63%
-- Why it matters: Use for speculative risk appetite, liquidity beta, and crypto-driven sentiment analogs.
-- Local normalized data file: knowledge/data-lake/normalized/av_btc_monthly.json
+## Framing Rules
 
-### EUR/USD
-- Source: FRED
-- Coverage: 1999-01-04 to 2026-03-27 (6829 observations)
-- Latest: 1.15 lin on 2026-03-27
-- Change versus previous observation: -0.19%
-- Approximate one-year change: +6.63%
-- Why it matters: Use for rate-divergence regime, carry unwind, ECB vs Fed policy-divergence analogs.
-- Local normalized data file: knowledge/data-lake/normalized/fred_eurusd.json
-
-### USD/JPY
-- Source: FRED
-- Coverage: 1990-01-02 to 2026-03-27 (9093 observations)
-- Latest: 160.16 lin on 2026-03-27
-- Change versus previous observation: +0.32%
-- Approximate one-year change: +6.94%
-- Why it matters: Use for carry trade stress, BOJ policy shifts, yen intervention episodes, and liquidity shocks.
-- Local normalized data file: knowledge/data-lake/normalized/fred_usdjpy.json
-
-### US 3M yield
-- Source: FRED
-- Coverage: 1990-01-02 to 2026-04-02 (9068 observations)
-- Latest: 3.70 lin on 2026-04-02
-- Change versus previous observation: +0.00%
-- Approximate one-year change: -14.55%
-- Why it matters: Use for money-market stress, Fed path pricing, and front-end inversion analogs.
-- Local normalized data file: knowledge/data-lake/normalized/fred_us3m.json
-
-### US 1Y yield
-- Source: FRED
-- Coverage: 1990-01-02 to 2026-04-02 (9068 observations)
-- Latest: 3.68 lin on 2026-04-02
-- Change versus previous observation: +0.00%
-- Approximate one-year change: -8.91%
-- Why it matters: Use for near-term policy expectations and bill-to-coupon rotation dynamics.
-- Local normalized data file: knowledge/data-lake/normalized/fred_us1y.json
-
-### US 5Y yield
-- Source: FRED
-- Coverage: 1990-01-02 to 2026-04-02 (9068 observations)
-- Latest: 3.94 lin on 2026-04-02
-- Change versus previous observation: -0.76%
-- Approximate one-year change: -1.01%
-- Why it matters: Use for belly repricing, intermediate policy sensitivity, and TIPS breakeven anchoring.
-- Local normalized data file: knowledge/data-lake/normalized/fred_us5y.json
-
-### US 30Y yield
-- Source: FRED
-- Coverage: 1990-01-02 to 2026-04-02 (9068 observations)
-- Latest: 4.88 lin on 2026-04-02
-- Change versus previous observation: -0.61%
-- Approximate one-year change: +5.17%
-- Why it matters: Use for long-duration repricing, inflation term premium, and pension rebalancing analogs.
-- Local normalized data file: knowledge/data-lake/normalized/fred_us30y.json
-
-### 5Y TIPS real yield
-- Source: FRED
-- Coverage: 2003-01-02 to 2026-04-02 (5816 observations)
-- Latest: 1.37 lin on 2026-04-02
-- Change versus previous observation: -3.52%
-- Approximate one-year change: -2.14%
-- Why it matters: Use for real-rate regime shifts, inflation expectations decoupling, and equity multiple pressure.
-- Local normalized data file: knowledge/data-lake/normalized/fred_tips_5y.json
-
-### 10Y TIPS real yield
-- Source: FRED
-- Coverage: 2003-01-02 to 2026-04-02 (5816 observations)
-- Latest: 1.97 lin on 2026-04-02
-- Change versus previous observation: -2.48%
-- Approximate one-year change: +3.68%
-- Why it matters: Use for real discount rate, gold-vs-real-yield tension, and equity valuation regime.
-- Local normalized data file: knowledge/data-lake/normalized/fred_tips_10y.json
-
-### WTI crude daily
-- Source: FRED
-- Coverage: 1990-01-02 to 2026-03-30 (9110 observations)
-- Latest: 104.69 lin on 2026-03-30
-- Change versus previous observation: +3.39%
-- Approximate one-year change: +50.68%
-- Why it matters: Use for daily oil regime, inflation impulse, and demand-supply dynamics at high frequency.
-- Local normalized data file: knowledge/data-lake/normalized/fred_wti_daily.json
-
-### Wheat
-- Source: FRED
-- Coverage: 1992-01-01 to 2026-02-01 (410 observations)
-- Latest: 174.75 lin on 2026-02-01
-- Change versus previous observation: +3.25%
-- Approximate one-year change: -8.07%
-- Why it matters: Use for food inflation, supply-shock analogs (drought, conflict), and agricultural regime shifts.
-- Local normalized data file: knowledge/data-lake/normalized/fred_wheat.json
-
-### TED spread
-- Source: FRED
-- Coverage: 1990-01-02 to 2022-01-21 (7869 observations)
-- Latest: 0.09 lin on 2022-01-21
-- Change versus previous observation: +12.50%
-- Approximate one-year change: -35.71%
-- Why it matters: Use for interbank funding stress, systemic risk episodes, and credit-crunch analogs.
-- Local normalized data file: knowledge/data-lake/normalized/fred_ted_spread.json
-
-## Agent framing prompts
-
-- Compare today’s inflation, labour, and policy mix with prior late-cycle and early-easing regimes.
-- Check whether growth, inflation, and real-yield signals are aligned or conflicted.
-- Flag what would invalidate the current macro regime analogy.
+- Always state WHICH regime we are in (tightening / stagflation / easing inflection / neutral) before discussing the trade.
+- Connect the macro regime to at least one cross-asset implication — equities, FX, or credit.
+- State the specific data point that would CHANGE the regime call. If nothing can change it this week, say that explicitly.
+- Do not use "uncertainty" as a conclusion. Uncertainty is the input; the view is the output.

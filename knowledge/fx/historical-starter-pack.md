@@ -1,134 +1,125 @@
-# FX historical starter pack
+# FX Agent — Market Frameworks & Playbooks
 
-_Auto-generated historical context pack._
+_Last updated: 2026-04-17. Sector memory for the FX Agent. Use these frameworks to reason about dollar direction, carry, and policy divergence — not just to describe cross levels._
 
-Generated: 2026-04-05T14:43:48.061Z
-Historical floor: 1990-01-01
+---
 
-## Why this exists
+## Dollar Regime Framework
 
-Dollar and cross-asset regime anchors that help the FX agent compare current moves with prior dollar squeeze, carry unwind, and policy-divergence episodes.
+Dollar direction is driven by three forces in order of dominance: **real yield differentials**, **risk appetite**, and **current account / capital flow dynamics**. When these three align, the move is durable. When they conflict, the move is corrective and should be faded.
 
-Use this pack as durable sector memory. It is meant to help the agent compare current conditions with older cycles, squeezes, disinflations, inventory shocks, valuation resets, and recovery phases.
+**Dollar bull conditions (all three aligned):**
+- US 2Y yield rising faster than G10 peers (real rate differential expanding)
+- VIX below 18 and stable (risk-on = dollar less needed as safe haven, but carry attractiveness dominates)
+- US current account deficit narrowing OR capital inflows accelerating
 
-## How to use it
+**Dollar bear conditions:**
+- US real yields peaking or falling (10Y TIPS declining from >1.5%)
+- VIX rising above 20 with HY spreads widening (safe haven flows go to JPY and CHF, not USD, in genuine risk-off)
+- Current account deficit widening without offsetting capital flows (structural dollar supply)
 
-- Upload this markdown into the relevant agent memory after a quick human review.
-- Pair it with event playbooks, policy reports, and post-mortems rather than treating it as a standalone forecast engine.
-- Refresh it periodically so new regimes get added without losing the long historical anchors.
+**The trap**: high nominal yields alone are NOT sufficient for sustained dollar strength. When real yields peak, the dollar reversal tends to be sharp — 5–8% over 6–10 weeks. Missing the turn in real yields is the single biggest FX timing error.
 
-## Series included
+---
 
-### Fed funds rate
-- Source: FRED
-- Coverage: 1990-01-01 to 2026-03-01 (435 observations)
-- Latest: 3.64 lin on 2026-03-01
-- Change versus previous observation: +0.00%
-- Approximate one-year change: -15.94%
-- Why it matters: Use for tightening and easing cycle analogs, discount-rate framing, and carry context.
-- Local normalized data file: knowledge/data-lake/normalized/fred_fedfunds.json
+## Carry Trade Mechanics — Be Precise
 
-### US 2Y yield
-- Source: FRED
-- Coverage: 1990-01-02 to 2026-04-02 (9068 observations)
-- Latest: 3.79 lin on 2026-04-02
-- Change versus previous observation: -0.52%
-- Approximate one-year change: -2.57%
-- Why it matters: Use for front-end repricing, policy path sensitivity, and FX rate-differential context.
-- Local normalized data file: knowledge/data-lake/normalized/fred_us2y.json
+Carry trades are directional bets on yield differentials, not just yield levels. Get the direction right:
 
-### Broad trade-weighted dollar
-- Source: FRED
-- Coverage: 2006-01-02 to 2026-03-27 (5072 observations)
-- Latest: 120.89 lin on 2026-03-27
-- Change versus previous observation: +0.41%
-- Approximate one-year change: -4.10%
-- Why it matters: Use for dollar squeeze, global liquidity, and policy-divergence regime comparisons.
-- Local normalized data file: knowledge/data-lake/normalized/fred_broad_dollar.json
+**EM carry trade (borrowing low-yield USD to invest in high-yield EM):**
+- Works when: US yields stable/falling + EM yields steady + VIX below 18 + dollar stable
+- Unwinds when: USD strengthens sharply OR VIX spikes above 22 OR EM country-specific stress (current account deterioration, inflation shock)
+- Unwind mechanics: EM investors sell EM assets → sell EM currency → buy USD → USD strengthens further → unwind accelerates. Self-reinforcing.
+- Typical unwind speed: 50–70% of the carry gain reverses in 2–3 weeks during stress episodes.
 
-### EUR/USD
-- Source: FRED
-- Coverage: 1999-01-04 to 2026-03-27 (6829 observations)
-- Latest: 1.15 lin on 2026-03-27
-- Change versus previous observation: -0.19%
-- Approximate one-year change: +6.63%
-- Why it matters: Use for rate-divergence regime, carry unwind, ECB vs Fed policy-divergence analogs.
-- Local normalized data file: knowledge/data-lake/normalized/fred_eurusd.json
+**JPY carry trade (borrowing cheap JPY to invest in USD or EM):**
+- Funded in JPY because BOJ held rates near zero for decades. USD/JPY above 145 is the stress zone where BOJ intervention risk rises.
+- When VIX spikes above 25, JPY carry unwind is fast and violent — USD/JPY typically drops 3–5% in 1–2 weeks.
+- The JPY carry unwind signal: USD/JPY falling sharply WHILE equities are also falling = genuine risk-off. USD/JPY falling with equities rising = BOJ policy change (different driver).
 
-### GBP/USD
-- Source: FRED
-- Coverage: 1990-01-02 to 2026-03-27 (9093 observations)
-- Latest: 1.33 lin on 2026-03-27
-- Change versus previous observation: -0.45%
-- Approximate one-year change: +2.66%
-- Why it matters: Use for BOE policy divergence, UK growth differentials, and sterling risk-appetite analogs.
-- Local normalized data file: knowledge/data-lake/normalized/fred_gbpusd.json
+**What "carry compression" actually means:**
+- Carry compression = the yield spread between the high-yield and low-yield currency is NARROWING. Either the high-yield country's rates are falling, or the low-yield country's rates are rising.
+- High US yields by themselves do NOT compress EM carry — they widen the spread in USD's favour. Compression happens when EM central banks cut, or when US yields rise faster than EM yields (rare).
+- Always name WHICH side of the spread is moving.
 
-### USD/JPY
-- Source: FRED
-- Coverage: 1990-01-02 to 2026-03-27 (9093 observations)
-- Latest: 160.16 lin on 2026-03-27
-- Change versus previous observation: +0.32%
-- Approximate one-year change: +6.94%
-- Why it matters: Use for carry trade stress, BOJ policy shifts, yen intervention episodes, and liquidity shocks.
-- Local normalized data file: knowledge/data-lake/normalized/fred_usdjpy.json
+---
 
-### AUD/USD
-- Source: FRED
-- Coverage: 1990-01-02 to 2026-03-27 (9093 observations)
-- Latest: 0.69 lin on 2026-03-27
-- Change versus previous observation: -0.33%
-- Approximate one-year change: +9.21%
-- Why it matters: Use for risk-on/off confirmation, China growth proxy, and commodity-demand-through-FX analogs.
-- Local normalized data file: knowledge/data-lake/normalized/fred_audusd.json
+## Policy Divergence Playbook
 
-### USD/CAD
-- Source: FRED
-- Coverage: 1990-01-02 to 2026-03-27 (9093 observations)
-- Latest: 1.39 lin on 2026-03-27
-- Change versus previous observation: +0.22%
-- Approximate one-year change: -2.98%
-- Why it matters: Use for oil-linked FX moves, BOC divergence, and commodity-currency regime analogs.
-- Local normalized data file: knowledge/data-lake/normalized/fred_usdcad.json
+Policy divergence is the most powerful medium-term FX driver. The timing sequence:
 
-### USD/CHF
-- Source: FRED
-- Coverage: 1990-01-02 to 2026-03-27 (9093 observations)
-- Latest: 0.80 lin on 2026-03-27
-- Change versus previous observation: +0.44%
-- Approximate one-year change: -9.63%
-- Why it matters: Use for safe-haven flow detection, SNB intervention episodes, and funding-stress analogs.
-- Local normalized data file: knowledge/data-lake/normalized/fred_usdchf.json
+1. **Pre-divergence**: market is pricing the same policy path for both central banks. Moves are driven by short-term data surprises.
+2. **Divergence signal**: one central bank signals a different path (e.g., ECB cuts while Fed holds). EUR/USD typically drops 3–5% in the 3 months following the first divergent cut — but the first 1–2% is usually given back as the market "tests" the divergence.
+3. **Sustained divergence**: 3+ meetings of different outcomes. The FX move is now structural, not tradeable by fading.
+4. **Convergence**: both central banks realign. This typically happens faster than the market expects — policy divergence rarely lasts more than 18 months at the extreme.
 
-### NZD/USD
-- Source: FRED
-- Coverage: 1990-01-02 to 2026-03-27 (9093 observations)
-- Latest: 0.58 lin on 2026-03-27
-- Change versus previous observation: -0.35%
-- Approximate one-year change: +0.37%
-- Why it matters: Use for risk sentiment, RBNZ policy, and Asia-Pacific growth analogs.
-- Local normalized data file: knowledge/data-lake/normalized/fred_nzdusd.json
+**Current relevance**: Fed at 3.64% vs ECB sub-2% = 150+bps differential. This gap is historically extreme and has never been sustained for more than 2 years without convergence. EUR/USD at 1.17 reflects some of this already — the question is whether the US growth story deteriorates fast enough to close the gap via Fed cuts.
 
-### NOK/USD
-- Source: FRED
-- Coverage: 1990-01-02 to 2026-03-27 (9093 observations)
-- Latest: 9.73 lin on 2026-03-27
-- Change versus previous observation: +0.58%
-- Approximate one-year change: -7.21%
-- Why it matters: Use for oil-driven carry, Norges Bank policy, and petrocurrency regime shifts.
-- Local normalized data file: knowledge/data-lake/normalized/fred_nokusd.json
+---
 
-### SEK/USD
-- Source: FRED
-- Coverage: 1990-01-02 to 2026-03-27 (9093 observations)
-- Latest: 9.45 lin on 2026-03-27
-- Change versus previous observation: +0.49%
-- Approximate one-year change: -5.73%
-- Why it matters: Use for European cyclicality, Riksbank policy shifts, and Nordic growth proxy.
-- Local normalized data file: knowledge/data-lake/normalized/fred_sekusd.json
+## Safe Haven Flow Mechanics
 
-## Agent framing prompts
+Not all risk-off episodes are the same. The currency flow depends on the TYPE of risk:
 
-- Compare current dollar behaviour with prior divergence, carry unwind, and dollar shortage episodes.
-- Check whether rate differentials and risk sentiment are reinforcing each other.
-- Explain which cross-asset signal most clearly supports or challenges the FX view.
+| Risk type | Safe havens | Avoid |
+|-----------|------------|-------|
+| US-specific (recession fear, credit stress) | JPY, CHF | USD — the problem is US-based |
+| Global growth shock | JPY, CHF, USD | Commodity FX (AUD, CAD, NOK) |
+| EM crisis/contagion | USD, JPY | EM FX, commodity-linked FX |
+| Geopolitical (Middle East) | USD, gold | EUR, EM |
+| European banking stress | USD, CHF | EUR, GBP |
+
+**Identification rule**: if USD is strengthening AND JPY is strengthening simultaneously → genuine risk-off, not just dollar strength. If USD strengthens but JPY weakens → it's a US real yield / carry trade move, not fear.
+
+---
+
+## Cross Playbooks — Key Pairs
+
+**EUR/USD:**
+- Primary driver: ECB vs Fed policy differential (2Y spread is best proxy)
+- Level context: 1.10 = strong dollar / rate differential zone; 1.20+ = dollar weakness regime
+- Rule: EUR/USD below 1.05 historically coincides with European recession or energy shock. At 1.17, the market is pricing some Fed convergence toward ECB rates.
+
+**USD/JPY:**
+- Primary driver: US-Japan 10Y yield differential
+- BOJ intervention zone: USD/JPY above 145–150. BOJ has intervened 3 times since 2022.
+- Rule: when USD/JPY exceeds 150 and VIX is below 20, the upside is capped by intervention risk. When VIX spikes above 25 with USD/JPY at 145+, the unwind is typically fast and severe (2022 episode: dropped 10% in 3 weeks).
+
+**AUD/USD:**
+- Primary driver: China industrial activity proxy (iron ore, copper demand) + risk appetite
+- Rule: AUD/USD rising with copper flat = pure risk-on signal. AUD/USD falling with WTI falling = China demand destruction signal — more bearish than just risk-off.
+
+**USD/CAD:**
+- Primary driver: WTI crude direction + BOC/Fed differential
+- Rule: WTI YoY >+20% historically correlates with CAD strength (USD/CAD lower) within 2–3 months. The oil-CAD relationship breaks when US growth fears dominate (both WTI and CAD weaken together against USD).
+
+---
+
+## Stored Data Correlation — Dollar/Oil
+
+The data lake confirms: Broad Dollar YoY% vs WTI YoY% correlation is approximately **-0.55** (negative). This is structural: a stronger dollar reduces global purchasing power for USD-denominated oil, suppressing demand and price. Conversely, dollar weakness releases this suppression.
+
+**Implication**: if calling dollar strength, the commodity-FX complex (AUD, CAD, NOK, BRL) should underperform. If those crosses are NOT moving as expected, question the dollar thesis.
+
+---
+
+## Failure Modes to Avoid
+
+**1. Treating EUR/USD as the only dollar proxy.** The broad dollar index (trade-weighted) is more accurate. EUR/USD can be distorted by European-specific flows. When USD/JPY and USD/CNH are both moving with EUR/USD, the dollar move is real. When only EUR/USD moves, it may be Euro-specific.
+
+**2. Assuming dollar strength persists just because US yields are high.** Real yield LEVEL matters less than the DIRECTION. Once real yields start falling, the dollar typically reverses within 4–6 weeks — missing this turn by one month costs the entire move. Watch the direction of TIPS yields, not just the level.
+
+---
+
+## Key Levels Reference
+
+| Cross | Current | Regime note |
+|-------|---------|------------|
+| Broad Dollar YoY% | -6.3% YoY | Dollar in weakening trend |
+| EUR/USD | 1.17 | Above 1.15 = dollar weakness zone |
+| USD/JPY | 159.22 | Above BOJ intervention watch zone (145–150) |
+| AUD/USD | 0.71 | Risk-on supported; China proxy positive |
+| USD/CAD | 1.38 | Oil-linked; watch WTI direction |
+| USD/CHF | 0.79 | CHF near multi-year strength — safe haven bid intact |
+| 10Y real yield | 1.89% | Still restrictive but below 2% peak |
+| Fed Funds | 3.64% | 150bps above ECB — extreme divergence |
