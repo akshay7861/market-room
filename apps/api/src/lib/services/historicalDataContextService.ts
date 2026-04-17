@@ -2,6 +2,10 @@ import eiaWtiMonthly from "../../../../../knowledge/data-lake/normalized/eia_wti
 import fredCpiHeadline from "../../../../../knowledge/data-lake/normalized/fred_cpi_headline.json";
 import fredM1Monthly from "../../../../../knowledge/data-lake/normalized/fred_m1_monthly.json";
 import fredM2Monthly from "../../../../../knowledge/data-lake/normalized/fred_m2_monthly.json";
+import fredBroadDollar from "../../../../../knowledge/data-lake/normalized/fred_broad_dollar.json";
+import avSpyMonthly from "../../../../../knowledge/data-lake/normalized/av_spy_monthly.json";
+import fredVix from "../../../../../knowledge/data-lake/normalized/fred_vix.json";
+import fredHighYieldSpread from "../../../../../knowledge/data-lake/normalized/fred_high_yield_spread.json";
 
 type HistoricalObservation = {
   date: string;
@@ -31,8 +35,11 @@ export function buildHistoricalDataPromptBlock(question: string): string {
   const mentionsInflation = /\b(cpi|inflation|headline inflation)\b/.test(lower);
   const mentionsMoneySupply = /\b(m1|money supply|liquidity)\b/.test(lower);
   const mentionsCrisis = /\b(2008|crisis|gfc|war|middle east|gulf war|iraq|iran|conflict)\b/.test(lower);
+  const mentionsFX = /\b(dollar|dxy|usd|fx|currency|eurusd|usdjpy|yen|euro|sterling|gbp|jpy)\b/.test(lower);
+  const mentionsEquities = /\b(spy|s&p|spx|equities|stocks|equity|stock market)\b/.test(lower);
+  const mentionsRisk = /\b(vix|volatility|risk|credit spread|high.?yield|spread)\b/.test(lower);
 
-  if (!mentionsOil && !mentionsInflation && !mentionsMoneySupply && !asksForCorrelation) {
+  if (!mentionsOil && !mentionsInflation && !mentionsMoneySupply && !mentionsFX && !mentionsEquities && !mentionsRisk && !asksForCorrelation) {
     return "";
   }
 
@@ -42,7 +49,11 @@ export function buildHistoricalDataPromptBlock(question: string): string {
     availableSeriesLine(wtiMonthlySeries()),
     availableSeriesLine(cpiHeadlineSeries()),
     availableSeriesLine(m1MonthlySeries()),
-    availableSeriesLine(m2MonthlySeries())
+    availableSeriesLine(m2MonthlySeries()),
+    availableSeriesLine(broadDollarSeries()),
+    availableSeriesLine(spyMonthlySeries()),
+    availableSeriesLine(vixSeries()),
+    availableSeriesLine(highYieldSpreadSeries())
   ];
 
   if (asksForCorrelation && mentionsOil && mentionsInflation) {
@@ -78,6 +89,54 @@ export function buildHistoricalDataPromptBlock(question: string): string {
     }
   }
 
+  if (asksForCorrelation && mentionsFX && mentionsOil) {
+    const fxWindow = mentionsCrisis ? { start: "2007-01", end: "2009-12", label: "2007-2009 crisis window" } : null;
+    const fxStats = computeDollarWtiStats(fxWindow?.start, fxWindow?.end);
+    if (fxStats) {
+      blocks.push(
+        [
+          `Computed stored-data check — Broad Dollar YoY% vs WTI YoY% (${fxWindow?.label || "full overlapping monthly sample"}):`,
+          `- observations: ${fxStats.count}`,
+          `- Broad Dollar YoY% vs WTI YoY% correlation: ${formatCorrelation(fxStats.dollarYoYVsWtiYoYCorrelation)}`,
+          `- Dollar YoY range: ${fxStats.dollarYoYMin.toFixed(1)}% to ${fxStats.dollarYoYMax.toFixed(1)}%`,
+          `- WTI YoY range: ${fxStats.wtiYoYMin.toFixed(1)}% to ${fxStats.wtiYoYMax.toFixed(1)}%`
+        ].join("\n")
+      );
+    }
+  }
+
+  if (asksForCorrelation && mentionsEquities && mentionsOil) {
+    const eqWindow = mentionsCrisis ? { start: "2007-01", end: "2009-12", label: "2007-2009 crisis window" } : null;
+    const eqStats = computeSpyWtiStats(eqWindow?.start, eqWindow?.end);
+    if (eqStats) {
+      blocks.push(
+        [
+          `Computed stored-data check — SPY YoY% vs WTI YoY% (${eqWindow?.label || "full overlapping monthly sample"}):`,
+          `- observations: ${eqStats.count}`,
+          `- SPY YoY% vs WTI YoY% correlation: ${formatCorrelation(eqStats.spyYoYVsWtiYoYCorrelation)}`,
+          `- SPY YoY range: ${eqStats.spyYoYMin.toFixed(1)}% to ${eqStats.spyYoYMax.toFixed(1)}%`,
+          `- WTI YoY range: ${eqStats.wtiYoYMin.toFixed(1)}% to ${eqStats.wtiYoYMax.toFixed(1)}%`
+        ].join("\n")
+      );
+    }
+  }
+
+  if (asksForCorrelation && mentionsRisk) {
+    const riskWindow = mentionsCrisis ? { start: "2007-01", end: "2009-12", label: "2007-2009 crisis window" } : null;
+    const riskStats = computeVixHyStats(riskWindow?.start, riskWindow?.end);
+    if (riskStats) {
+      blocks.push(
+        [
+          `Computed stored-data check — VIX vs High-Yield Spread (${riskWindow?.label || "full overlapping monthly sample"}):`,
+          `- observations: ${riskStats.count}`,
+          `- VIX level vs HY Spread level correlation: ${formatCorrelation(riskStats.vixVsHyCorrelation)}`,
+          `- VIX range: ${riskStats.vixMin.toFixed(1)} to ${riskStats.vixMax.toFixed(1)}`,
+          `- HY Spread range: ${riskStats.hyMin.toFixed(0)}bps to ${riskStats.hyMax.toFixed(0)}bps`
+        ].join("\n")
+      );
+    }
+  }
+
   blocks.push(
     "Answering rule: if exact data is unavailable, say so plainly and offer the closest available stored-data calculation instead of approximating from model memory."
   );
@@ -103,6 +162,22 @@ function m1MonthlySeries(): HistoricalSeries {
 
 function m2MonthlySeries(): HistoricalSeries {
   return fredM2Monthly as HistoricalSeries;
+}
+
+function broadDollarSeries(): HistoricalSeries {
+  return fredBroadDollar as HistoricalSeries;
+}
+
+function spyMonthlySeries(): HistoricalSeries {
+  return avSpyMonthly as unknown as HistoricalSeries;
+}
+
+function vixSeries(): HistoricalSeries {
+  return fredVix as HistoricalSeries;
+}
+
+function highYieldSpreadSeries(): HistoricalSeries {
+  return fredHighYieldSpread as HistoricalSeries;
 }
 
 function computeWtiCpiStats(start?: string, end?: string) {
@@ -175,6 +250,79 @@ function computeM1CpiStats(start?: string, end?: string) {
   };
 }
 
+function computeDollarWtiStats(start?: string, end?: string) {
+  const dollarByMonth = toMonthlyMap(broadDollarSeries().observations);
+  const wtiByMonth = toMonthlyMap(wtiMonthlySeries().observations);
+  const dollarYoY = yoyMap(dollarByMonth);
+  const wtiYoY = yoyMap(wtiByMonth);
+
+  const points: AlignedPoint[] = [];
+  for (const [month, d] of dollarYoY) {
+    if (start && month < start) continue;
+    if (end && month > end) continue;
+    const w = wtiYoY.get(month);
+    if (typeof w === "number") points.push({ date: month, left: d, right: w });
+  }
+
+  if (points.length < 6) return null;
+  return {
+    count: points.length,
+    dollarYoYVsWtiYoYCorrelation: pearson(points),
+    dollarYoYMin: Math.min(...points.map((p) => p.left)),
+    dollarYoYMax: Math.max(...points.map((p) => p.left)),
+    wtiYoYMin: Math.min(...points.map((p) => p.right)),
+    wtiYoYMax: Math.max(...points.map((p) => p.right))
+  };
+}
+
+function computeSpyWtiStats(start?: string, end?: string) {
+  const spyByMonth = toMonthlyMap(spyMonthlySeries().observations);
+  const wtiByMonth = toMonthlyMap(wtiMonthlySeries().observations);
+  const spyYoY = yoyMap(spyByMonth);
+  const wtiYoY = yoyMap(wtiByMonth);
+
+  const points: AlignedPoint[] = [];
+  for (const [month, s] of spyYoY) {
+    if (start && month < start) continue;
+    if (end && month > end) continue;
+    const w = wtiYoY.get(month);
+    if (typeof w === "number") points.push({ date: month, left: s, right: w });
+  }
+
+  if (points.length < 6) return null;
+  return {
+    count: points.length,
+    spyYoYVsWtiYoYCorrelation: pearson(points),
+    spyYoYMin: Math.min(...points.map((p) => p.left)),
+    spyYoYMax: Math.max(...points.map((p) => p.left)),
+    wtiYoYMin: Math.min(...points.map((p) => p.right)),
+    wtiYoYMax: Math.max(...points.map((p) => p.right))
+  };
+}
+
+function computeVixHyStats(start?: string, end?: string) {
+  const vixByMonth = toMonthlyMap(vixSeries().observations);
+  const hyByMonth = toMonthlyMap(highYieldSpreadSeries().observations);
+
+  const points: AlignedPoint[] = [];
+  for (const [month, v] of vixByMonth) {
+    if (start && month < start) continue;
+    if (end && month > end) continue;
+    const h = hyByMonth.get(month);
+    if (typeof h === "number") points.push({ date: month, left: v, right: h });
+  }
+
+  if (points.length < 6) return null;
+  return {
+    count: points.length,
+    vixVsHyCorrelation: pearson(points),
+    vixMin: Math.min(...points.map((p) => p.left)),
+    vixMax: Math.max(...points.map((p) => p.left)),
+    hyMin: Math.min(...points.map((p) => p.right)),
+    hyMax: Math.max(...points.map((p) => p.right))
+  };
+}
+
 function toMonthlyMap(observations: HistoricalObservation[]): Map<string, number> {
   const map = new Map<string, number>();
   for (const observation of observations) {
@@ -234,6 +382,8 @@ export function buildChartDataFromQuestion(question: string): ChartData | null {
   const mentionsInflation = /\b(cpi|inflation|headline inflation)\b/.test(lower);
   const mentionsMoneySupply = /\b(m1|money supply|liquidity)\b/.test(lower);
   const mentionsCrisis = /\b(2008|crisis|gfc|war|middle east|gulf war|iraq|iran|conflict)\b/.test(lower);
+  const mentionsFX = /\b(dollar|dxy|usd|fx|currency|eurusd|usdjpy|yen|euro|sterling|gbp|jpy)\b/.test(lower);
+  const mentionsEquities = /\b(spy|s&p|spx|equities|stocks|equity|stock market)\b/.test(lower);
 
   const windowStart = mentionsCrisis ? "2007-01" : tenYearsAgo();
   const windowEnd = mentionsCrisis ? "2009-12" : undefined;

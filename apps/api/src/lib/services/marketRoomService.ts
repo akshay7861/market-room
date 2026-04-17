@@ -31,6 +31,7 @@ import { listRelevantMarketCasesForAgent } from "./marketCaseService";
 import { findRelevantKnowledgeSnippets, type LocalKnowledgeSnippet } from "./knowledgeSnippetService";
 import { recordDiscussionLearning } from "./learningService";
 import { fetchOfficialCatalystLayer } from "./officialCatalystService";
+import { buildHistoricalDataPromptBlock } from "./historicalDataContextService";
 import { fetchYahooFinanceBriefing } from "./yahooFinanceNewsService";
 import { fetchMarketauxBriefing } from "./marketauxNewsService";
 import { analyzeTopHeadlinesForAgent, type HeadlineAnalysis } from "./headlineAnalysisService";
@@ -2204,6 +2205,8 @@ async function requestStructuredForumPost({
   }
 
   try {
+    const historicalContext = buildMarketRoomHistoricalContext(agent, generalHeadlines, sectorHeadlines);
+
     const payload = await generateGeminiContent(env, {
       model: getLlmModel(env),
       instructions: [
@@ -2259,7 +2262,8 @@ async function requestStructuredForumPost({
         agentState,
         roomCoverage,
         thisRunPosts,
-        headlineAnalysis
+        headlineAnalysis,
+        historicalContext
       ),
       // Gemma 4 / Gemini 2.5 count thinking tokens + output tokens against maxOutputTokens together.
       // With ~600-1200 thinking tokens per call, we need a generous budget for the actual post.
@@ -2360,6 +2364,53 @@ async function requestStructuredForumComment({
   }
 }
 
+function buildMarketRoomHistoricalContext(
+  agent: Agent,
+  generalHeadlines: SnapshotHeadline[],
+  sectorHeadlines: SnapshotHeadline[]
+): string {
+  const allHeadlines = [...generalHeadlines, ...sectorHeadlines];
+
+  const crisisSignal = allHeadlines.some((h) =>
+    /\b(war|conflict|crisis|middle east|gulf|iran|iraq|russia|sanctions)\b/i.test(h.title)
+  );
+  const moneySupplySignal = allHeadlines.some((h) =>
+    /\b(money supply|liquidity|m1|m2|monetary)\b/i.test(h.title)
+  );
+
+  let query: string;
+  switch (agent.sector) {
+    case "Commodities":
+      query = "wti oil inflation correlation";
+      break;
+    case "Macro":
+      query = moneySupplySignal
+        ? "wti oil inflation m1 money supply correlation"
+        : "wti oil inflation correlation";
+      break;
+    case "Rates":
+      query = "wti oil inflation correlation";
+      break;
+    case "FX":
+      query = "dollar fx currency wti oil correlation";
+      break;
+    case "Equities":
+      query = "spy equities stocks wti oil correlation";
+      break;
+    case "Risk/Sentiment":
+      query = "vix volatility risk high yield credit spread correlation";
+      break;
+    default:
+      return "";
+  }
+
+  if (crisisSignal) {
+    query += " war middle east crisis";
+  }
+
+  return buildHistoricalDataPromptBlock(query);
+}
+
 function buildForumPostPrompt(
   agent: Agent,
   marketSnapshot: MarketSnapshotPayload,
@@ -2376,7 +2427,8 @@ function buildForumPostPrompt(
   agentState: AgentBehavioralSummary | null,
   roomCoverage: RoomCoverageState | null,
   thisRunPosts: AgentMessage[] = [],
-  headlineAnalysis: HeadlineAnalysis | null = null
+  headlineAnalysis: HeadlineAnalysis | null = null,
+  historicalContext: string = ""
 ): string {
   const availableInstruments = relevantInstrumentsForAgent(agent, marketSnapshot);
   const mergedHeadlines = relevantHeadlinesForAgent(agent, [
@@ -2480,6 +2532,7 @@ function buildForumPostPrompt(
     buildDynamicMemoryPromptBlock(agent, dynamicMemory),
     ...(agentState ? [buildStatePromptBlock(agentState)] : []),
     ...(roomCoverage ? [buildRoomCoveragePromptBlock(roomCoverage)] : []),
+    ...(historicalContext ? [historicalContext] : []),
     knowledgeSnippets.length > 0 ? "Approved long-term memory snippets:" : "No approved long-term memory snippets were retrieved for this post.",
     ...knowledgeSnippets.map(
       (snippet, index) => `${index + 1}. ${snippet.title} [${snippet.category}] ${snippet.excerpt}`
