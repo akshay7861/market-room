@@ -185,6 +185,40 @@ export function createKnowledgeProcessingJobsRepository(env: Env) {
       return result.results;
     },
 
+    async listApprovedKnowledgeByIds(
+      ids: string[]
+    ): Promise<ApprovedKnowledgeDocumentRow[]> {
+      if (ids.length === 0) {
+        return [];
+      }
+
+      const placeholders = ids.map(() => "?").join(", ");
+      const result = await env.DB.prepare(
+        `SELECT
+          items.id AS id,
+          items.job_id AS jobId,
+          items.source_filename AS sourceFilename,
+          items.processed_filename AS processedFilename,
+          items.title AS title,
+          items.summary AS summary,
+          jobs.category AS category,
+          items.distilled_markdown AS distilledMarkdown,
+          items.review_notes AS reviewNotes,
+          items.persisted_at AS persistedAt,
+          items.created_at AS createdAt
+        FROM knowledge_processing_job_items AS items
+        INNER JOIN knowledge_processing_jobs AS jobs
+          ON jobs.id = items.job_id
+        WHERE items.id IN (${placeholders})
+          AND items.status = 'completed'
+          AND items.review_status = 'approved'
+          AND items.distilled_markdown IS NOT NULL`
+      ).bind(...ids).all<ApprovedKnowledgeDocumentRow>();
+
+      const byId = new Map(result.results.map((row) => [row.id, row]));
+      return ids.map((id) => byId.get(id)).filter((row): row is ApprovedKnowledgeDocumentRow => Boolean(row));
+    },
+
     async updateItemGovernance(
       agentId: string,
       itemId: string,

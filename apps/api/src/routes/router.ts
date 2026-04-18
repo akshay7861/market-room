@@ -11,6 +11,7 @@ import type {
 import { json } from "../lib/http";
 import {
   buildAdminSummary,
+  backfillAdminKnowledgeVectors,
   createAdminAgentMarketCase,
   exportTrainingExamplesJsonl,
   getAdminAgentKnowledgeStore,
@@ -208,6 +209,11 @@ export async function handleRequest(request: Request, env: Env, ctx: ExecutionCo
     const limit = limitParam ? Math.min(parseInt(limitParam, 10), 200) : 50;
     const items = await repositories.fetchedNews.listRecent(hours, limit);
     return json({ items, meta: { hours, count: items.length } });
+  }
+
+  if (url.pathname === "/api/admin/knowledge/vector-backfill" && request.method === "POST") {
+    const result = await backfillAdminKnowledgeVectors(env);
+    return json(result, { status: result.ok ? 200 : 503 });
   }
 
   const adminMessageNoveltyMatch = new URLPattern({ pathname: "/api/admin/messages/:messageId/novelty" }).exec(url);

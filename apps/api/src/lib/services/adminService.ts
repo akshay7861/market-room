@@ -27,6 +27,7 @@ import {
 import { getAgentLearningView, refreshLearningSignals } from "./learningService";
 import { processAgentResearchFiles } from "./researchProcessingService";
 import { getSchedulerCooldownMinutes, getSchedulerPrompt, isSchedulerEnabled } from "./scheduledMarketService";
+import { backfillKnowledgeVectors, type VectorBackfillResult } from "./vectorKnowledgeService";
 
 export async function buildAdminSummary(env: Env): Promise<AdminSummary> {
   const repositories = createRepositories(env);
@@ -241,6 +242,10 @@ export async function exportTrainingExamplesJsonl(
   return exportRows
     .map((row) => JSON.stringify(buildTrainingExampleExportLine(row)))
     .join("\n");
+}
+
+export async function backfillAdminKnowledgeVectors(env: Env): Promise<VectorBackfillResult> {
+  return backfillKnowledgeVectors(env);
 }
 
 function buildTrainingExampleExportLine(row: {

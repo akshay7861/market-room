@@ -3,6 +3,8 @@ import { handleRequest } from "./routes/router";
 
 export interface Env {
   DB: D1Database;
+  AI?: Ai;
+  KNOWLEDGE_VECTOR_INDEX?: Vectorize;
   APP_NAME: string;
   GEMINI_API_KEY?: string;
   GEMINI_MODEL?: string;
@@ -29,6 +31,7 @@ export interface Env {
   SCHEDULED_HEADLINE_CHANGE_COUNT?: string;
   ADMIN_API_ENABLED?: string;
   ADMIN_API_TOKEN?: string;
+  KNOWLEDGE_VECTOR_RETRIEVAL?: string;
 }
 
 export default {

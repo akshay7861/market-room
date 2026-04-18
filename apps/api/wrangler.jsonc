@@ -18,6 +18,15 @@
       "migrations_dir": "../../database/migrations"
     }
   ],
+  "ai": {
+    "binding": "AI"
+  },
+  "vectorize": [
+    {
+      "binding": "KNOWLEDGE_VECTOR_INDEX",
+      "index_name": "market-room-knowledge"
+    }
+  ],
   "vars": {
     "APP_NAME": "Market Room",
     "SCHEDULED_DISCUSSIONS_ENABLED": "true",
@@ -29,6 +38,7 @@
     "SCHEDULED_MATERIALITY_DXY_MOVE_PCT": "0.5",
     "SCHEDULED_MATERIALITY_US10Y_BPS": "8",
     "SCHEDULED_HEADLINE_CHANGE_COUNT": "2",
-    "ADMIN_API_ENABLED": "false"
+    "ADMIN_API_ENABLED": "false",
+    "KNOWLEDGE_VECTOR_RETRIEVAL": "true"
   }
 }

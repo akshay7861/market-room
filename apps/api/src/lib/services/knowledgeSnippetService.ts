@@ -1,6 +1,7 @@
 import type { Agent, KnowledgeCategory } from "@market-room/shared";
 import type { Env } from "../../index";
 import { createRepositories } from "../repositories";
+import { queryKnowledgeVectors, type KnowledgeVectorMatch } from "./vectorKnowledgeService";
 
 type LocalKnowledgeDocument = {
   id: string;
@@ -53,16 +54,21 @@ export async function findRelevantKnowledgeSnippets(
   query: string,
   limit = 8
 ): Promise<LocalKnowledgeSnippet[]> {
-  const documents = await listApprovedKnowledgeDocuments(env, agent.id, 24);
+  const documents = await listApprovedKnowledgeDocuments(env, agent.id, 50);
 
   if (documents.length === 0) {
     console.log(`[knowledge:${agent.name}] 0 approved docs — retrieval skipped`);
     return [];
   }
 
+  const vectorMatches = await queryKnowledgeVectors(env, agent, query, 16);
+  const vectorMatchById = new Map(vectorMatches.map((match) => [match.id, match]));
+
   const scored = documents.map((document) => {
     const excerptChoice = bestExcerpt(document.content, query);
     const scoreDetails = scoreDocument(document, excerptChoice.excerpt, query, agent.sector);
+    const vectorMatch = vectorMatchById.get(document.id) || null;
+    const vectorBoost = vectorMatch ? vectorScoreBoost(vectorMatch) : 0;
     return {
       title: document.title,
       category: document.category,
@@ -70,9 +76,13 @@ export async function findRelevantKnowledgeSnippets(
       excerpt: excerptChoice.excerpt,
       excerptLabel: excerptChoice.label,
       excerptScore: excerptChoice.score,
-      score: scoreDetails.total,
+      score: scoreDetails.total + vectorBoost,
       baseScore: scoreDetails.baseScore,
-      adjustments: scoreDetails.adjustments,
+      adjustments: vectorMatch
+        ? [...scoreDetails.adjustments, `+vector:${vectorBoost.toFixed(1)}@${vectorMatch.rank}`]
+        : scoreDetails.adjustments,
+      vectorScore: vectorMatch?.score ?? null,
+      vectorRank: vectorMatch?.rank ?? null,
       governanceTier: scoreDetails.governanceTier
     };
   });
@@ -85,8 +95,11 @@ export async function findRelevantKnowledgeSnippets(
   );
   for (const entry of aboveZero) {
     const adjustmentText = entry.adjustments.length > 0 ? ` adj=${entry.adjustments.join(",")}` : "";
+    const vectorText = entry.vectorScore !== null
+      ? ` vector=${entry.vectorScore.toFixed(3)}#${entry.vectorRank}`
+      : "";
     console.log(
-      `[knowledge:${agent.name}]   score=${entry.score.toFixed(1)} base=${entry.baseScore.toFixed(1)} tier=${entry.governanceTier} cat=${entry.category} excerpt=${entry.excerptLabel}:${entry.excerptScore.toFixed(1)}${adjustmentText} title="${entry.title}" excerpt="${entry.excerpt.slice(0, 80).replace(/\n/g, " ")}…"`
+      `[knowledge:${agent.name}]   score=${entry.score.toFixed(1)} base=${entry.baseScore.toFixed(1)}${vectorText} tier=${entry.governanceTier} cat=${entry.category} excerpt=${entry.excerptLabel}:${entry.excerptScore.toFixed(1)}${adjustmentText} title="${entry.title}" excerpt="${entry.excerpt.slice(0, 80).replace(/\n/g, " ")}…"`
     );
   }
 
@@ -104,6 +117,12 @@ export async function findRelevantKnowledgeSnippets(
   }
 
   return selected.map(({ title, category, excerpt }) => ({ title, category, excerpt }));
+}
+
+function vectorScoreBoost(match: KnowledgeVectorMatch): number {
+  const similarityBoost = Math.max(0, match.score) * 18;
+  const rankBoost = Math.max(0, 5 - match.rank) * 1.5;
+  return similarityBoost + rankBoost;
 }
 
 // Pulls the Coverage, Triggers, Use When, and Instruments sections that are
