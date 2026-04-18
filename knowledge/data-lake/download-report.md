@@ -1,9 +1,9 @@
 # Historical data download report
 
-Generated: 2026-04-16T16:58:49.885Z
+Generated: 2026-04-18T19:40:00.000Z
 Historical floor: 1990-01-01
 
-Successful series: 57
+Successful series: 58
 Failed series: 2
 
 ## Provider status
@@ -18,6 +18,7 @@ Failed series: 2
 - fred: ok — Downloaded Nonfarm payrolls with 435 observations.
 - fred: ok — Downloaded Retail sales with 410 observations.
 - fred: ok — Downloaded Industrial production with 435 observations.
+- fred: ok — Downloaded Manufacturing employment with 435 observations.
 - fred: ok — Downloaded Real GDP proxy with 144 observations.
 - fred: ok — Downloaded Fed funds rate with 435 observations.
 - fred: ok — Downloaded US 2Y yield with 9076 observations.

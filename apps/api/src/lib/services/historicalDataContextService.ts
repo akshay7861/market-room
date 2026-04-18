@@ -13,6 +13,7 @@ import fredBreakeven10y from "../../../../../knowledge/data-lake/normalized/fred
 import fredUnemployment from "../../../../../knowledge/data-lake/normalized/fred_unemployment.json";
 import fredRetailSales from "../../../../../knowledge/data-lake/normalized/fred_retail_sales.json";
 import fredIndustrialProduction from "../../../../../knowledge/data-lake/normalized/fred_industrial_production.json";
+import fredManufacturingEmployment from "../../../../../knowledge/data-lake/normalized/fred_manufacturing_employment.json";
 import fredFedFunds from "../../../../../knowledge/data-lake/normalized/fred_fedfunds.json";
 import fredPceHeadline from "../../../../../knowledge/data-lake/normalized/fred_pce_headline.json";
 import fredPceCore from "../../../../../knowledge/data-lake/normalized/fred_pce_core.json";
@@ -50,8 +51,9 @@ export function buildHistoricalDataPromptBlock(question: string): string {
   const mentionsEquities = /\b(spy|s&p|spx|equities|stocks|equity|stock market)\b/.test(lower);
   const mentionsRisk = /\b(vix|volatility|risk|credit spread|high.?yield|spread)\b/.test(lower);
   const mentionsRates = /\b(yield|treasury|treasuries|rates|rate|duration|curve|10y|2y|bps|basis.?point|fed.?fund|policy.?rate|steepen|invert)\b/.test(lower);
+  const mentionsManufacturing = /\b(ism|pmi|manufactur|factory|industrial|manemp)\b/.test(lower);
 
-  if (!mentionsOil && !mentionsInflation && !mentionsMoneySupply && !mentionsFX && !mentionsEquities && !mentionsRisk && !mentionsRates && !asksForCorrelation) {
+  if (!mentionsOil && !mentionsInflation && !mentionsMoneySupply && !mentionsFX && !mentionsEquities && !mentionsRisk && !mentionsRates && !mentionsManufacturing && !asksForCorrelation) {
     return "";
   }
 
@@ -73,11 +75,12 @@ export function buildHistoricalDataPromptBlock(question: string): string {
     availableSeriesLine(unemploymentSeries()),
     availableSeriesLine(retailSalesSeries()),
     availableSeriesLine(industrialProductionSeries()),
+    availableSeriesLine(manufacturingEmploymentSeries()),
     availableSeriesLine(fedFundsSeries()),
     availableSeriesLine(pceHeadlineSeries()),
     availableSeriesLine(pceCoreSeriesFn()),
-    availableSeriesLine(nonfarmPayrollsSeries())
-    // Note: ISM Manufacturing PMI is NOT in the data lake — sourcing from FRED ISM endpoint is a future addition
+    availableSeriesLine(nonfarmPayrollsSeries()),
+    "Unavailable: ISM Manufacturing PMI is not in the stored data lake. Do not cite exact ISM PMI levels from memory; use manufacturing employment and industrial production as stored proxies unless an external headline provides the PMI level."
   ];
 
   if (asksForCorrelation && mentionsOil && mentionsInflation) {
@@ -181,6 +184,23 @@ export function buildHistoricalDataPromptBlock(question: string): string {
     }
   }
 
+  if (mentionsManufacturing) {
+    const manufacturingStats = computeManufacturingStats();
+    if (manufacturingStats) {
+      blocks.push(
+        [
+          "Computed stored-data check — Manufacturing cycle proxy:",
+          `- manufacturing employment latest: ${manufacturingStats.latestValue.toFixed(0)}K (${manufacturingStats.latestDate})`,
+          `- manufacturing employment 1m change: ${manufacturingStats.monthlyChange >= 0 ? "+" : ""}${manufacturingStats.monthlyChange.toFixed(0)}K`,
+          `- manufacturing employment YoY change: ${manufacturingStats.manempYoY.toFixed(1)}%`,
+          `- industrial production YoY change: ${manufacturingStats.ipYoY.toFixed(1)}%`,
+          `- manufacturing employment YoY vs industrial production YoY correlation: ${formatCorrelation(manufacturingStats.manempIpYoYCorrelation)} (${manufacturingStats.count} monthly observations)`,
+          "- interpretation boundary: this is a manufacturing labour/activity proxy, not the official ISM PMI diffusion index."
+        ].join("\n")
+      );
+    }
+  }
+
   blocks.push(
     "Answering rule: if exact data is unavailable, say so plainly and offer the closest available stored-data calculation instead of approximating from model memory."
   );
@@ -252,6 +272,10 @@ function industrialProductionSeries(): HistoricalSeries {
   return fredIndustrialProduction as HistoricalSeries;
 }
 
+function manufacturingEmploymentSeries(): HistoricalSeries {
+  return fredManufacturingEmployment as HistoricalSeries;
+}
+
 function fedFundsSeries(): HistoricalSeries {
   return fredFedFunds as HistoricalSeries;
 }
@@ -309,6 +333,42 @@ function computeRatesCpiStats(start?: string, end?: string) {
     spreadMax: curveValues.length > 0 ? Math.max(...curveValues) : null,
     breakevenMin: breakevenValues.length > 0 ? Math.min(...breakevenValues) : null,
     breakevenMax: breakevenValues.length > 0 ? Math.max(...breakevenValues) : null
+  };
+}
+
+function computeManufacturingStats() {
+  const manempByMonth = toMonthlyMap(manufacturingEmploymentSeries().observations);
+  const ipByMonth = toMonthlyMap(industrialProductionSeries().observations);
+  const manempYoY = yoyMap(manempByMonth);
+  const ipYoY = yoyMap(ipByMonth);
+  const manempEntries = [...manempByMonth.entries()].sort(([a], [b]) => a.localeCompare(b));
+  const latest = manempEntries[manempEntries.length - 1];
+  const previous = manempEntries[manempEntries.length - 2];
+
+  if (!latest || !previous) {
+    return null;
+  }
+
+  const points: AlignedPoint[] = [];
+  for (const [month, manempValue] of manempYoY) {
+    const ipValue = ipYoY.get(month);
+    if (typeof ipValue === "number") {
+      points.push({ date: month, left: manempValue, right: ipValue });
+    }
+  }
+
+  if (points.length < 12) {
+    return null;
+  }
+
+  return {
+    count: points.length,
+    latestDate: latest[0],
+    latestValue: latest[1],
+    monthlyChange: latest[1] - previous[1],
+    manempYoY: manempYoY.get(latest[0]) ?? 0,
+    ipYoY: ipYoY.get(latest[0]) ?? 0,
+    manempIpYoYCorrelation: pearson(points)
   };
 }
 

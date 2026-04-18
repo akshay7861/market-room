@@ -1,11 +1,11 @@
 {
-  "generatedAt": "2026-04-16T16:58:49.885Z",
+  "generatedAt": "2026-04-18T19:40:00.000Z",
   "startDate": "1990-01-01",
-  "seriesCount": 57,
+  "seriesCount": 58,
   "failedSeriesCount": 2,
   "providers": {
     "fred": {
-      "ok": 46,
+      "ok": 47,
       "error": 2,
       "skipped": 0,
       "configured": 0
@@ -189,6 +189,23 @@
       ],
       "rawFile": "knowledge/data-lake/raw/fred/fred_industrial_production.json",
       "normalizedFile": "knowledge/data-lake/normalized/fred_industrial_production.json",
+      "observationCount": 435,
+      "coverageStart": "1990-01-01",
+      "coverageEnd": "2026-03-01"
+    },
+    {
+      "id": "fred_manufacturing_employment",
+      "label": "Manufacturing employment",
+      "source": "fred",
+      "frequency": "monthly",
+      "agents": [
+        "macro-agent",
+        "equities-agent",
+        "commodities-agent",
+        "risk-sentiment-agent"
+      ],
+      "rawFile": "knowledge/data-lake/raw/fred/fred_manufacturing_employment.json",
+      "normalizedFile": "knowledge/data-lake/normalized/fred_manufacturing_employment.json",
       "observationCount": 435,
       "coverageStart": "1990-01-01",
       "coverageEnd": "2026-03-01"

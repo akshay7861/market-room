@@ -142,6 +142,16 @@ export const STARTER_SERIES_CATALOG = [
     agents: ["macro-agent", "commodities-agent", "equities-agent"]
   },
   {
+    id: "fred_manufacturing_employment",
+    source: "fred",
+    sourceSeriesId: "MANEMP",
+    label: "Manufacturing employment",
+    description: "All employees, manufacturing payrolls, monthly.",
+    usageNote: "Use for manufacturing labor-cycle confirmation, ISM/PMI employment proxy context, and cyclical growth analogs when true PMI data is unavailable.",
+    frequency: "monthly",
+    agents: ["macro-agent", "equities-agent", "commodities-agent", "risk-sentiment-agent"]
+  },
+  {
     id: "fred_gdp",
     source: "fred",
     sourceSeriesId: "GDP",

@@ -44,7 +44,8 @@ type RichTextBlock =
   | { type: "chart"; data: ChartData };
 
 function parseBlocks(content: string): RichTextBlock[] {
-  const lines = cleanMarkdown(content).split("\n");
+  const { text, charts } = extractChartBlocks(content);
+  const lines = cleanMarkdown(text).split("\n");
   const blocks: RichTextBlock[] = [];
   let paragraph: string[] = [];
   let listItems: string[] = [];
@@ -113,7 +114,80 @@ function parseBlocks(content: string): RichTextBlock[] {
 
   flushParagraph();
   flushList();
+  blocks.push(...charts.map((data) => ({ type: "chart" as const, data })));
   return blocks;
+}
+
+function extractChartBlocks(content: string): { text: string; charts: ChartData[] } {
+  const marker = "%%CHART_DATA%%";
+  let text = content;
+  const charts: ChartData[] = [];
+
+  while (true) {
+    const markerIndex = text.indexOf(marker);
+    if (markerIndex < 0) {
+      break;
+    }
+
+    const jsonStart = text.indexOf("{", markerIndex + marker.length);
+    if (jsonStart < 0) {
+      text = `${text.slice(0, markerIndex)}${text.slice(markerIndex + marker.length)}`;
+      continue;
+    }
+
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+    let jsonEnd = -1;
+
+    for (let index = jsonStart; index < text.length; index += 1) {
+      const char = text[index];
+
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+
+      if (char === "\\") {
+        escaped = true;
+        continue;
+      }
+
+      if (char === "\"") {
+        inString = !inString;
+        continue;
+      }
+
+      if (inString) {
+        continue;
+      }
+
+      if (char === "{") {
+        depth += 1;
+      } else if (char === "}") {
+        depth -= 1;
+        if (depth === 0) {
+          jsonEnd = index + 1;
+          break;
+        }
+      }
+    }
+
+    if (jsonEnd < 0) {
+      text = text.slice(0, markerIndex);
+      break;
+    }
+
+    try {
+      charts.push(JSON.parse(text.slice(jsonStart, jsonEnd)) as ChartData);
+    } catch {
+      // Keep malformed chart data out of the visible answer.
+    }
+
+    text = `${text.slice(0, markerIndex).trimEnd()}\n${text.slice(jsonEnd).trimStart()}`;
+  }
+
+  return { text, charts };
 }
 
 function cleanMarkdown(value: string): string {

@@ -52,6 +52,11 @@
   {
     "source": "fred",
     "status": "ok",
+    "note": "Downloaded Manufacturing employment with 435 observations."
+  },
+  {
+    "source": "fred",
+    "status": "ok",
     "note": "Downloaded Real GDP proxy with 144 observations."
   },
   {
