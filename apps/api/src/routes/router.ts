@@ -212,7 +212,7 @@ export async function handleRequest(request: Request, env: Env, ctx: ExecutionCo
   }
 
   if (url.pathname === "/api/admin/knowledge/vector-backfill" && request.method === "POST") {
-    const result = await backfillAdminKnowledgeVectors(env);
+    const result = await backfillAdminKnowledgeVectors(env, url.searchParams.get("agentId"));
     return json(result, { status: result.ok ? 200 : 503 });
   }
 

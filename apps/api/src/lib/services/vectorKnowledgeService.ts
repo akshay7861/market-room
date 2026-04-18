@@ -87,7 +87,7 @@ export async function queryKnowledgeVectors(
   }
 }
 
-export async function backfillKnowledgeVectors(env: Env): Promise<VectorBackfillResult> {
+export async function backfillKnowledgeVectors(env: Env, agentId?: string | null): Promise<VectorBackfillResult> {
   if (!isVectorKnowledgeConfigured(env)) {
     return {
       ok: false,
@@ -101,7 +101,12 @@ export async function backfillKnowledgeVectors(env: Env): Promise<VectorBackfill
   }
 
   const repositories = createRepositories(env);
-  const agents = await repositories.agents.list();
+  const requestedAgent = agentId ? await repositories.agents.getById(agentId) : null;
+  const agents = agentId
+    ? requestedAgent
+      ? [requestedAgent]
+      : []
+    : await repositories.agents.list();
   const agentResults: VectorBackfillAgentResult[] = [];
 
   for (const agent of agents) {

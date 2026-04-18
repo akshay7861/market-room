@@ -244,8 +244,8 @@ export async function exportTrainingExamplesJsonl(
     .join("\n");
 }
 
-export async function backfillAdminKnowledgeVectors(env: Env): Promise<VectorBackfillResult> {
-  return backfillKnowledgeVectors(env);
+export async function backfillAdminKnowledgeVectors(env: Env, agentId?: string | null): Promise<VectorBackfillResult> {
+  return backfillKnowledgeVectors(env, agentId);
 }
 
 function buildTrainingExampleExportLine(row: {
