@@ -11,16 +11,16 @@
     "macro-agent",
     "equities-agent"
   ],
-  "observationCount": 410,
+  "observationCount": 411,
   "coverageStart": "1992-01-01",
-  "coverageEnd": "2026-02-01",
+  "coverageEnd": "2026-03-01",
   "summary": {
-    "latestDate": "2026-02-01",
-    "latestValue": 12951.345,
-    "previousDate": "2026-01-01",
-    "previousValue": 12986.60681818182,
-    "periodChangePct": -0.2715244919284972,
-    "annualChangePct": 298.8588278771827
+    "latestDate": "2026-03-01",
+    "latestValue": 12528.70954545455,
+    "previousDate": "2026-02-01",
+    "previousValue": 12951.345,
+    "periodChangePct": -3.2632553186209523,
+    "annualChangePct": 270.7920296158879
   },
   "observations": [
     {
@@ -1662,6 +1662,10 @@
     {
       "date": "2026-02-01",
       "value": 12951.345
+    },
+    {
+      "date": "2026-03-01",
+      "value": 12528.70954545455
     }
   ]
 }

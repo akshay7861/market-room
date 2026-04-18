@@ -11,16 +11,16 @@
     "rates-agent",
     "fx-agent"
   ],
-  "observationCount": 9068,
+  "observationCount": 9076,
   "coverageStart": "1990-01-02",
-  "coverageEnd": "2026-04-02",
+  "coverageEnd": "2026-04-14",
   "summary": {
-    "latestDate": "2026-04-02",
-    "latestValue": 3.79,
-    "previousDate": "2026-04-01",
-    "previousValue": 3.81,
-    "periodChangePct": -0.5249343832021002,
-    "annualChangePct": -2.5706940874036013
+    "latestDate": "2026-04-14",
+    "latestValue": 3.76,
+    "previousDate": "2026-04-13",
+    "previousValue": 3.78,
+    "periodChangePct": -0.5291005291005296,
+    "annualChangePct": -3.8363171355498813
   },
   "observations": [
     {
@@ -36294,6 +36294,38 @@
     {
       "date": "2026-04-02",
       "value": 3.79
+    },
+    {
+      "date": "2026-04-03",
+      "value": 3.84
+    },
+    {
+      "date": "2026-04-06",
+      "value": 3.84
+    },
+    {
+      "date": "2026-04-07",
+      "value": 3.81
+    },
+    {
+      "date": "2026-04-08",
+      "value": 3.79
+    },
+    {
+      "date": "2026-04-09",
+      "value": 3.78
+    },
+    {
+      "date": "2026-04-10",
+      "value": 3.81
+    },
+    {
+      "date": "2026-04-13",
+      "value": 3.78
+    },
+    {
+      "date": "2026-04-14",
+      "value": 3.76
     }
   ]
 }

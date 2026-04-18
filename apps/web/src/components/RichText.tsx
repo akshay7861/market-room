@@ -72,12 +72,11 @@ function parseBlocks(content: string): RichTextBlock[] {
       continue;
     }
 
-    const chartMatch = line.match(/^\[CHART_JSON:(.+)\]$/);
-    if (chartMatch) {
+    if (line.startsWith("%%CHART_DATA%%")) {
       flushParagraph();
       flushList();
       try {
-        const data = JSON.parse(chartMatch[1]) as ChartData;
+        const data = JSON.parse(line.slice("%%CHART_DATA%%".length)) as ChartData;
         blocks.push({ type: "chart", data });
       } catch {
         // malformed — skip

@@ -1,6 +1,6 @@
 {
   "response": {
-    "total": "1891",
+    "total": "1893",
     "dateFormat": "YYYY-MM-DD",
     "frequency": "weekly",
     "data": [
@@ -24585,6 +24585,32 @@
         "series": "WCRSTUS1",
         "series-description": "U.S. Ending Stocks of Crude Oil (Thousand Barrels)",
         "value": "876700",
+        "units": "MBBL"
+      },
+      {
+        "period": "2026-04-03",
+        "duoarea": "NUS",
+        "area-name": "U.S.",
+        "product": "EPC0",
+        "product-name": "Crude Oil",
+        "process": "SAE",
+        "process-name": "Ending Stocks",
+        "series": "WCRSTUS1",
+        "series-description": "U.S. Ending Stocks of Crude Oil (Thousand Barrels)",
+        "value": "878042",
+        "units": "MBBL"
+      },
+      {
+        "period": "2026-04-10",
+        "duoarea": "NUS",
+        "area-name": "U.S.",
+        "product": "EPC0",
+        "product-name": "Crude Oil",
+        "process": "SAE",
+        "process-name": "Ending Stocks",
+        "series": "WCRSTUS1",
+        "series-description": "U.S. Ending Stocks of Crude Oil (Thousand Barrels)",
+        "value": "872985",
         "units": "MBBL"
       }
     ]

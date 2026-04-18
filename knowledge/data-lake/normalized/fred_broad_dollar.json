@@ -11,16 +11,16 @@
     "macro-agent",
     "risk-sentiment-agent"
   ],
-  "observationCount": 5072,
+  "observationCount": 5082,
   "coverageStart": "2006-01-02",
-  "coverageEnd": "2026-03-27",
+  "coverageEnd": "2026-04-10",
   "summary": {
-    "latestDate": "2026-03-27",
-    "latestValue": 120.8851,
-    "previousDate": "2026-03-26",
-    "previousValue": 120.389,
-    "periodChangePct": 0.41208083795030975,
-    "annualChangePct": -4.100163819330685
+    "latestDate": "2026-04-10",
+    "latestValue": 118.8552,
+    "previousDate": "2026-04-09",
+    "previousValue": 118.8998,
+    "periodChangePct": -0.03751057613217401,
+    "annualChangePct": -6.314969716269349
   },
   "observations": [
     {
@@ -20310,6 +20310,46 @@
     {
       "date": "2026-03-27",
       "value": 120.8851
+    },
+    {
+      "date": "2026-03-30",
+      "value": 121.2851
+    },
+    {
+      "date": "2026-03-31",
+      "value": 121.035
+    },
+    {
+      "date": "2026-04-01",
+      "value": 120.1198
+    },
+    {
+      "date": "2026-04-02",
+      "value": 120.503
+    },
+    {
+      "date": "2026-04-03",
+      "value": 120.6565
+    },
+    {
+      "date": "2026-04-06",
+      "value": 120.4302
+    },
+    {
+      "date": "2026-04-07",
+      "value": 120.32
+    },
+    {
+      "date": "2026-04-08",
+      "value": 119.0596
+    },
+    {
+      "date": "2026-04-09",
+      "value": 118.8998
+    },
+    {
+      "date": "2026-04-10",
+      "value": 118.8552
     }
   ]
 }

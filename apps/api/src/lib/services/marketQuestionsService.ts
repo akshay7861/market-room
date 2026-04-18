@@ -838,7 +838,7 @@ async function generateAgentQuestionReply(
       : fallbackQuestionReply(agent, marketSnapshot, latestQuestion);
 
   const chartData = buildChartDataFromQuestion(latestQuestion);
-  const finalContent = chartData ? `${content}\n[CHART_JSON:${JSON.stringify(chartData)}]` : content;
+  const finalContent = chartData ? `${content}\n%%CHART_DATA%%${JSON.stringify(chartData)}` : content;
 
   return {
     id: crypto.randomUUID(),

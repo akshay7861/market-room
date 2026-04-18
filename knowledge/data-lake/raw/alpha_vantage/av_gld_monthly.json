@@ -2,17 +2,17 @@
   "Meta Data": {
     "1. Information": "Monthly Adjusted Prices and Volumes",
     "2. Symbol": "GLD",
-    "3. Last Refreshed": "2026-04-02",
+    "3. Last Refreshed": "2026-04-15",
     "4. Time Zone": "US/Eastern"
   },
   "Monthly Adjusted Time Series": {
-    "2026-04-02": {
+    "2026-04-15": {
       "1. open": "435.0000",
-      "2. high": "440.1900",
+      "2. high": "445.1800",
       "3. low": "421.1700",
-      "4. close": "429.4100",
-      "5. adjusted close": "429.4100",
-      "6. volume": "24971757",
+      "4. close": "440.4600",
+      "5. adjusted close": "440.4600",
+      "6. volume": "81020868",
       "7. dividend amount": "0.0000"
     },
     "2026-03-31": {

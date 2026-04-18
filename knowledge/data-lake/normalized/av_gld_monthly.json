@@ -13,14 +13,14 @@
   ],
   "observationCount": 257,
   "coverageStart": "2004-12-31",
-  "coverageEnd": "2026-04-02",
+  "coverageEnd": "2026-04-15",
   "summary": {
-    "latestDate": "2026-04-02",
-    "latestValue": 429.41,
+    "latestDate": "2026-04-15",
+    "latestValue": 440.46,
     "previousDate": "2026-03-31",
     "previousValue": 430.29,
-    "periodChangePct": -0.20451323525993992,
-    "annualChangePct": 41.360239655002154
+    "periodChangePct": 2.3635222756745353,
+    "annualChangePct": 44.99786022319518
   },
   "observations": [
     {
@@ -1048,8 +1048,8 @@
       "value": 430.29
     },
     {
-      "date": "2026-04-02",
-      "value": 429.41
+      "date": "2026-04-15",
+      "value": 440.46
     }
   ]
 }

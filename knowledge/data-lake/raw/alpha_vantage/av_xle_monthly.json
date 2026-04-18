@@ -2,17 +2,17 @@
   "Meta Data": {
     "1. Information": "Monthly Adjusted Prices and Volumes",
     "2. Symbol": "XLE",
-    "3. Last Refreshed": "2026-04-02",
+    "3. Last Refreshed": "2026-04-15",
     "4. Time Zone": "US/Eastern"
   },
   "Monthly Adjusted Time Series": {
-    "2026-04-02": {
+    "2026-04-15": {
       "1. open": "59.7200",
       "2. high": "61.0100",
-      "3. low": "58.3550",
-      "4. close": "59.2500",
-      "5. adjusted close": "59.2500",
-      "6. volume": "157053428",
+      "3. low": "55.2700",
+      "4. close": "55.7600",
+      "5. adjusted close": "55.7600",
+      "6. volume": "548495543",
       "7. dividend amount": "0.0000"
     },
     "2026-03-31": {

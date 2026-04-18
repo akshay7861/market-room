@@ -2,22 +2,32 @@
   {
     "source": "fred",
     "status": "ok",
-    "note": "Downloaded Headline CPI with 433 observations."
+    "note": "Downloaded Headline CPI with 434 observations."
   },
   {
     "source": "fred",
     "status": "ok",
-    "note": "Downloaded Core CPI with 433 observations."
+    "note": "Downloaded Core CPI with 434 observations."
   },
   {
     "source": "fred",
     "status": "ok",
-    "note": "Downloaded Headline PCE with 433 observations."
+    "note": "Downloaded M1 Money Stock with 434 observations."
   },
   {
     "source": "fred",
     "status": "ok",
-    "note": "Downloaded Core PCE with 433 observations."
+    "note": "Downloaded M2 Money Stock with 434 observations."
+  },
+  {
+    "source": "fred",
+    "status": "ok",
+    "note": "Downloaded Headline PCE with 434 observations."
+  },
+  {
+    "source": "fred",
+    "status": "ok",
+    "note": "Downloaded Core PCE with 434 observations."
   },
   {
     "source": "fred",
@@ -37,7 +47,7 @@
   {
     "source": "fred",
     "status": "ok",
-    "note": "Downloaded Industrial production with 434 observations."
+    "note": "Downloaded Industrial production with 435 observations."
   },
   {
     "source": "fred",
@@ -52,47 +62,47 @@
   {
     "source": "fred",
     "status": "ok",
-    "note": "Downloaded US 2Y yield with 9068 observations."
+    "note": "Downloaded US 2Y yield with 9076 observations."
   },
   {
     "source": "fred",
     "status": "ok",
-    "note": "Downloaded US 10Y yield with 9068 observations."
+    "note": "Downloaded US 10Y yield with 9076 observations."
   },
   {
     "source": "fred",
     "status": "ok",
-    "note": "Downloaded 10Y minus 2Y curve with 9069 observations."
+    "note": "Downloaded 10Y minus 2Y curve with 9077 observations."
   },
   {
     "source": "fred",
     "status": "ok",
-    "note": "Downloaded 10Y breakeven inflation with 5817 observations."
+    "note": "Downloaded 10Y breakeven inflation with 5825 observations."
   },
   {
     "source": "fred",
     "status": "ok",
-    "note": "Downloaded VIX with 9156 observations."
+    "note": "Downloaded VIX with 9165 observations."
   },
   {
     "source": "fred",
     "status": "ok",
-    "note": "Downloaded US high-yield spread with 7639 observations."
+    "note": "Downloaded US high-yield spread with 7648 observations."
   },
   {
     "source": "fred",
     "status": "ok",
-    "note": "Downloaded Broad trade-weighted dollar with 5072 observations."
+    "note": "Downloaded Broad trade-weighted dollar with 5082 observations."
   },
   {
     "source": "fred",
     "status": "ok",
-    "note": "Downloaded Copper spot with 410 observations."
+    "note": "Downloaded Copper spot with 411 observations."
   },
   {
     "source": "fred",
     "status": "ok",
-    "note": "Downloaded Henry Hub natural gas with 7339 observations."
+    "note": "Downloaded Henry Hub natural gas with 7348 observations."
   },
   {
     "source": "eia",
@@ -107,7 +117,7 @@
   {
     "source": "eia",
     "status": "ok",
-    "note": "Downloaded US crude oil ending stocks with 1891 observations."
+    "note": "Downloaded US crude oil ending stocks with 1893 observations."
   },
   {
     "source": "alpha_vantage",
@@ -152,107 +162,107 @@
   {
     "source": "fred",
     "status": "ok",
-    "note": "Downloaded EUR/USD with 6829 observations."
+    "note": "Downloaded EUR/USD with 6839 observations."
   },
   {
     "source": "fred",
     "status": "ok",
-    "note": "Downloaded GBP/USD with 9093 observations."
+    "note": "Downloaded GBP/USD with 9103 observations."
   },
   {
     "source": "fred",
     "status": "ok",
-    "note": "Downloaded USD/JPY with 9093 observations."
+    "note": "Downloaded USD/JPY with 9103 observations."
   },
   {
     "source": "fred",
     "status": "ok",
-    "note": "Downloaded AUD/USD with 9093 observations."
+    "note": "Downloaded AUD/USD with 9103 observations."
   },
   {
     "source": "fred",
     "status": "ok",
-    "note": "Downloaded USD/CAD with 9093 observations."
+    "note": "Downloaded USD/CAD with 9103 observations."
   },
   {
     "source": "fred",
     "status": "ok",
-    "note": "Downloaded USD/CHF with 9093 observations."
+    "note": "Downloaded USD/CHF with 9103 observations."
   },
   {
     "source": "fred",
     "status": "ok",
-    "note": "Downloaded NZD/USD with 9093 observations."
+    "note": "Downloaded NZD/USD with 9103 observations."
   },
   {
     "source": "fred",
     "status": "ok",
-    "note": "Downloaded NOK/USD with 9093 observations."
+    "note": "Downloaded NOK/USD with 9103 observations."
   },
   {
     "source": "fred",
     "status": "ok",
-    "note": "Downloaded SEK/USD with 9093 observations."
+    "note": "Downloaded SEK/USD with 9103 observations."
   },
   {
     "source": "fred",
     "status": "ok",
-    "note": "Downloaded US 3M yield with 9068 observations."
+    "note": "Downloaded US 3M yield with 9076 observations."
   },
   {
     "source": "fred",
     "status": "ok",
-    "note": "Downloaded US 1Y yield with 9068 observations."
+    "note": "Downloaded US 1Y yield with 9076 observations."
   },
   {
     "source": "fred",
     "status": "ok",
-    "note": "Downloaded US 5Y yield with 9068 observations."
+    "note": "Downloaded US 5Y yield with 9076 observations."
   },
   {
     "source": "fred",
     "status": "ok",
-    "note": "Downloaded US 7Y yield with 9068 observations."
+    "note": "Downloaded US 7Y yield with 9076 observations."
   },
   {
     "source": "fred",
     "status": "ok",
-    "note": "Downloaded US 20Y yield with 8129 observations."
+    "note": "Downloaded US 20Y yield with 8137 observations."
   },
   {
     "source": "fred",
     "status": "ok",
-    "note": "Downloaded US 30Y yield with 9068 observations."
+    "note": "Downloaded US 30Y yield with 9076 observations."
   },
   {
     "source": "fred",
     "status": "ok",
-    "note": "Downloaded 5Y TIPS real yield with 5816 observations."
+    "note": "Downloaded 5Y TIPS real yield with 5824 observations."
   },
   {
     "source": "fred",
     "status": "ok",
-    "note": "Downloaded 10Y TIPS real yield with 5816 observations."
+    "note": "Downloaded 10Y TIPS real yield with 5824 observations."
   },
   {
     "source": "fred",
     "status": "ok",
-    "note": "Downloaded ICE BofA IG OAS with 7638 observations."
+    "note": "Downloaded ICE BofA IG OAS with 7647 observations."
   },
   {
     "source": "fred",
     "status": "ok",
-    "note": "Downloaded ICE BofA BBB OAS with 7639 observations."
+    "note": "Downloaded ICE BofA BBB OAS with 7648 observations."
   },
   {
     "source": "fred",
     "status": "ok",
-    "note": "Downloaded WTI crude daily with 9110 observations."
+    "note": "Downloaded WTI crude daily with 9119 observations."
   },
   {
     "source": "fred",
     "status": "ok",
-    "note": "Downloaded Brent crude daily with 9192 observations."
+    "note": "Downloaded Brent crude daily with 9200 observations."
   },
   {
     "source": "fred",
@@ -267,12 +277,12 @@
   {
     "source": "fred",
     "status": "ok",
-    "note": "Downloaded Aluminum with 410 observations."
+    "note": "Downloaded Aluminum with 411 observations."
   },
   {
     "source": "fred",
     "status": "ok",
-    "note": "Downloaded Wheat with 410 observations."
+    "note": "Downloaded Wheat with 411 observations."
   },
   {
     "source": "fred",
@@ -282,7 +292,7 @@
   {
     "source": "fred",
     "status": "ok",
-    "note": "Downloaded VIX near-term (9-day) with 4610 observations."
+    "note": "Downloaded VIX near-term (9-day) with 4619 observations."
   },
   {
     "source": "bea",

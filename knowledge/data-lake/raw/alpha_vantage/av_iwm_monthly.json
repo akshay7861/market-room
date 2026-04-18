@@ -2,17 +2,17 @@
   "Meta Data": {
     "1. Information": "Monthly Adjusted Prices and Volumes",
     "2. Symbol": "IWM",
-    "3. Last Refreshed": "2026-04-02",
+    "3. Last Refreshed": "2026-04-15",
     "4. Time Zone": "US/Eastern"
   },
   "Monthly Adjusted Time Series": {
-    "2026-04-02": {
+    "2026-04-15": {
       "1. open": "249.9200",
-      "2. high": "252.4400",
+      "2. high": "269.5850",
       "3. low": "244.8700",
-      "4. close": "251.2900",
-      "5. adjusted close": "251.2900",
-      "6. volume": "81665067",
+      "4. close": "269.3900",
+      "5. adjusted close": "269.3900",
+      "6. volume": "304263943",
       "7. dividend amount": "0.0000"
     },
     "2026-03-31": {

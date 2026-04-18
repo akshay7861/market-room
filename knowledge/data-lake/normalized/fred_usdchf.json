@@ -10,16 +10,16 @@
     "fx-agent",
     "risk-sentiment-agent"
   ],
-  "observationCount": 9093,
+  "observationCount": 9103,
   "coverageStart": "1990-01-02",
-  "coverageEnd": "2026-03-27",
+  "coverageEnd": "2026-04-10",
   "summary": {
-    "latestDate": "2026-03-27",
-    "latestValue": 0.797,
-    "previousDate": "2026-03-26",
-    "previousValue": 0.7935,
-    "periodChangePct": 0.44108380592313273,
-    "annualChangePct": -9.626941830139469
+    "latestDate": "2026-04-10",
+    "latestValue": 0.7893,
+    "previousDate": "2026-04-09",
+    "previousValue": 0.7889,
+    "periodChangePct": 0.050703511218146265,
+    "annualChangePct": -7.792056074766353
   },
   "observations": [
     {
@@ -36393,6 +36393,46 @@
     {
       "date": "2026-03-27",
       "value": 0.797
+    },
+    {
+      "date": "2026-03-30",
+      "value": 0.8001
+    },
+    {
+      "date": "2026-03-31",
+      "value": 0.8027
+    },
+    {
+      "date": "2026-04-01",
+      "value": 0.7933
+    },
+    {
+      "date": "2026-04-02",
+      "value": 0.7985
+    },
+    {
+      "date": "2026-04-03",
+      "value": 0.7999
+    },
+    {
+      "date": "2026-04-06",
+      "value": 0.7979
+    },
+    {
+      "date": "2026-04-07",
+      "value": 0.7997
+    },
+    {
+      "date": "2026-04-08",
+      "value": 0.7899
+    },
+    {
+      "date": "2026-04-09",
+      "value": 0.7889
+    },
+    {
+      "date": "2026-04-10",
+      "value": 0.7893
     }
   ]
 }

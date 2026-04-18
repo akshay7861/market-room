@@ -9,16 +9,16 @@
   "agents": [
     "rates-agent"
   ],
-  "observationCount": 9068,
+  "observationCount": 9076,
   "coverageStart": "1990-01-02",
-  "coverageEnd": "2026-04-02",
+  "coverageEnd": "2026-04-14",
   "summary": {
-    "latestDate": "2026-04-02",
-    "latestValue": 4.12,
-    "previousDate": "2026-04-01",
-    "previousValue": 4.15,
-    "periodChangePct": -0.7228915662650661,
-    "annualChangePct": 0.24330900243308481
+    "latestDate": "2026-04-14",
+    "latestValue": 4.06,
+    "previousDate": "2026-04-13",
+    "previousValue": 4.1,
+    "periodChangePct": -0.9756097560975618,
+    "annualChangePct": -3.3333333333333464
   },
   "observations": [
     {
@@ -36292,6 +36292,38 @@
     {
       "date": "2026-04-02",
       "value": 4.12
+    },
+    {
+      "date": "2026-04-03",
+      "value": 4.17
+    },
+    {
+      "date": "2026-04-06",
+      "value": 4.16
+    },
+    {
+      "date": "2026-04-07",
+      "value": 4.13
+    },
+    {
+      "date": "2026-04-08",
+      "value": 4.1
+    },
+    {
+      "date": "2026-04-09",
+      "value": 4.1
+    },
+    {
+      "date": "2026-04-10",
+      "value": 4.12
+    },
+    {
+      "date": "2026-04-13",
+      "value": 4.1
+    },
+    {
+      "date": "2026-04-14",
+      "value": 4.06
     }
   ]
 }

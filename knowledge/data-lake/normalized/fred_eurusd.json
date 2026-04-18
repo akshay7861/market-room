@@ -10,16 +10,16 @@
     "fx-agent",
     "macro-agent"
   ],
-  "observationCount": 6829,
+  "observationCount": 6839,
   "coverageStart": "1999-01-04",
-  "coverageEnd": "2026-03-27",
+  "coverageEnd": "2026-04-10",
   "summary": {
-    "latestDate": "2026-03-27",
-    "latestValue": 1.152,
-    "previousDate": "2026-03-26",
-    "previousValue": 1.1542,
-    "periodChangePct": -0.19060821348119736,
-    "annualChangePct": 6.627175120325794
+    "latestDate": "2026-04-10",
+    "latestValue": 1.1723,
+    "previousDate": "2026-04-09",
+    "previousValue": 1.1706,
+    "periodChangePct": 0.14522467110881707,
+    "annualChangePct": 7.432184750733134
   },
   "observations": [
     {
@@ -27337,6 +27337,46 @@
     {
       "date": "2026-03-27",
       "value": 1.152
+    },
+    {
+      "date": "2026-03-30",
+      "value": 1.1454
+    },
+    {
+      "date": "2026-03-31",
+      "value": 1.1518
+    },
+    {
+      "date": "2026-04-01",
+      "value": 1.1614
+    },
+    {
+      "date": "2026-04-02",
+      "value": 1.1546
+    },
+    {
+      "date": "2026-04-03",
+      "value": 1.1523
+    },
+    {
+      "date": "2026-04-06",
+      "value": 1.1545
+    },
+    {
+      "date": "2026-04-07",
+      "value": 1.1571
+    },
+    {
+      "date": "2026-04-08",
+      "value": 1.1686
+    },
+    {
+      "date": "2026-04-09",
+      "value": 1.1706
+    },
+    {
+      "date": "2026-04-10",
+      "value": 1.1723
     }
   ]
 }

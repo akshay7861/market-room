@@ -2,17 +2,17 @@
   "Meta Data": {
     "1. Information": "Monthly Adjusted Prices and Volumes",
     "2. Symbol": "XLF",
-    "3. Last Refreshed": "2026-04-02",
+    "3. Last Refreshed": "2026-04-15",
     "4. Time Zone": "US/Eastern"
   },
   "Monthly Adjusted Time Series": {
-    "2026-04-02": {
+    "2026-04-15": {
       "1. open": "49.8000",
-      "2. high": "49.8500",
+      "2. high": "52.3300",
       "3. low": "48.6000",
-      "4. close": "49.5300",
-      "5. adjusted close": "49.5300",
-      "6. volume": "101078100",
+      "4. close": "52.1700",
+      "5. adjusted close": "52.1700",
+      "6. volume": "378046413",
       "7. dividend amount": "0.0000"
     },
     "2026-03-31": {

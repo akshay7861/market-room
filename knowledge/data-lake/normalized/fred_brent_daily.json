@@ -9,16 +9,16 @@
   "agents": [
     "commodities-agent"
   ],
-  "observationCount": 9192,
+  "observationCount": 9200,
   "coverageStart": "1990-01-02",
-  "coverageEnd": "2026-03-30",
+  "coverageEnd": "2026-04-13",
   "summary": {
-    "latestDate": "2026-03-30",
-    "latestValue": 121.88,
-    "previousDate": "2026-03-27",
-    "previousValue": 121.47,
-    "periodChangePct": 0.33753190088087315,
-    "annualChangePct": 57.81432085976951
+    "latestDate": "2026-04-13",
+    "latestValue": 123.28,
+    "previousDate": "2026-04-10",
+    "previousValue": 119.07,
+    "periodChangePct": 3.535735281767035,
+    "annualChangePct": 88.58803732599051
   },
   "observations": [
     {
@@ -36788,6 +36788,38 @@
     {
       "date": "2026-03-30",
       "value": 121.88
+    },
+    {
+      "date": "2026-03-31",
+      "value": 126.69
+    },
+    {
+      "date": "2026-04-01",
+      "value": 119.56
+    },
+    {
+      "date": "2026-04-02",
+      "value": 127.61
+    },
+    {
+      "date": "2026-04-07",
+      "value": 138.21
+    },
+    {
+      "date": "2026-04-08",
+      "value": 122.11
+    },
+    {
+      "date": "2026-04-09",
+      "value": 119.03
+    },
+    {
+      "date": "2026-04-10",
+      "value": 119.07
+    },
+    {
+      "date": "2026-04-13",
+      "value": 123.28
     }
   ]
 }

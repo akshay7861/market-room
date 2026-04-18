@@ -15,11 +15,11 @@
   "coverageEnd": "2026-03",
   "summary": {
     "latestDate": "2026-03",
-    "latestValue": 102.01,
+    "latestValue": 103.13,
     "previousDate": "2026-02",
     "previousValue": 70.89,
-    "periodChangePct": 43.89899844830019,
-    "annualChangePct": 40.2584903066135
+    "periodChangePct": 45.478910988855965,
+    "annualChangePct": 41.798432558779034
   },
   "observations": [
     {
@@ -1760,7 +1760,7 @@
     },
     {
       "date": "2026-03",
-      "value": 102.01
+      "value": 103.13
     }
   ]
 }

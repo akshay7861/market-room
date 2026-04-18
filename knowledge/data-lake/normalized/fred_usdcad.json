@@ -10,16 +10,16 @@
     "fx-agent",
     "commodities-agent"
   ],
-  "observationCount": 9093,
+  "observationCount": 9103,
   "coverageStart": "1990-01-02",
-  "coverageEnd": "2026-03-27",
+  "coverageEnd": "2026-04-10",
   "summary": {
-    "latestDate": "2026-03-27",
-    "latestValue": 1.388,
-    "previousDate": "2026-03-26",
-    "previousValue": 1.3849,
-    "periodChangePct": 0.22384287674199443,
-    "annualChangePct": -2.984553016006163
+    "latestDate": "2026-04-10",
+    "latestValue": 1.3828,
+    "previousDate": "2026-04-09",
+    "previousValue": 1.3807,
+    "periodChangePct": 0.15209676251176873,
+    "annualChangePct": -2.6128600605676393
   },
   "observations": [
     {
@@ -36393,6 +36393,46 @@
     {
       "date": "2026-03-27",
       "value": 1.388
+    },
+    {
+      "date": "2026-03-30",
+      "value": 1.3921
+    },
+    {
+      "date": "2026-03-31",
+      "value": 1.3953
+    },
+    {
+      "date": "2026-04-01",
+      "value": 1.3875
+    },
+    {
+      "date": "2026-04-02",
+      "value": 1.3917
+    },
+    {
+      "date": "2026-04-03",
+      "value": 1.3942
+    },
+    {
+      "date": "2026-04-06",
+      "value": 1.3913
+    },
+    {
+      "date": "2026-04-07",
+      "value": 1.3905
+    },
+    {
+      "date": "2026-04-08",
+      "value": 1.3851
+    },
+    {
+      "date": "2026-04-09",
+      "value": 1.3807
+    },
+    {
+      "date": "2026-04-10",
+      "value": 1.3828
     }
   ]
 }

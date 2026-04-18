@@ -1,11 +1,11 @@
 {
-  "generatedAt": "2026-04-05T14:43:48.061Z",
+  "generatedAt": "2026-04-16T16:58:49.885Z",
   "startDate": "1990-01-01",
-  "seriesCount": 55,
+  "seriesCount": 57,
   "failedSeriesCount": 2,
   "providers": {
     "fred": {
-      "ok": 44,
+      "ok": 46,
       "error": 2,
       "skipped": 0,
       "configured": 0
@@ -48,9 +48,9 @@
       ],
       "rawFile": "knowledge/data-lake/raw/fred/fred_cpi_headline.json",
       "normalizedFile": "knowledge/data-lake/normalized/fred_cpi_headline.json",
-      "observationCount": 433,
+      "observationCount": 434,
       "coverageStart": "1990-01-01",
-      "coverageEnd": "2026-02-01"
+      "coverageEnd": "2026-03-01"
     },
     {
       "id": "fred_cpi_core",
@@ -63,7 +63,39 @@
       ],
       "rawFile": "knowledge/data-lake/raw/fred/fred_cpi_core.json",
       "normalizedFile": "knowledge/data-lake/normalized/fred_cpi_core.json",
-      "observationCount": 433,
+      "observationCount": 434,
+      "coverageStart": "1990-01-01",
+      "coverageEnd": "2026-03-01"
+    },
+    {
+      "id": "fred_m1_monthly",
+      "label": "M1 Money Stock",
+      "source": "fred",
+      "frequency": "monthly",
+      "agents": [
+        "macro-agent",
+        "rates-agent",
+        "fx-agent"
+      ],
+      "rawFile": "knowledge/data-lake/raw/fred/fred_m1_monthly.json",
+      "normalizedFile": "knowledge/data-lake/normalized/fred_m1_monthly.json",
+      "observationCount": 434,
+      "coverageStart": "1990-01-01",
+      "coverageEnd": "2026-02-01"
+    },
+    {
+      "id": "fred_m2_monthly",
+      "label": "M2 Money Stock",
+      "source": "fred",
+      "frequency": "monthly",
+      "agents": [
+        "macro-agent",
+        "rates-agent",
+        "fx-agent"
+      ],
+      "rawFile": "knowledge/data-lake/raw/fred/fred_m2_monthly.json",
+      "normalizedFile": "knowledge/data-lake/normalized/fred_m2_monthly.json",
+      "observationCount": 434,
       "coverageStart": "1990-01-01",
       "coverageEnd": "2026-02-01"
     },
@@ -78,9 +110,9 @@
       ],
       "rawFile": "knowledge/data-lake/raw/fred/fred_pce_headline.json",
       "normalizedFile": "knowledge/data-lake/normalized/fred_pce_headline.json",
-      "observationCount": 433,
+      "observationCount": 434,
       "coverageStart": "1990-01-01",
-      "coverageEnd": "2026-01-01"
+      "coverageEnd": "2026-02-01"
     },
     {
       "id": "fred_pce_core",
@@ -93,9 +125,9 @@
       ],
       "rawFile": "knowledge/data-lake/raw/fred/fred_pce_core.json",
       "normalizedFile": "knowledge/data-lake/normalized/fred_pce_core.json",
-      "observationCount": 433,
+      "observationCount": 434,
       "coverageStart": "1990-01-01",
-      "coverageEnd": "2026-01-01"
+      "coverageEnd": "2026-02-01"
     },
     {
       "id": "fred_unemployment",
@@ -157,9 +189,9 @@
       ],
       "rawFile": "knowledge/data-lake/raw/fred/fred_industrial_production.json",
       "normalizedFile": "knowledge/data-lake/normalized/fred_industrial_production.json",
-      "observationCount": 434,
+      "observationCount": 435,
       "coverageStart": "1990-01-01",
-      "coverageEnd": "2026-02-01"
+      "coverageEnd": "2026-03-01"
     },
     {
       "id": "fred_gdp",
@@ -205,9 +237,9 @@
       ],
       "rawFile": "knowledge/data-lake/raw/fred/fred_us2y.json",
       "normalizedFile": "knowledge/data-lake/normalized/fred_us2y.json",
-      "observationCount": 9068,
+      "observationCount": 9076,
       "coverageStart": "1990-01-02",
-      "coverageEnd": "2026-04-02"
+      "coverageEnd": "2026-04-14"
     },
     {
       "id": "fred_us10y",
@@ -222,9 +254,9 @@
       ],
       "rawFile": "knowledge/data-lake/raw/fred/fred_us10y.json",
       "normalizedFile": "knowledge/data-lake/normalized/fred_us10y.json",
-      "observationCount": 9068,
+      "observationCount": 9076,
       "coverageStart": "1990-01-02",
-      "coverageEnd": "2026-04-02"
+      "coverageEnd": "2026-04-14"
     },
     {
       "id": "fred_curve_10y2y",
@@ -238,9 +270,9 @@
       ],
       "rawFile": "knowledge/data-lake/raw/fred/fred_curve_10y2y.json",
       "normalizedFile": "knowledge/data-lake/normalized/fred_curve_10y2y.json",
-      "observationCount": 9069,
+      "observationCount": 9077,
       "coverageStart": "1990-01-02",
-      "coverageEnd": "2026-04-03"
+      "coverageEnd": "2026-04-15"
     },
     {
       "id": "fred_breakeven_10y",
@@ -254,9 +286,9 @@
       ],
       "rawFile": "knowledge/data-lake/raw/fred/fred_breakeven_10y.json",
       "normalizedFile": "knowledge/data-lake/normalized/fred_breakeven_10y.json",
-      "observationCount": 5817,
+      "observationCount": 5825,
       "coverageStart": "2003-01-02",
-      "coverageEnd": "2026-04-03"
+      "coverageEnd": "2026-04-15"
     },
     {
       "id": "fred_vix",
@@ -270,9 +302,9 @@
       ],
       "rawFile": "knowledge/data-lake/raw/fred/fred_vix.json",
       "normalizedFile": "knowledge/data-lake/normalized/fred_vix.json",
-      "observationCount": 9156,
+      "observationCount": 9165,
       "coverageStart": "1990-01-02",
-      "coverageEnd": "2026-04-01"
+      "coverageEnd": "2026-04-15"
     },
     {
       "id": "fred_high_yield_spread",
@@ -286,9 +318,9 @@
       ],
       "rawFile": "knowledge/data-lake/raw/fred/fred_high_yield_spread.json",
       "normalizedFile": "knowledge/data-lake/normalized/fred_high_yield_spread.json",
-      "observationCount": 7639,
+      "observationCount": 7648,
       "coverageStart": "1996-12-31",
-      "coverageEnd": "2026-04-02"
+      "coverageEnd": "2026-04-15"
     },
     {
       "id": "fred_broad_dollar",
@@ -302,9 +334,9 @@
       ],
       "rawFile": "knowledge/data-lake/raw/fred/fred_broad_dollar.json",
       "normalizedFile": "knowledge/data-lake/normalized/fred_broad_dollar.json",
-      "observationCount": 5072,
+      "observationCount": 5082,
       "coverageStart": "2006-01-02",
-      "coverageEnd": "2026-03-27"
+      "coverageEnd": "2026-04-10"
     },
     {
       "id": "fred_copper",
@@ -318,9 +350,9 @@
       ],
       "rawFile": "knowledge/data-lake/raw/fred/fred_copper.json",
       "normalizedFile": "knowledge/data-lake/normalized/fred_copper.json",
-      "observationCount": 410,
+      "observationCount": 411,
       "coverageStart": "1992-01-01",
-      "coverageEnd": "2026-02-01"
+      "coverageEnd": "2026-03-01"
     },
     {
       "id": "fred_nat_gas",
@@ -333,9 +365,9 @@
       ],
       "rawFile": "knowledge/data-lake/raw/fred/fred_nat_gas.json",
       "normalizedFile": "knowledge/data-lake/normalized/fred_nat_gas.json",
-      "observationCount": 7339,
+      "observationCount": 7348,
       "coverageStart": "1997-01-07",
-      "coverageEnd": "2026-03-30"
+      "coverageEnd": "2026-04-13"
     },
     {
       "id": "eia_wti_monthly",
@@ -379,9 +411,9 @@
       ],
       "rawFile": "knowledge/data-lake/raw/eia/eia_us_crude_stocks.json",
       "normalizedFile": "knowledge/data-lake/normalized/eia_us_crude_stocks.json",
-      "observationCount": 1891,
+      "observationCount": 1893,
       "coverageStart": "1990-01-05",
-      "coverageEnd": "2026-03-27"
+      "coverageEnd": "2026-04-10"
     },
     {
       "id": "av_gld_monthly",
@@ -397,7 +429,7 @@
       "normalizedFile": "knowledge/data-lake/normalized/av_gld_monthly.json",
       "observationCount": 257,
       "coverageStart": "2004-12-31",
-      "coverageEnd": "2026-04-02"
+      "coverageEnd": "2026-04-15"
     },
     {
       "id": "av_spy_monthly",
@@ -413,7 +445,7 @@
       "normalizedFile": "knowledge/data-lake/normalized/av_spy_monthly.json",
       "observationCount": 317,
       "coverageStart": "1999-12-31",
-      "coverageEnd": "2026-04-02"
+      "coverageEnd": "2026-04-15"
     },
     {
       "id": "av_qqq_monthly",
@@ -428,7 +460,7 @@
       "normalizedFile": "knowledge/data-lake/normalized/av_qqq_monthly.json",
       "observationCount": 317,
       "coverageStart": "1999-12-31",
-      "coverageEnd": "2026-04-02"
+      "coverageEnd": "2026-04-15"
     },
     {
       "id": "av_iwm_monthly",
@@ -444,7 +476,7 @@
       "normalizedFile": "knowledge/data-lake/normalized/av_iwm_monthly.json",
       "observationCount": 311,
       "coverageStart": "2000-06-30",
-      "coverageEnd": "2026-04-02"
+      "coverageEnd": "2026-04-15"
     },
     {
       "id": "av_xle_monthly",
@@ -459,7 +491,7 @@
       "normalizedFile": "knowledge/data-lake/normalized/av_xle_monthly.json",
       "observationCount": 317,
       "coverageStart": "1999-12-31",
-      "coverageEnd": "2026-04-02"
+      "coverageEnd": "2026-04-15"
     },
     {
       "id": "av_xlf_monthly",
@@ -475,7 +507,7 @@
       "normalizedFile": "knowledge/data-lake/normalized/av_xlf_monthly.json",
       "observationCount": 317,
       "coverageStart": "1999-12-31",
-      "coverageEnd": "2026-04-02"
+      "coverageEnd": "2026-04-15"
     },
     {
       "id": "av_xlk_monthly",
@@ -491,7 +523,7 @@
       "normalizedFile": "knowledge/data-lake/normalized/av_xlk_monthly.json",
       "observationCount": 317,
       "coverageStart": "1999-12-31",
-      "coverageEnd": "2026-04-02"
+      "coverageEnd": "2026-04-15"
     },
     {
       "id": "av_btc_monthly",
@@ -506,7 +538,7 @@
       "normalizedFile": "knowledge/data-lake/normalized/av_btc_monthly.json",
       "observationCount": 189,
       "coverageStart": "2010-08-31",
-      "coverageEnd": "2026-04-05"
+      "coverageEnd": "2026-04-16"
     },
     {
       "id": "fred_eurusd",
@@ -519,9 +551,9 @@
       ],
       "rawFile": "knowledge/data-lake/raw/fred/fred_eurusd.json",
       "normalizedFile": "knowledge/data-lake/normalized/fred_eurusd.json",
-      "observationCount": 6829,
+      "observationCount": 6839,
       "coverageStart": "1999-01-04",
-      "coverageEnd": "2026-03-27"
+      "coverageEnd": "2026-04-10"
     },
     {
       "id": "fred_gbpusd",
@@ -534,9 +566,9 @@
       ],
       "rawFile": "knowledge/data-lake/raw/fred/fred_gbpusd.json",
       "normalizedFile": "knowledge/data-lake/normalized/fred_gbpusd.json",
-      "observationCount": 9093,
+      "observationCount": 9103,
       "coverageStart": "1990-01-02",
-      "coverageEnd": "2026-03-27"
+      "coverageEnd": "2026-04-10"
     },
     {
       "id": "fred_usdjpy",
@@ -550,9 +582,9 @@
       ],
       "rawFile": "knowledge/data-lake/raw/fred/fred_usdjpy.json",
       "normalizedFile": "knowledge/data-lake/normalized/fred_usdjpy.json",
-      "observationCount": 9093,
+      "observationCount": 9103,
       "coverageStart": "1990-01-02",
-      "coverageEnd": "2026-03-27"
+      "coverageEnd": "2026-04-10"
     },
     {
       "id": "fred_audusd",
@@ -566,9 +598,9 @@
       ],
       "rawFile": "knowledge/data-lake/raw/fred/fred_audusd.json",
       "normalizedFile": "knowledge/data-lake/normalized/fred_audusd.json",
-      "observationCount": 9093,
+      "observationCount": 9103,
       "coverageStart": "1990-01-02",
-      "coverageEnd": "2026-03-27"
+      "coverageEnd": "2026-04-10"
     },
     {
       "id": "fred_usdcad",
@@ -581,9 +613,9 @@
       ],
       "rawFile": "knowledge/data-lake/raw/fred/fred_usdcad.json",
       "normalizedFile": "knowledge/data-lake/normalized/fred_usdcad.json",
-      "observationCount": 9093,
+      "observationCount": 9103,
       "coverageStart": "1990-01-02",
-      "coverageEnd": "2026-03-27"
+      "coverageEnd": "2026-04-10"
     },
     {
       "id": "fred_usdchf",
@@ -596,9 +628,9 @@
       ],
       "rawFile": "knowledge/data-lake/raw/fred/fred_usdchf.json",
       "normalizedFile": "knowledge/data-lake/normalized/fred_usdchf.json",
-      "observationCount": 9093,
+      "observationCount": 9103,
       "coverageStart": "1990-01-02",
-      "coverageEnd": "2026-03-27"
+      "coverageEnd": "2026-04-10"
     },
     {
       "id": "fred_nzdusd",
@@ -610,9 +642,9 @@
       ],
       "rawFile": "knowledge/data-lake/raw/fred/fred_nzdusd.json",
       "normalizedFile": "knowledge/data-lake/normalized/fred_nzdusd.json",
-      "observationCount": 9093,
+      "observationCount": 9103,
       "coverageStart": "1990-01-02",
-      "coverageEnd": "2026-03-27"
+      "coverageEnd": "2026-04-10"
     },
     {
       "id": "fred_nokusd",
@@ -625,9 +657,9 @@
       ],
       "rawFile": "knowledge/data-lake/raw/fred/fred_nokusd.json",
       "normalizedFile": "knowledge/data-lake/normalized/fred_nokusd.json",
-      "observationCount": 9093,
+      "observationCount": 9103,
       "coverageStart": "1990-01-02",
-      "coverageEnd": "2026-03-27"
+      "coverageEnd": "2026-04-10"
     },
     {
       "id": "fred_sekusd",
@@ -639,9 +671,9 @@
       ],
       "rawFile": "knowledge/data-lake/raw/fred/fred_sekusd.json",
       "normalizedFile": "knowledge/data-lake/normalized/fred_sekusd.json",
-      "observationCount": 9093,
+      "observationCount": 9103,
       "coverageStart": "1990-01-02",
-      "coverageEnd": "2026-03-27"
+      "coverageEnd": "2026-04-10"
     },
     {
       "id": "fred_us3m",
@@ -654,9 +686,9 @@
       ],
       "rawFile": "knowledge/data-lake/raw/fred/fred_us3m.json",
       "normalizedFile": "knowledge/data-lake/normalized/fred_us3m.json",
-      "observationCount": 9068,
+      "observationCount": 9076,
       "coverageStart": "1990-01-02",
-      "coverageEnd": "2026-04-02"
+      "coverageEnd": "2026-04-14"
     },
     {
       "id": "fred_us1y",
@@ -669,9 +701,9 @@
       ],
       "rawFile": "knowledge/data-lake/raw/fred/fred_us1y.json",
       "normalizedFile": "knowledge/data-lake/normalized/fred_us1y.json",
-      "observationCount": 9068,
+      "observationCount": 9076,
       "coverageStart": "1990-01-02",
-      "coverageEnd": "2026-04-02"
+      "coverageEnd": "2026-04-14"
     },
     {
       "id": "fred_us5y",
@@ -684,9 +716,9 @@
       ],
       "rawFile": "knowledge/data-lake/raw/fred/fred_us5y.json",
       "normalizedFile": "knowledge/data-lake/normalized/fred_us5y.json",
-      "observationCount": 9068,
+      "observationCount": 9076,
       "coverageStart": "1990-01-02",
-      "coverageEnd": "2026-04-02"
+      "coverageEnd": "2026-04-14"
     },
     {
       "id": "fred_us7y",
@@ -698,9 +730,9 @@
       ],
       "rawFile": "knowledge/data-lake/raw/fred/fred_us7y.json",
       "normalizedFile": "knowledge/data-lake/normalized/fred_us7y.json",
-      "observationCount": 9068,
+      "observationCount": 9076,
       "coverageStart": "1990-01-02",
-      "coverageEnd": "2026-04-02"
+      "coverageEnd": "2026-04-14"
     },
     {
       "id": "fred_us20y",
@@ -712,9 +744,9 @@
       ],
       "rawFile": "knowledge/data-lake/raw/fred/fred_us20y.json",
       "normalizedFile": "knowledge/data-lake/normalized/fred_us20y.json",
-      "observationCount": 8129,
+      "observationCount": 8137,
       "coverageStart": "1993-10-01",
-      "coverageEnd": "2026-04-02"
+      "coverageEnd": "2026-04-14"
     },
     {
       "id": "fred_us30y",
@@ -728,9 +760,9 @@
       ],
       "rawFile": "knowledge/data-lake/raw/fred/fred_us30y.json",
       "normalizedFile": "knowledge/data-lake/normalized/fred_us30y.json",
-      "observationCount": 9068,
+      "observationCount": 9076,
       "coverageStart": "1990-01-02",
-      "coverageEnd": "2026-04-02"
+      "coverageEnd": "2026-04-14"
     },
     {
       "id": "fred_tips_5y",
@@ -743,9 +775,9 @@
       ],
       "rawFile": "knowledge/data-lake/raw/fred/fred_tips_5y.json",
       "normalizedFile": "knowledge/data-lake/normalized/fred_tips_5y.json",
-      "observationCount": 5816,
+      "observationCount": 5824,
       "coverageStart": "2003-01-02",
-      "coverageEnd": "2026-04-02"
+      "coverageEnd": "2026-04-14"
     },
     {
       "id": "fred_tips_10y",
@@ -758,9 +790,9 @@
       ],
       "rawFile": "knowledge/data-lake/raw/fred/fred_tips_10y.json",
       "normalizedFile": "knowledge/data-lake/normalized/fred_tips_10y.json",
-      "observationCount": 5816,
+      "observationCount": 5824,
       "coverageStart": "2003-01-02",
-      "coverageEnd": "2026-04-02"
+      "coverageEnd": "2026-04-14"
     },
     {
       "id": "fred_ig_oas",
@@ -773,9 +805,9 @@
       ],
       "rawFile": "knowledge/data-lake/raw/fred/fred_ig_oas.json",
       "normalizedFile": "knowledge/data-lake/normalized/fred_ig_oas.json",
-      "observationCount": 7638,
+      "observationCount": 7647,
       "coverageStart": "1996-12-31",
-      "coverageEnd": "2026-04-02"
+      "coverageEnd": "2026-04-15"
     },
     {
       "id": "fred_bbb_oas",
@@ -788,9 +820,9 @@
       ],
       "rawFile": "knowledge/data-lake/raw/fred/fred_bbb_oas.json",
       "normalizedFile": "knowledge/data-lake/normalized/fred_bbb_oas.json",
-      "observationCount": 7639,
+      "observationCount": 7648,
       "coverageStart": "1996-12-31",
-      "coverageEnd": "2026-04-02"
+      "coverageEnd": "2026-04-15"
     },
     {
       "id": "fred_wti_daily",
@@ -804,9 +836,9 @@
       ],
       "rawFile": "knowledge/data-lake/raw/fred/fred_wti_daily.json",
       "normalizedFile": "knowledge/data-lake/normalized/fred_wti_daily.json",
-      "observationCount": 9110,
+      "observationCount": 9119,
       "coverageStart": "1990-01-02",
-      "coverageEnd": "2026-03-30"
+      "coverageEnd": "2026-04-13"
     },
     {
       "id": "fred_brent_daily",
@@ -818,9 +850,9 @@
       ],
       "rawFile": "knowledge/data-lake/raw/fred/fred_brent_daily.json",
       "normalizedFile": "knowledge/data-lake/normalized/fred_brent_daily.json",
-      "observationCount": 9192,
+      "observationCount": 9200,
       "coverageStart": "1990-01-02",
-      "coverageEnd": "2026-03-30"
+      "coverageEnd": "2026-04-13"
     },
     {
       "id": "fred_aluminum",
@@ -832,9 +864,9 @@
       ],
       "rawFile": "knowledge/data-lake/raw/fred/fred_aluminum.json",
       "normalizedFile": "knowledge/data-lake/normalized/fred_aluminum.json",
-      "observationCount": 410,
+      "observationCount": 411,
       "coverageStart": "1992-01-01",
-      "coverageEnd": "2026-02-01"
+      "coverageEnd": "2026-03-01"
     },
     {
       "id": "fred_wheat",
@@ -847,9 +879,9 @@
       ],
       "rawFile": "knowledge/data-lake/raw/fred/fred_wheat.json",
       "normalizedFile": "knowledge/data-lake/normalized/fred_wheat.json",
-      "observationCount": 410,
+      "observationCount": 411,
       "coverageStart": "1992-01-01",
-      "coverageEnd": "2026-02-01"
+      "coverageEnd": "2026-03-01"
     },
     {
       "id": "fred_ted_spread",
@@ -877,9 +909,9 @@
       ],
       "rawFile": "knowledge/data-lake/raw/fred/fred_vxvcls.json",
       "normalizedFile": "knowledge/data-lake/normalized/fred_vxvcls.json",
-      "observationCount": 4610,
+      "observationCount": 4619,
       "coverageStart": "2007-12-04",
-      "coverageEnd": "2026-04-01"
+      "coverageEnd": "2026-04-15"
     }
   ],
   "failures": [

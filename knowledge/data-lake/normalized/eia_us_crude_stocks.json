@@ -10,16 +10,16 @@
     "commodities-agent",
     "macro-agent"
   ],
-  "observationCount": 1891,
+  "observationCount": 1893,
   "coverageStart": "1990-01-05",
-  "coverageEnd": "2026-03-27",
+  "coverageEnd": "2026-04-10",
   "summary": {
-    "latestDate": "2026-03-27",
-    "latestValue": 876700,
-    "previousDate": "2026-03-20",
-    "previousValue": 871627,
-    "periodChangePct": 0.5820150133027087,
-    "annualChangePct": 4.840079117367793
+    "latestDate": "2026-04-10",
+    "latestValue": 872985,
+    "previousDate": "2026-04-03",
+    "previousValue": 878042,
+    "periodChangePct": -0.5759405586520918,
+    "annualChangePct": 3.9429958719752722
   },
   "observations": [
     {
@@ -7585,6 +7585,14 @@
     {
       "date": "2026-03-27",
       "value": 876700
+    },
+    {
+      "date": "2026-04-03",
+      "value": 878042
+    },
+    {
+      "date": "2026-04-10",
+      "value": 872985
     }
   ]
 }

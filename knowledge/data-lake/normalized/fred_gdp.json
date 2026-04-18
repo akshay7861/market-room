@@ -15,11 +15,11 @@
   "coverageEnd": "2025-10-01",
   "summary": {
     "latestDate": "2025-10-01",
-    "latestValue": 31442.483,
+    "latestValue": 31422.526,
     "previousDate": "2025-07-01",
     "previousValue": 31098.027,
-    "periodChangePct": 1.1076458323224234,
-    "annualChangePct": 5.422602282862848
+    "periodChangePct": 1.0434713430533824,
+    "annualChangePct": 5.3556890281507785
   },
   "observations": [
     {
@@ -596,7 +596,7 @@
     },
     {
       "date": "2025-10-01",
-      "value": 31442.483
+      "value": 31422.526
     }
   ]
 }

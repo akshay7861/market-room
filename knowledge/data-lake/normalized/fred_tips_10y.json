@@ -10,16 +10,16 @@
     "rates-agent",
     "macro-agent"
   ],
-  "observationCount": 5816,
+  "observationCount": 5824,
   "coverageStart": "2003-01-02",
-  "coverageEnd": "2026-04-02",
+  "coverageEnd": "2026-04-14",
   "summary": {
-    "latestDate": "2026-04-02",
-    "latestValue": 1.97,
-    "previousDate": "2026-04-01",
-    "previousValue": 2.02,
-    "periodChangePct": -2.4752475247524774,
-    "annualChangePct": 3.6842105263157925
+    "latestDate": "2026-04-14",
+    "latestValue": 1.89,
+    "previousDate": "2026-04-13",
+    "previousValue": 1.92,
+    "periodChangePct": -1.5625000000000013,
+    "annualChangePct": -8.695652173913041
   },
   "observations": [
     {
@@ -23285,6 +23285,38 @@
     {
       "date": "2026-04-02",
       "value": 1.97
+    },
+    {
+      "date": "2026-04-03",
+      "value": 1.99
+    },
+    {
+      "date": "2026-04-06",
+      "value": 1.98
+    },
+    {
+      "date": "2026-04-07",
+      "value": 1.96
+    },
+    {
+      "date": "2026-04-08",
+      "value": 1.96
+    },
+    {
+      "date": "2026-04-09",
+      "value": 1.95
+    },
+    {
+      "date": "2026-04-10",
+      "value": 1.95
+    },
+    {
+      "date": "2026-04-13",
+      "value": 1.92
+    },
+    {
+      "date": "2026-04-14",
+      "value": 1.89
     }
   ]
 }

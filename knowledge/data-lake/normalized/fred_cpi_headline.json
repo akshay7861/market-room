@@ -11,16 +11,16 @@
     "rates-agent",
     "risk-sentiment-agent"
   ],
-  "observationCount": 433,
+  "observationCount": 434,
   "coverageStart": "1990-01-01",
-  "coverageEnd": "2026-02-01",
+  "coverageEnd": "2026-03-01",
   "summary": {
-    "latestDate": "2026-02-01",
-    "latestValue": 327.46,
-    "previousDate": "2026-01-01",
-    "previousValue": 326.588,
-    "periodChangePct": 0.26700307420969455,
-    "annualChangePct": 2.6645890876940963
+    "latestDate": "2026-03-01",
+    "latestValue": 330.293,
+    "previousDate": "2026-02-01",
+    "previousValue": 327.46,
+    "periodChangePct": 0.865143834361457,
+    "annualChangePct": 3.320205581223676
   },
   "observations": [
     {
@@ -1754,6 +1754,10 @@
     {
       "date": "2026-02-01",
       "value": 327.46
+    },
+    {
+      "date": "2026-03-01",
+      "value": 330.293
     }
   ]
 }

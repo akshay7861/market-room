@@ -2,17 +2,17 @@
   "Meta Data": {
     "1. Information": "Monthly Adjusted Prices and Volumes",
     "2. Symbol": "SPY",
-    "3. Last Refreshed": "2026-04-02",
+    "3. Last Refreshed": "2026-04-15",
     "4. Time Zone": "US/Eastern"
   },
   "Monthly Adjusted Time Series": {
-    "2026-04-02": {
+    "2026-04-15": {
       "1. open": "653.9000",
-      "2. high": "658.5200",
+      "2. high": "700.2800",
       "3. low": "645.1100",
-      "4. close": "655.8300",
-      "5. adjusted close": "655.8300",
-      "6. volume": "166200185",
+      "4. close": "699.9400",
+      "5. adjusted close": "699.9400",
+      "6. volume": "644187052",
       "7. dividend amount": "0.0000"
     },
     "2026-03-31": {

@@ -2,17 +2,17 @@
   "Meta Data": {
     "1. Information": "Monthly Adjusted Prices and Volumes",
     "2. Symbol": "QQQ",
-    "3. Last Refreshed": "2026-04-02",
+    "3. Last Refreshed": "2026-04-15",
     "4. Time Zone": "US/Eastern"
   },
   "Monthly Adjusted Time Series": {
-    "2026-04-02": {
+    "2026-04-15": {
       "1. open": "581.4800",
-      "2. high": "587.7390",
+      "2. high": "637.8300",
       "3. low": "571.9200",
-      "4. close": "584.9800",
-      "5. adjusted close": "584.9800",
-      "6. volume": "130376841",
+      "4. close": "637.4000",
+      "5. adjusted close": "637.4000",
+      "6. volume": "483391176",
       "7. dividend amount": "0.0000"
     },
     "2026-03-31": {
