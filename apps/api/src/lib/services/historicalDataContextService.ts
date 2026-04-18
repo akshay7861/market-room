@@ -804,7 +804,7 @@ export function buildAnalogContextBlock(
     if ((sector === "Commodities" || sector === "Macro") && snapshotSignal.wtiPrice) {
       signal = { kind: "oil", value: snapshotSignal.wtiPrice, label: `WTI $${snapshotSignal.wtiPrice.toFixed(2)}/bbl`, ...INDICATOR_CONFIG.oil };
     } else if ((sector === "Rates" || sector === "Equities" || sector === "FX") && snapshotSignal.us10yYield) {
-      // FX: dollar and 10Y yield are tightly linked (real yield = primary USD driver)
+      // This is the nominal 10Y Treasury yield from the live snapshot, not a TIPS real yield.
       signal = { kind: "us10y", value: snapshotSignal.us10yYield, label: `10Y yield ${snapshotSignal.us10yYield.toFixed(2)}%`, ...INDICATOR_CONFIG.us10y };
     }
   }

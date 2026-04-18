@@ -10,6 +10,9 @@ import type {
   MarketSnapshotPayload,
   MarketRoomView,
   MarketSnapshot,
+  NoveltyAssessment,
+  PostQualityFlag,
+  PostingDecision,
   RoomCoverageState,
   SnapshotHeadline,
   SnapshotInstrument,
@@ -1033,9 +1036,18 @@ async function generateAgentForumPosts({
       return postingDecision;
     })();
 
+    const materialityAdjustedDecision = applyCatalystMaterialityGate({
+      agent,
+      postingDecision: finalPostingDecision,
+      noveltyAssessment,
+      topicPlan,
+      headlineAnalysis
+    });
+
     // Pre-generate message ID so it can be linked in the decision log
     const willPost =
-      finalPostingDecision.actionType === "new_post" || finalPostingDecision.actionType === "update_existing";
+      materialityAdjustedDecision.actionType === "new_post" ||
+      materialityAdjustedDecision.actionType === "update_existing";
     const preGeneratedMessageId = willPost ? crypto.randomUUID() : null;
 
     // Log all decisions including silent ones (fire-and-forget)
@@ -1043,13 +1055,13 @@ async function generateAgentForumPosts({
       id: crypto.randomUUID(),
       agentId: agent.id,
       roomId,
-      actionType: finalPostingDecision.actionType,
-      reasonCodes: finalPostingDecision.reasonCodes,
-      noveltyScore: finalPostingDecision.noveltyScore,
-      candidateThemeKey: finalPostingDecision.suggestedTopic?.themeKey ?? null,
-      targetThesisId: finalPostingDecision.targetThesisId,
+      actionType: materialityAdjustedDecision.actionType,
+      reasonCodes: materialityAdjustedDecision.reasonCodes,
+      noveltyScore: materialityAdjustedDecision.noveltyScore,
+      candidateThemeKey: materialityAdjustedDecision.suggestedTopic?.themeKey ?? null,
+      targetThesisId: materialityAdjustedDecision.targetThesisId,
       messageId: preGeneratedMessageId,
-      decidedAt: finalPostingDecision.decidedAt,
+      decidedAt: materialityAdjustedDecision.decidedAt,
       headlineAnalysisJson: headlineAnalysis ? JSON.stringify(headlineAnalysis) : null
     });
 
@@ -1078,14 +1090,46 @@ async function generateAgentForumPosts({
     });
 
     const createdAt = offsetTimestamp(index * 3);
-    const isUpdate = finalPostingDecision.actionType === "update_existing";
+    const isUpdate = materialityAdjustedDecision.actionType === "update_existing";
     const thesisId =
-      finalPostingDecision.targetThesisId ||
+      materialityAdjustedDecision.targetThesisId ||
       topicPlan.matchedThesis?.id ||
       (isUpdate ? null : crypto.randomUUID());
     const parentPostId =
-      finalPostingDecision.targetPostId ||
+      materialityAdjustedDecision.targetPostId ||
       (isUpdate ? topicPlan.updateTargetPostId : null);
+    const resolvedContent = trimToWordLimit(
+      result?.content || fallbackForumPost(agent, marketSnapshot, previousSnapshot),
+      isUpdate ? 170 : 320
+    );
+    const resolvedStance = result?.stance || stanceFor(agent);
+    const titleResolution = resolveForumPostTitle({
+      agent,
+      resultTitle: result?.title,
+      resultCatalyst: result?.catalyst,
+      marketSnapshot,
+      topicPlan,
+      stance: resolvedStance,
+      isUpdate
+    });
+    const postQualityFlags = collectPostQualityFlags({
+      agent,
+      titleFlags: titleResolution.flags,
+      content: resolvedContent,
+      hasStoredContext: knowledgeSnippets.length > 0,
+      postingDecision: materialityAdjustedDecision
+    });
+    const postingDecisionWithQualityFlags: PostingDecision = {
+      ...materialityAdjustedDecision,
+      qualityFlags: postQualityFlags
+    };
+
+    if (postQualityFlags.length > 0) {
+      console.log(
+        `[post-quality:${agent.name}] flags=${postQualityFlags.join(",")} title="${titleResolution.title ?? "null"}"`
+      );
+    }
+
     const message: AgentMessage = {
       id: preGeneratedMessageId!,
       roomId,
@@ -1096,26 +1140,21 @@ async function generateAgentForumPosts({
       role: "assistant",
       messageType: isUpdate ? "comment" : "post",
       parentMessageId: parentPostId,
-      title: isUpdate
-        ? null
-        : result?.title || fallbackForumTitle(agent, marketSnapshot, topicPlan),
+      title: titleResolution.title,
       catalyst: result?.catalyst || topicPlan.primary.catalyst || fallbackCatalyst(agent, marketSnapshot),
       thesisId,
       thesisUpdateId: thesisId ? crypto.randomUUID() : null,
       thesisStatus: topicPlan.thesisStatus,
       thesisTopicPrimary: topicPlan.topicPrimaryKey,
       thesisTopicSecondary: topicPlan.topicSecondaryKey,
-      content: trimToWordLimit(
-        result?.content || fallbackForumPost(agent, marketSnapshot, previousSnapshot),
-        isUpdate ? 170 : 320
-      ),
-      stance: result?.stance || stanceFor(agent),
+      content: resolvedContent,
+      stance: resolvedStance,
       confidence: result?.confidence ?? confidenceFor(agent),
       likeCount: 0,
       dislikeCount: 0,
       viewerReaction: null,
       noveltyAssessment: noveltyAssessment,
-      postingDecision: postingDecision,
+      postingDecision: postingDecisionWithQualityFlags,
       createdAt
     };
 
@@ -2499,19 +2538,84 @@ function buildMarketRoomHistoricalContext(
  *  Values are stored as display strings ("$82.40/bbl", "4.30%") — strip non-numeric chars. */
 function extractSnapshotSignal(snapshot: MarketSnapshotPayload): SnapshotSignal {
   const parseInstrumentValue = (value: string): number | undefined => {
-    const match = value.replace(/,/g, "").match(/[\d.]+/);
+    const match = value.replace(/,/g, "").match(/-?[\d.]+/);
     const n = match ? parseFloat(match[0]) : NaN;
     return isNaN(n) ? undefined : n;
   };
-  const get = (key: string): number | undefined => {
+  const get = (key: string, validator?: (instrument: SnapshotInstrument, value: number) => boolean): number | undefined => {
     const inst = snapshot.instruments.find((i) => i.key === key);
-    return inst ? parseInstrumentValue(inst.value) : undefined;
+    if (!inst || inst.status === "unavailable") {
+      return undefined;
+    }
+    const value = parseInstrumentValue(inst.value);
+    if (value === undefined) {
+      return undefined;
+    }
+    return !validator || validator(inst, value) ? value : undefined;
   };
   return {
-    wtiPrice: get("wti"),
-    us10yYield: get("us10y"),
-    dxyLevel: get("dxy")
+    wtiPrice: get("wti", (_instrument, value) => value > 0 && value < 250),
+    us10yYield: get("us10y", (instrument, value) => {
+      const descriptor = `${instrument.label} ${instrument.source}`.toLowerCase();
+      const isRealYieldSource = /\b(tips|real yield|real-rate|real rate)\b/.test(descriptor);
+      const isPlausibleNominalYield = value >= 0 && value <= 10;
+      if (isRealYieldSource || !isPlausibleNominalYield) {
+        console.log(
+          `[market-data-sanity] skipped us10y snapshot injection label="${instrument.label}" source="${instrument.source}" value="${instrument.value}"`
+        );
+        return false;
+      }
+      return true;
+    }),
+    dxyLevel: get("dxy", (_instrument, value) => value >= 50 && value <= 150)
   };
+}
+
+function buildMarketDataSanityBlock(instruments: SnapshotInstrument[]): string {
+  if (instruments.length === 0) {
+    return "";
+  }
+
+  const hasNominal10y = instruments.some((instrument) => instrument.key === "us10y");
+  const hasRealYield = instruments.some((instrument) =>
+    /\b(tips|real yield|real-rate|real rate)\b/i.test(`${instrument.label} ${instrument.source}`)
+  );
+  const suspicious = instruments
+    .map((instrument) => {
+      const value = parseDisplayNumber(instrument.value);
+      if (value === null) return null;
+      if (instrument.key === "us10y" && (value < 0 || value > 10)) {
+        return `${instrument.label}=${instrument.value} is outside plausible nominal 10Y range`;
+      }
+      if (/dxy|dollar/i.test(instrument.label) && (value < 50 || value > 150)) {
+        return `${instrument.label}=${instrument.value} is outside plausible DXY range`;
+      }
+      if (/wti|brent|oil/i.test(instrument.label) && (value <= 0 || value > 250)) {
+        return `${instrument.label}=${instrument.value} is outside plausible oil range`;
+      }
+      return null;
+    })
+    .filter((item): item is string => Boolean(item));
+
+  return [
+    "MARKET DATA SOURCE SANITY:",
+    hasNominal10y
+      ? "- The live `us10y` metric is a nominal 10Y Treasury yield. Do not call it TIPS, real yield, or real-rate data unless a separate TIPS/real-yield instrument is explicitly shown."
+      : "",
+    !hasRealYield
+      ? "- No live TIPS real-yield instrument is present in this snapshot. If discussing real yields, frame it as a mechanism or stored/historical context, not as a live quoted value."
+      : "",
+    ...suspicious.map((item) => `- Source sanity warning: ${item}. Treat this value as suspect unless corroborated.`)
+  ].filter(Boolean).join("\n");
+}
+
+function parseDisplayNumber(value: string): number | null {
+  const match = value.replace(/,/g, "").match(/-?[\d.]+/);
+  if (!match) {
+    return null;
+  }
+  const parsed = parseFloat(match[0]);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 function buildForumPostPrompt(
@@ -2617,6 +2721,7 @@ function buildForumPostPrompt(
       (instrument) =>
         `- ${instrument.label}: ${instrument.value}${instrument.change ? ` (${instrument.change})` : ""} [${instrument.source}]`
     ),
+    buildMarketDataSanityBlock(availableInstruments),
     mergedHeadlines.length > 0 ? "Additional sector headlines (context only — your primary focus is the headline above):" : "No current headlines available.",
     ...mergedHeadlines.map((headline, index) => `${index + 1}. ${headline.title} (${headline.source})`),
     `Catalyst discipline: ${ownedCatalystGuard}`,
@@ -3207,6 +3312,168 @@ function compareHeadlineTimes(left: SnapshotHeadline, right: SnapshotHeadline): 
 function truncateText(text: string, maxLength: number): string {
   const normalized = text.trim();
   return normalized.length <= maxLength ? normalized : `${normalized.slice(0, maxLength - 1)}…`;
+}
+
+function applyCatalystMaterialityGate({
+  agent,
+  postingDecision,
+  noveltyAssessment,
+  topicPlan,
+  headlineAnalysis
+}: {
+  agent: Agent;
+  postingDecision: PostingDecision;
+  noveltyAssessment: NoveltyAssessment;
+  topicPlan: AgentTopicPlan;
+  headlineAnalysis: HeadlineAnalysis | null;
+}): PostingDecision {
+  if (postingDecision.actionType !== "new_post") {
+    return postingDecision;
+  }
+
+  const hasOpenThesis = Boolean(topicPlan.matchedThesis);
+  const noveltyScore = noveltyAssessment.compositeScore;
+  const headlineIsMaterial = Boolean(
+    headlineAnalysis &&
+      headlineAnalysis.is_new_information &&
+      headlineAnalysis.primary_mechanism.trim().length > 0 &&
+      headlineAnalysis.direct_relevance_score >= 3 &&
+      (headlineAnalysis.market_signal_strength === "high" || headlineAnalysis.market_signal_strength === "medium")
+  );
+  const topicIsMaterial = topicPlan.hasMeaningfulFreshSignal && noveltyScore >= 55;
+  const shouldGate =
+    !headlineIsMaterial &&
+    !topicIsMaterial &&
+    !hasOpenThesis &&
+    (noveltyScore < 65 ||
+      !headlineAnalysis ||
+      headlineAnalysis.market_signal_strength === "low" ||
+      headlineAnalysis.primary_mechanism.trim().length === 0);
+
+  if (!shouldGate) {
+    return postingDecision;
+  }
+
+  const reason = headlineAnalysis
+    ? `headline signal=${headlineAnalysis.market_signal_strength}, direct=${headlineAnalysis.direct_relevance_score}, new=${headlineAnalysis.is_new_information}, mechanism=${headlineAnalysis.primary_mechanism ? "yes" : "no"}`
+    : `no headline analysis, topicFresh=${topicPlan.hasMeaningfulFreshSignal}`;
+  console.log(
+    `[catalyst-materiality:${agent.name}] gated weak new_post before View Protocol — novelty=${noveltyScore}, ${reason}`
+  );
+
+  return {
+    ...postingDecision,
+    actionType: "stay_silent",
+    reasonCodes: [...postingDecision.reasonCodes, "weak_catalyst_materiality_gate"],
+    qualityFlags: [
+      ...(postingDecision.qualityFlags || []),
+      "weak_catalyst_forced_view"
+    ]
+  };
+}
+
+function resolveForumPostTitle({
+  agent,
+  resultTitle,
+  resultCatalyst,
+  marketSnapshot,
+  topicPlan,
+  stance,
+  isUpdate
+}: {
+  agent: Agent;
+  resultTitle?: string | null;
+  resultCatalyst?: string | null;
+  marketSnapshot: MarketSnapshotPayload;
+  topicPlan: AgentTopicPlan;
+  stance: string | null;
+  isUpdate: boolean;
+}): { title: string | null; flags: PostQualityFlag[] } {
+  if (isUpdate) {
+    return { title: null, flags: [] };
+  }
+
+  const cleanedTitle = sanitizeTitle(resultTitle || "");
+  if (cleanedTitle) {
+    return { title: cleanedTitle, flags: [] };
+  }
+
+  const catalyst = sanitizeTitle(resultCatalyst || topicPlan.primary.catalyst || fallbackCatalyst(agent, marketSnapshot));
+  const asset = primaryAssetLabelFor(agent);
+  const directional = sanitizeTitle(stance || stanceFor(agent)).replace(/-/g, " ");
+  const catalystSummary = catalyst || topicPlan.primary.label || fallbackCatalyst(agent, marketSnapshot);
+  const title = sanitizeTitle(
+    `${agent.sector}: ${titleCase(directional)} ${asset} View on ${truncateText(catalystSummary, 72)}`
+  ) || fallbackForumTitle(agent, marketSnapshot, topicPlan);
+
+  console.log(`[post-quality:${agent.name}] title fallback applied — generated="${title}"`);
+  return { title, flags: ["missing_title", "title_fallback_applied"] };
+}
+
+function collectPostQualityFlags({
+  agent,
+  titleFlags,
+  content,
+  hasStoredContext,
+  postingDecision
+}: {
+  agent: Agent;
+  titleFlags: PostQualityFlag[];
+  content: string;
+  hasStoredContext: boolean;
+  postingDecision: PostingDecision;
+}): PostQualityFlag[] {
+  const flags = new Set<PostQualityFlag>([
+    ...(postingDecision.qualityFlags || []),
+    ...titleFlags
+  ]);
+
+  const hasDataAnchor =
+    /(?:\$|\b\d+(?:\.\d+)?\s?(?:%|bps|bp|mb|m bbl|million|bn|billion|x\b))/i.test(content) ||
+    /\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b/.test(content);
+  flags.add(hasDataAnchor ? "data_anchor_present" : "data_anchor_missing");
+
+  const citesStoredStat =
+    /\b(stored data|stored correlation|correlation [+-]?\d|historical range|observations|analog|forward returns?|post-1990|YoY)\b/i.test(content);
+  if (citesStoredStat) {
+    flags.add("stored_stat_cited");
+  } else if (hasStoredContext || /Rates|FX/.test(agent.sector)) {
+    flags.add("no_stored_stat_cited");
+  }
+
+  const hasConvictionCondition =
+    /\b(I change my view if|I would change my view if|I flip|invalidation|invalidated|confirm(?:s|ed)? if|unless|would change if|breaks above|breaks below|holds above|holds below|sustains above|sustains below)\b/i.test(content);
+  flags.add(hasConvictionCondition ? "conviction_condition_present" : "conviction_condition_missing");
+
+  return [...flags];
+}
+
+function sanitizeTitle(value: string): string {
+  return value
+    .replace(/\s+/g, " ")
+    .replace(/^["'`]+|["'`]+$/g, "")
+    .trim()
+    .slice(0, 120);
+}
+
+function titleCase(value: string): string {
+  return value
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => `${word.charAt(0).toUpperCase()}${word.slice(1).toLowerCase()}`)
+    .join(" ");
+}
+
+function primaryAssetLabelFor(agent: Agent): string {
+  const labels: Record<string, string> = {
+    Macro: "Macro",
+    Rates: "Duration",
+    FX: "USD",
+    Equities: "Equity",
+    Commodities: "WTI",
+    "Risk/Sentiment": "Risk"
+  };
+  return labels[agent.sector] || agent.sector;
 }
 
 function fallbackForumTitle(

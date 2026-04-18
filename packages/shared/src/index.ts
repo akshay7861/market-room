@@ -586,7 +586,20 @@ export type PostingReasonCode =
   | "headline_routed_to_comment"
   | "run_catalyst_claimed"
   // Macro materiality gate — agent silenced due to low novelty within cooldown window
-  | "macro_low_novelty_cooldown";
+  | "macro_low_novelty_cooldown"
+  // Quality gate — prevents weak/noisy catalysts from being upgraded into forced views
+  | "weak_catalyst_materiality_gate";
+
+export type PostQualityFlag =
+  | "missing_title"
+  | "title_fallback_applied"
+  | "weak_catalyst_forced_view"
+  | "stored_stat_cited"
+  | "no_stored_stat_cited"
+  | "data_anchor_present"
+  | "data_anchor_missing"
+  | "conviction_condition_present"
+  | "conviction_condition_missing";
 
 export type PostingDecision = {
   actionType: "new_post" | "update_existing" | "comment_only" | "stay_silent";
@@ -601,6 +614,7 @@ export type PostingDecision = {
   suggestedCommentPurpose: string | null;
   noveltyScore: number;
   decidedAt: string;
+  qualityFlags?: PostQualityFlag[];
 };
 
 export type NoveltyAssessment = {
