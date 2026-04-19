@@ -476,6 +476,23 @@ Pass 2 (temp 0.72, 3000 tokens): writes full post defending it
 - Makes follow-up edits safer: `make it MoM`, `make it two axes`, `lag SPY by 3 months`, `show the same chart again`.
 - Keeps chart behavior deterministic and inspectable before adding more chart types.
 
+## 2026-04-19 — Ask Market Chart Waves A/B/C
+
+### Wave A
+- Hardened the existing series-level parser and retained backward-compatible `ChartData` output.
+- Heatmaps can now use requested subsets instead of always rendering the full default matrix.
+
+### Wave B
+- Added rolling correlation line charts.
+- Added lead-lag correlation bar charts.
+- Added drawdown-from-peak line charts for supported level series.
+- Frontend `ChartBlock.tsx` now renders `chartType: "bar"` using Recharts `BarChart`.
+
+### Wave C
+- Added `npm run charts:backtest`.
+- Backtest script: `scripts/backtest-ask-market-charts.mjs`.
+- Current checkpoint: 9 chart prompts covering WTI/CPI transforms, rolling correlation, lead-lag bars, SPY drawdown, and heatmap subsets.
+
 | Layer | Technology | Location |
 |-------|-----------|---------|
 | Backend | Cloudflare Workers | `apps/api` |

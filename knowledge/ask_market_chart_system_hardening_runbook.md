@@ -47,6 +47,9 @@ Currently supported:
 - WTI vs Broad Dollar
 - WTI vs SPY/equities
 - Cross-asset correlation heatmap
+- Rolling correlation line charts
+- Lead-lag correlation bar charts
+- Drawdown-from-peak line charts for supported level series
 
 Unsupported for now:
 
@@ -80,6 +83,25 @@ Run these through Ask Market after deploy:
 7. `Commodities: Plot WTI absolute vs SPY absolute over the last 10 years`
 8. `Commodities: Plot WTI vs dollar over the last 10 years`
 9. `Commodities: Draw a correlation heatmap of oil, inflation, dollar, SPY, VIX, HY spreads and 10Y`
+10. `Commodities: Plot 24 month rolling correlation of WTI vs inflation over the last 10 years`
+11. `Commodities: Show lead-lag correlation of WTI vs inflation over the last 10 years`
+12. `Risk: Show SPY drawdown from peak over the last 10 years`
+
+## Backtest command
+
+Run:
+
+```bash
+npm run charts:backtest
+```
+
+The current checkpoint covers:
+
+- Existing WTI/CPI transform and axis cases.
+- Rolling correlation.
+- Lead-lag bar chart.
+- SPY drawdown.
+- 4x4 and 7x7 heatmap subsets.
 
 ## Success criteria
 

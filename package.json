@@ -15,6 +15,7 @@
     "data:download:census-retail": "node ./scripts/download-census-retail-history.mjs",
     "data:download:reports": "node ./scripts/download-public-report-library.mjs",
     "data:queue:starter": "node ./scripts/queue-generated-knowledge.mjs",
+    "charts:backtest": "node ./scripts/backtest-ask-market-charts.mjs",
     "build": "npm run build --workspaces",
     "check": "npm run check --workspaces",
     "typecheck": "npm run typecheck --workspaces",

@@ -1,10 +1,10 @@
 import { Fragment } from "react";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 
 export type ChartData = {
   title: string;
   subtitle?: string;
-  chartType?: "line" | "heatmap";
+  chartType?: "line" | "heatmap" | "bar";
   series: Array<{ key: string; label: string; color: string; unit?: string; yAxisId?: "left" | "right" }>;
   data: Array<{ date: string; [key: string]: number | string }>;
   yAxes?: Array<{ id: "left" | "right"; label: string; unit?: string }>;
@@ -20,6 +20,9 @@ type Props = { data: ChartData };
 export function ChartBlock({ data }: Props) {
   if (data.chartType === "heatmap" && data.heatmap) {
     return <HeatmapBlock data={data} />;
+  }
+  if (data.chartType === "bar") {
+    return <BarChartBlock data={data} />;
   }
 
   const tickInterval = Math.max(1, Math.floor(data.data.length / 8));
@@ -86,6 +89,57 @@ export function ChartBlock({ data }: Props) {
             />
           ))}
         </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+function BarChartBlock({ data }: Props) {
+  const leftAxis = data.yAxes?.find((axis) => axis.id === "left") || { id: "left" as const, label: "", unit: "" };
+  const series = data.series[0];
+
+  return (
+    <div className="chart-block">
+      <p className="chart-block__title">{data.title}</p>
+      {data.subtitle ? <p className="chart-block__subtitle">{data.subtitle}</p> : null}
+      {data.yAxes?.length ? (
+        <div className="chart-block__axes" aria-label="Chart axes">
+          {data.yAxes.map((axis) => (
+            <span key={axis.id} className={`chart-block__axis chart-block__axis--${axis.id}`}>
+              {axis.id === "left" ? "Left" : "Right"}: {axis.label}{axis.unit ? ` (${axis.unit})` : ""}
+            </span>
+          ))}
+        </div>
+      ) : null}
+      <ResponsiveContainer width="100%" height={220}>
+        <BarChart data={data.data} margin={{ top: 4, right: 12, left: 0, bottom: 4 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--panel-border)" />
+          <XAxis dataKey="date" tick={{ fontSize: 11, fill: "var(--muted)" }} />
+          <YAxis
+            yAxisId="left"
+            tick={{ fontSize: 11, fill: "var(--muted)" }}
+            tickFormatter={(v: number) => formatAxisTick(v, leftAxis.unit)}
+          />
+          <Tooltip
+            contentStyle={{
+              background: "var(--panel)",
+              border: "1px solid var(--panel-border)",
+              fontSize: 12,
+              color: "var(--text)"
+            }}
+            formatter={(value, name) => [formatTooltipValue(value, series?.unit), name ?? ""]}
+          />
+          <Legend wrapperStyle={{ fontSize: 12 }} />
+          {series ? (
+            <Bar
+              dataKey={series.key}
+              name={series.label}
+              fill={series.color}
+              yAxisId={series.yAxisId || "left"}
+              radius={[4, 4, 0, 0]}
+            />
+          ) : null}
+        </BarChart>
       </ResponsiveContainer>
     </div>
   );

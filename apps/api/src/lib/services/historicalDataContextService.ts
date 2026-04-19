@@ -936,8 +936,8 @@ export function buildAnalogContextBlock(
 type ChartSeries = { key: string; label: string; color: string; unit?: string; yAxisId?: "left" | "right" };
 type ChartPoint = { date: string; [key: string]: number | string };
 type HeatmapCell = { row: string; column: string; value: number };
-type ChartMode = "yoy_same_axis" | "yoy_dual_axis" | "absolute_dual_axis" | "correlation_heatmap";
-type ChartPair = "wti_cpi" | "m1_cpi" | "wti_dollar" | "wti_spy" | "cross_asset";
+type ChartMode = "yoy_same_axis" | "yoy_dual_axis" | "absolute_dual_axis" | "correlation_heatmap" | "rolling_correlation" | "lead_lag" | "drawdown";
+type ChartPair = "wti_cpi" | "m1_cpi" | "wti_dollar" | "wti_spy" | "cross_asset" | "single_asset";
 type ChartAsset = "wti" | "cpi" | "dollar" | "spy" | "m1" | "vix" | "hy_oas" | "us10y";
 type ChartTransform = "level" | "yoy_pct" | "mom_pct";
 type ChartAxis = "left" | "right";
@@ -954,6 +954,8 @@ export type ChartIntent = {
   mode: ChartMode;
   inflationMode?: "yoy" | "mom" | "level";
   seriesIntents: ChartSeriesIntent[];
+  heatmapAssets?: ChartAsset[];
+  rollingWindowMonths?: number;
   confidence: "high" | "medium" | "low";
   warnings: string[];
   lagMonths: number;
@@ -966,7 +968,7 @@ export type ChartIntent = {
 export type ChartData = {
   title: string;
   subtitle?: string;
-  chartType?: "line" | "heatmap";
+  chartType?: "line" | "heatmap" | "bar";
   series: ChartSeries[];
   data: ChartPoint[];
   yAxes?: Array<{ id: "left" | "right"; label: string; unit?: string }>;
@@ -1015,7 +1017,19 @@ export function buildChartIntentFromThread(messages: Array<{ role: string; conte
 
 export function buildChartDataFromIntent(intent: ChartIntent): ChartData | null {
   if (intent.mode === "correlation_heatmap" || intent.pair === "cross_asset") {
-    return buildCorrelationHeatmapChart(intent.windowStart, intent.windowEnd, intent.windowLabel);
+    return buildCorrelationHeatmapChart(intent.windowStart, intent.windowEnd, intent.windowLabel, intent.heatmapAssets);
+  }
+
+  if (intent.mode === "drawdown") {
+    return buildDrawdownChart(intent);
+  }
+
+  if (intent.mode === "lead_lag") {
+    return buildLeadLagChart(intent);
+  }
+
+  if (intent.mode === "rolling_correlation") {
+    return buildRollingCorrelationChart(intent);
   }
 
   const leftIntent = intent.seriesIntents.find((series) => series.axis === "left") || intent.seriesIntents[0];
@@ -1073,6 +1087,14 @@ export function describeChartDataForPrompt(data: ChartData | null): string {
       "Do not say you cannot plot or draw the chart. Refer to it as the chart below."
     ].join("\n");
   }
+  if (data.chartType === "bar") {
+    return [
+      "A computed chart WILL render below your answer.",
+      `Chart title: ${data.title}`,
+      "Chart type: bar chart.",
+      "Do not say you cannot plot or draw the chart. Refer to it as the chart below."
+    ].join("\n");
+  }
   const axes = data.yAxes || [];
   const axisLines = axes.map((axis) => `${axis.id === "left" ? "Left" : "Right"} axis: ${axis.label}${axis.unit ? ` (${axis.unit})` : ""}`);
   return [
@@ -1096,16 +1118,25 @@ function buildChartIntentFromQuestion(question: string, modifierText = question)
   const windowEnd = mentionsCrisis ? "2009-12" : undefined;
   const windowLabel = mentionsCrisis ? "2007–2009 crisis window" : "last 10 years";
   const wantsHeatmap = /\b(heat.?map|correlation map|matrix|cross.?asset map)\b/.test(modifier);
+  const wantsRollingCorrelation = /\b(rolling correlation|rolling corr|correlation over time|changing correlation|correlation trend)\b/.test(modifier);
+  const wantsLeadLag = /\b(lead.?lag|lead lag|which .* leads|leads? .* by|lags? .* by|best lag|peak lag)\b/.test(modifier);
+  const wantsDrawdown = /\b(drawdown|draw down|from peak|peak-to-trough|correction)\b/.test(modifier);
   const wantsAbsolute = /\b(absolute|level|price|index level|cpi index)\b/.test(modifier);
   const wantsDualAxis = /\b(two axis|dual axis|primary|secondary|separate axis|separate axes)\b/.test(modifier);
   const mode: ChartMode =
     wantsHeatmap || pair === "cross_asset"
       ? "correlation_heatmap"
-      : wantsAbsolute
-        ? "absolute_dual_axis"
-        : wantsDualAxis
-          ? "yoy_dual_axis"
-          : "yoy_same_axis";
+      : wantsDrawdown
+        ? "drawdown"
+        : wantsLeadLag
+          ? "lead_lag"
+          : wantsRollingCorrelation
+            ? "rolling_correlation"
+            : wantsAbsolute
+              ? "absolute_dual_axis"
+              : wantsDualAxis
+                ? "yoy_dual_axis"
+                : "yoy_same_axis";
   const lagMonths = extractRequestedLagMonths(modifier) || extractRequestedLagMonths(lower);
   const seriesIntents = buildSeriesIntents(pair, modifier, lower, mode, lagMonths);
 
@@ -1114,6 +1145,8 @@ function buildChartIntentFromQuestion(question: string, modifierText = question)
     mode,
     inflationMode: transformToInflationMode(seriesIntents.find((series) => series.asset === "cpi")?.transform),
     seriesIntents,
+    heatmapAssets: pair === "cross_asset" ? inferRequestedHeatmapAssets(lower) : undefined,
+    rollingWindowMonths: extractRollingWindowMonths(modifier) || extractRollingWindowMonths(lower),
     confidence: seriesIntents.length >= 2 ? "high" : "low",
     warnings: [],
     lagMonths,
@@ -1211,6 +1244,9 @@ function buildSeriesIntents(
   if (pair === "cross_asset") {
     return [];
   }
+  if (pair === "single_asset") {
+    return [inferSingleAssetIntent(fullText) || { asset: "spy", transform: "level", axis: "left", lagMonths: 0 }];
+  }
 
   const defaults = defaultSeriesForPair(pair);
   const text = `${modifier}\n${fullText}`;
@@ -1225,6 +1261,8 @@ function buildSeriesIntents(
 
 function defaultSeriesForPair(pair: Exclude<ChartPair, "cross_asset">): ChartSeriesIntent[] {
   switch (pair) {
+    case "single_asset":
+      return [{ asset: "spy", transform: "level", axis: "left", lagMonths: 0 }];
     case "m1_cpi":
       return [
         { asset: "m1", transform: "yoy_pct", axis: "left", lagMonths: 0 },
@@ -1428,6 +1466,9 @@ function inferChartPair(text: string): ChartPair | null {
   if (/\b(heat.?map|correlation map|matrix|cross.?asset map)\b/.test(lower)) {
     return "cross_asset";
   }
+  if (/\b(drawdown|draw down|from peak|peak-to-trough|correction)\b/.test(lower)) {
+    return inferSingleAssetIntent(lower) ? "single_asset" : null;
+  }
   const mentionsOil = /\b(wti|crude|oil)\b/.test(lower);
   const mentionsInflation = /\b(cpi|inflation|headline inflation)\b/.test(lower);
   const mentionsMoneySupply = /\b(m1|money supply|liquidity)\b/.test(lower);
@@ -1439,6 +1480,66 @@ function inferChartPair(text: string): ChartPair | null {
   if (mentionsOil && mentionsFX) return "wti_dollar";
   if (mentionsOil && mentionsEquities) return "wti_spy";
   return null;
+}
+
+function inferSingleAssetIntent(text: string): ChartSeriesIntent | null {
+  const lower = text.toLowerCase();
+  if (/\b(wti|crude|oil|oil price)\b/.test(lower)) {
+    return { asset: "wti", transform: "level", axis: "left", lagMonths: 0 };
+  }
+  if (/\b(spy|s&p|spx|s&p 500|equities|stocks|stock market)\b/.test(lower)) {
+    return { asset: "spy", transform: "level", axis: "left", lagMonths: 0 };
+  }
+  if (/\b(vix|volatility)\b/.test(lower)) {
+    return { asset: "vix", transform: "level", axis: "left", lagMonths: 0 };
+  }
+  if (/\b(hy oas|high yield|credit spreads?|spreads?)\b/.test(lower)) {
+    return { asset: "hy_oas", transform: "level", axis: "left", lagMonths: 0 };
+  }
+  if (/\b(10y|10-year|10 year|treasury yield|us10y|ust 10y)\b/.test(lower)) {
+    return { asset: "us10y", transform: "level", axis: "left", lagMonths: 0 };
+  }
+  if (/\b(cpi|inflation)\b/.test(lower)) {
+    return { asset: "cpi", transform: "level", axis: "left", lagMonths: 0 };
+  }
+  return null;
+}
+
+function inferRequestedHeatmapAssets(text: string): ChartAsset[] {
+  const assets: ChartAsset[] = [];
+  const add = (asset: ChartAsset, pattern: RegExp) => {
+    if (pattern.test(text) && !assets.includes(asset)) assets.push(asset);
+  };
+  add("wti", /\b(wti|crude|oil)\b/);
+  add("cpi", /\b(cpi|inflation)\b/);
+  add("dollar", /\b(dollar|dxy|usd)\b/);
+  add("spy", /\b(spy|s&p|spx|equities|stocks)\b/);
+  add("vix", /\b(vix|volatility)\b/);
+  add("hy_oas", /\b(hy oas|high yield|credit spreads?|spreads?)\b/);
+  add("us10y", /\b(10y|10-year|10 year|treasury yield|us10y)\b/);
+  add("m1", /\b(m1|money supply|liquidity)\b/);
+  return assets;
+}
+
+function heatmapSeriesLabelForAsset(asset: ChartAsset): string | null {
+  switch (asset) {
+    case "wti":
+      return "WTI YoY%";
+    case "cpi":
+      return "CPI YoY%";
+    case "dollar":
+      return "Broad Dollar YoY%";
+    case "spy":
+      return "SPY YoY%";
+    case "vix":
+      return "VIX level";
+    case "hy_oas":
+      return "HY OAS";
+    case "us10y":
+      return "US 10Y yield";
+    case "m1":
+      return "M1 YoY%";
+  }
 }
 
 function hasChartRequestLanguage(text: string): boolean {
@@ -1510,8 +1611,120 @@ function alignedSeriesPoints(
   return points.sort((a, b) => a.date.localeCompare(b.date));
 }
 
-function buildCorrelationHeatmapChart(start: string, end: string | undefined, windowLabel: string): ChartData | null {
-  const series = [
+function buildRollingCorrelationChart(intent: ChartIntent): ChartData | null {
+  const leftIntent = intent.seriesIntents.find((series) => series.axis === "left") || intent.seriesIntents[0];
+  const rightIntent = intent.seriesIntents.find((series) => series.axis === "right") || intent.seriesIntents[1];
+  if (!leftIntent || !rightIntent) return null;
+
+  const left = seriesDefinitionForIntent(leftIntent);
+  const right = seriesDefinitionForIntent(rightIntent);
+  const windowMonths = intent.rollingWindowMonths || 24;
+  const points = alignedSeriesPoints(left, right, intent.windowStart, intent.windowEnd, rightIntent.lagMonths);
+  if (points.length < windowMonths + 6) return null;
+
+  const rolling = rollingCorrelationPoints(points, windowMonths);
+  if (rolling.length < 6) return null;
+
+  const lagLabel = rightIntent.lagMonths ? `, ${right.label} lagged ${rightIntent.lagMonths}m` : "";
+  return {
+    title: `${windowMonths}m rolling correlation: ${left.label} vs ${right.label}${lagLabel} — ${intent.windowLabel}`,
+    subtitle: "Stored monthly data. Shows how the relationship changes over time.",
+    chartType: "line",
+    series: [{ key: "correlation", label: "Rolling correlation", color: "#7c3aed", unit: "", yAxisId: "left" }],
+    yAxes: [{ id: "left", label: "Correlation", unit: "" }],
+    data: rolling.map((point) => ({ date: point.date.slice(0, 7), correlation: roundChartValue(point.value) }))
+  };
+}
+
+function buildLeadLagChart(intent: ChartIntent): ChartData | null {
+  const leftIntent = intent.seriesIntents.find((series) => series.axis === "left") || intent.seriesIntents[0];
+  const rightIntent = intent.seriesIntents.find((series) => series.axis === "right") || intent.seriesIntents[1];
+  if (!leftIntent || !rightIntent) return null;
+
+  const left = seriesDefinitionForIntent(leftIntent);
+  const right = seriesDefinitionForIntent(rightIntent);
+  const data: ChartPoint[] = [];
+  let bestLag = 0;
+  let bestCorrelation = 0;
+
+  for (let lag = -6; lag <= 6; lag += 1) {
+    const points = alignedSeriesPoints(left, right, intent.windowStart, intent.windowEnd, lag);
+    const correlation = points.length >= 12 ? pearson(points) : 0;
+    if (Math.abs(correlation) > Math.abs(bestCorrelation)) {
+      bestCorrelation = correlation;
+      bestLag = lag;
+    }
+    data.push({ date: lag === 0 ? "0m" : lag > 0 ? `+${lag}m` : `${lag}m`, correlation: +correlation.toFixed(2) });
+  }
+
+  const lagMeaning =
+    bestLag > 0
+      ? `${right.label} strongest when shifted ${bestLag}m later`
+      : bestLag < 0
+        ? `${right.label} strongest when shifted ${Math.abs(bestLag)}m earlier`
+        : "strongest contemporaneously";
+
+  return {
+    title: `Lead-lag correlation: ${left.label} vs ${right.label} — ${intent.windowLabel}`,
+    subtitle: `Peak correlation ${formatCorrelation(bestCorrelation)} at ${bestLag === 0 ? "0m" : `${bestLag > 0 ? "+" : ""}${bestLag}m`} (${lagMeaning}).`,
+    chartType: "bar",
+    series: [{ key: "correlation", label: "Correlation", color: "#0f766e", unit: "", yAxisId: "left" }],
+    yAxes: [{ id: "left", label: "Correlation", unit: "" }],
+    data
+  };
+}
+
+function buildDrawdownChart(intent: ChartIntent): ChartData | null {
+  const primaryIntent = intent.seriesIntents[0] || inferSingleAssetIntent(intent.sourceText);
+  if (!primaryIntent) return null;
+
+  const levelIntent: ChartSeriesIntent = {
+    ...primaryIntent,
+    transform: supportsTransform(primaryIntent.asset, "level") ? "level" : primaryIntent.transform
+  };
+  const series = seriesDefinitionForIntent(levelIntent);
+  const points = drawdownPoints(series.data, intent.windowStart, intent.windowEnd);
+  if (points.length < 6) return null;
+
+  return {
+    title: `${series.label} drawdown from peak — ${intent.windowLabel}`,
+    subtitle: "Stored monthly data. Drawdown is measured from the running peak.",
+    chartType: "line",
+    series: [{ key: "drawdown", label: "Drawdown", color: "#dc2626", unit: "%", yAxisId: "left" }],
+    yAxes: [{ id: "left", label: "Drawdown", unit: "%" }],
+    data: points.map((point) => ({ date: point.date.slice(0, 7), drawdown: roundChartValue(point.value) }))
+  };
+}
+
+function rollingCorrelationPoints(points: AlignedPoint[], windowMonths: number): Array<{ date: string; value: number }> {
+  const rolling: Array<{ date: string; value: number }> = [];
+  for (let index = windowMonths - 1; index < points.length; index += 1) {
+    const window = points.slice(index - windowMonths + 1, index + 1);
+    rolling.push({ date: points[index].date, value: pearson(window) });
+  }
+  return rolling;
+}
+
+function drawdownPoints(
+  series: Map<string, number>,
+  start: string,
+  end?: string
+): Array<{ date: string; value: number }> {
+  const points: Array<{ date: string; value: number }> = [];
+  let peak = Number.NEGATIVE_INFINITY;
+  for (const [month, value] of [...series.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
+    if (month < start) continue;
+    if (end && month > end) continue;
+    peak = Math.max(peak, value);
+    if (Number.isFinite(peak) && peak !== 0) {
+      points.push({ date: month, value: ((value - peak) / peak) * 100 });
+    }
+  }
+  return points;
+}
+
+function buildCorrelationHeatmapChart(start: string, end: string | undefined, windowLabel: string, requestedAssets?: ChartAsset[]): ChartData | null {
+  const allSeries = [
     seriesDefinition("wti_yoy"),
     seriesDefinition("cpi_yoy"),
     seriesDefinition("dollar_yoy"),
@@ -1520,6 +1733,11 @@ function buildCorrelationHeatmapChart(start: string, end: string | undefined, wi
     seriesDefinition("hy_spread"),
     seriesDefinition("us10y")
   ];
+  const requestedLabels = requestedAssets?.map((asset) => heatmapSeriesLabelForAsset(asset)).filter(Boolean) as string[] | undefined;
+  const series = requestedLabels?.length
+    ? allSeries.filter((item) => requestedLabels.includes(item.label))
+    : allSeries;
+  if (series.length < 2) return null;
   const cells: HeatmapCell[] = [];
 
   for (const row of series) {
@@ -1557,6 +1775,15 @@ function extractRequestedLagMonths(lowerQuestion: string): number {
   if (!match) return 0;
   const months = Number(match[1]);
   return Number.isFinite(months) ? Math.min(Math.max(months, 0), 12) : 0;
+}
+
+function extractRollingWindowMonths(lowerQuestion: string): number {
+  const match =
+    lowerQuestion.match(/\brolling\s*(\d{1,2})\s*(?:m|mo|month|months)\b/) ||
+    lowerQuestion.match(/\b(\d{1,2})\s*(?:m|mo|month|months)\s*rolling\b/);
+  if (!match) return 24;
+  const months = Number(match[1]);
+  return Number.isFinite(months) ? Math.min(Math.max(months, 3), 60) : 24;
 }
 
 function alignedWtiCpiYoYPoints(start: string, end?: string): AlignedPoint[] {
