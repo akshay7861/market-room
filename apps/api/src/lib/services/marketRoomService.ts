@@ -39,6 +39,7 @@ import { fetchYahooFinanceBriefing } from "./yahooFinanceNewsService";
 import { fetchMarketauxBriefing } from "./marketauxNewsService";
 import { analyzeTopHeadlinesForAgent, type HeadlineAnalysis } from "./headlineAnalysisService";
 import { buildCrossAgentMacroView, buildDynamicMemoryContext, buildDynamicMemoryPromptBlock, refreshDynamicHouseViews } from "./dynamicMemoryService";
+import { buildEquityFundamentalsForPost } from "./equityQuoteService";
 
 const defaultDiscussionPrompt =
   "Discuss the biggest market drivers right now, the main risk, and one thing investors should watch next.";
@@ -2279,6 +2280,18 @@ async function requestStructuredForumPost({
       buildCrossAgentMacroView(env, agent)
     ]);
 
+    // Equities Agent: fetch company fundamentals from top headline (5-second hard timeout)
+    const equityFundamentals =
+      agent.sector === "Equities"
+        ? await Promise.race([
+            buildEquityFundamentalsForPost(
+              topHeadlineTitle,
+              sectorHeadlines
+            ),
+            new Promise<string>((resolve) => setTimeout(() => resolve(""), 5000))
+          ])
+        : "";
+
     // Build the prompt once — used by both passes
     const postPrompt = buildForumPostPrompt(
       agent,
@@ -2299,7 +2312,8 @@ async function requestStructuredForumPost({
       headlineAnalysis,
       historicalContext,
       analogBlock,
-      crossAgentView
+      crossAgentView,
+      equityFundamentals
     );
 
     // ── Pass 1: View crystallisation ────────────────────────────────────────
@@ -2637,7 +2651,8 @@ function buildForumPostPrompt(
   headlineAnalysis: HeadlineAnalysis | null = null,
   historicalContext: string = "",
   analogBlock: string = "",
-  crossAgentView: string = ""
+  crossAgentView: string = "",
+  equityFundamentals: string = ""
 ): string {
   const availableInstruments = relevantInstrumentsForAgent(agent, marketSnapshot);
   const mergedHeadlines = relevantHeadlinesForAgent(agent, [
@@ -2756,6 +2771,7 @@ function buildForumPostPrompt(
     ...(roomCoverage ? [buildRoomCoveragePromptBlock(roomCoverage)] : []),
     ...(historicalContext ? [historicalContext] : []),
     ...(analogBlock ? [analogBlock] : []),
+    ...(equityFundamentals ? [equityFundamentals] : []),
     knowledgeSnippets.length > 0 ? "Approved long-term memory snippets:" : "No approved long-term memory snippets were retrieved for this post.",
     ...knowledgeSnippets.map(
       (snippet, index) => `${index + 1}. ${snippet.title} [${snippet.category}] ${snippet.excerpt}`
