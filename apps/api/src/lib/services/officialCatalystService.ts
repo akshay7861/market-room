@@ -11,17 +11,21 @@ export async function fetchOfficialCatalystLayer(
   generalHeadlines: SnapshotHeadline[];
   headlinesByAgentId: Map<string, SnapshotHeadline[]>;
 }> {
-  const [fredHeadlines, fedHeadlines, treasuryHeadlines] = await Promise.all([
-    fetchFredMacroReleaseHeadlines(env),
+  void env;
+  const [fedHeadlines, treasuryHeadlines] = await Promise.all([
     fetchFedHeadlines(),
     fetchTreasuryHeadlines()
   ]);
 
+  // FRED and EIA are data-lake/context sources, not autonomous posting triggers.
+  // This service only returns actual official news/releases that can compete as catalysts.
   const generalHeadlines = dedupeHeadlines([
-    ...fredHeadlines,
     ...fedHeadlines,
     ...treasuryHeadlines
   ]).slice(0, 10);
+  console.log(
+    `[official-news] catalysts=${generalHeadlines.length} fred=excluded_data_lake_only eia=excluded_data_lake_only`
+  );
 
   const headlinesByAgentId = new Map<string, SnapshotHeadline[]>();
 
@@ -36,103 +40,6 @@ export async function fetchOfficialCatalystLayer(
     generalHeadlines,
     headlinesByAgentId
   };
-}
-
-async function fetchFredMacroReleaseHeadlines(env: Env): Promise<SnapshotHeadline[]> {
-  if (!env.FRED_API_KEY) {
-    return [];
-  }
-
-  const configs = [
-    {
-      seriesId: "CPIAUCSL",
-      label: "CPI",
-      formatter: (latest: FredObservation, previous: FredObservation | null) =>
-        `${latest.value}${previous ? ` vs ${previous.value} prior month` : ""}`
-    },
-    {
-      seriesId: "PAYEMS",
-      label: "Nonfarm payrolls",
-      formatter: (latest: FredObservation, previous: FredObservation | null) =>
-        `${formatFredDelta(latest, previous)} jobs change context`
-    },
-    {
-      seriesId: "UNRATE",
-      label: "Unemployment rate",
-      formatter: (latest: FredObservation) => `${latest.value}%`
-    },
-    {
-      seriesId: "FEDFUNDS",
-      label: "Fed funds",
-      formatter: (latest: FredObservation) => `${latest.value}%`
-    },
-    {
-      seriesId: "DGS10",
-      label: "US 10Y Treasury",
-      formatter: (latest: FredObservation) => `${latest.value}%`
-    }
-  ];
-
-  const maybeHeadlines = await Promise.all(
-    configs.map(async (config) => {
-      const observations = await fetchFredSeriesObservations(env.FRED_API_KEY!, config.seriesId, 2);
-
-      if (observations.length === 0) {
-        return undefined;
-      }
-
-      const [latest, previous] = observations;
-      const headline: SnapshotHeadline = {
-        title: `${config.label} latest official print: ${config.formatter(latest, previous || null)} (${latest.date})`,
-        source: "FRED",
-        url: `https://fred.stlouisfed.org/series/${config.seriesId}`,
-        publishedAt: latest.realtimeStart ? `${latest.realtimeStart}T00:00:00.000Z` : undefined
-      };
-
-      return headline;
-    })
-  );
-
-  return maybeHeadlines.filter((headline): headline is SnapshotHeadline => headline !== undefined);
-}
-
-async function fetchFredSeriesObservations(
-  apiKey: string,
-  seriesId: string,
-  limit: number
-): Promise<FredObservation[]> {
-  try {
-    const url = new URL("https://api.stlouisfed.org/fred/series/observations");
-    url.searchParams.set("series_id", seriesId);
-    url.searchParams.set("api_key", apiKey);
-    url.searchParams.set("file_type", "json");
-    url.searchParams.set("sort_order", "desc");
-    url.searchParams.set("limit", String(limit));
-
-    const response = await fetch(url.toString());
-
-    if (!response.ok) {
-      return [];
-    }
-
-    const payload = (await response.json()) as {
-      observations?: Array<{
-        realtime_start?: string;
-        date?: string;
-        value?: string;
-      }>;
-    };
-
-    return (payload.observations || [])
-      .filter((item) => item.date && item.value && item.value !== ".")
-      .map((item) => ({
-        realtimeStart: item.realtime_start || "",
-        date: item.date || "",
-        value: item.value || ""
-      }));
-  } catch {
-    return [];
-  }
 }
 
 async function fetchFedHeadlines(): Promise<SnapshotHeadline[]> {
@@ -218,23 +125,6 @@ function parsePubDate(value?: string): string | undefined {
   return Number.isNaN(parsed) ? undefined : new Date(parsed).toISOString();
 }
 
-function formatFredDelta(latest: FredObservation, previous: FredObservation | null): string {
-  if (!previous) {
-    return latest.value;
-  }
-
-  const latestNumber = Number(latest.value);
-  const previousNumber = Number(previous.value);
-
-  if (Number.isNaN(latestNumber) || Number.isNaN(previousNumber)) {
-    return latest.value;
-  }
-
-  const delta = latestNumber - previousNumber;
-  const sign = delta > 0 ? "+" : "";
-  return `${sign}${delta.toFixed(0)}`;
-}
-
 function officialHeadlineMatchesSector(headline: SnapshotHeadline, sector: string): boolean {
   const text = `${headline.title} ${headline.source}`.toLowerCase();
 
@@ -278,8 +168,14 @@ function decodeHtmlEntities(value: string): string {
     .replace(/&nbsp;/g, " ");
 }
 
-type FredObservation = {
-  realtimeStart: string;
-  date: string;
-  value: string;
-};
+export function isDataLakeOnlyHeadline(headline: SnapshotHeadline): boolean {
+  const source = headline.source.toLowerCase();
+  const title = headline.title.toLowerCase();
+
+  return (
+    source === "fred" ||
+    source === "eia" ||
+    source.includes("energy information administration") ||
+    /\blatest official print\b/.test(title)
+  );
+}

@@ -5,6 +5,36 @@ Each session appends a dated entry. Read the most recent entries first.
 
 ---
 
+## 2026-04-19 — FRED/EIA Removed From Catalyst Trigger Lane
+
+### Root cause
+
+The earlier repetition guard stopped unchanged official prints from updating theses, but the deeper architecture issue was still present: FRED data was being fetched by `officialCatalystService.ts`, converted into `SnapshotHeadline`s, and merged into the same Market Room catalyst queues as Marketaux news. That meant durable data-lake observations such as `Nonfarm payrolls latest official print: +178...`, `Fed funds latest official print...`, and `US 10Y Treasury latest official print...` could compete as autonomous post triggers.
+
+This was feed-role confusion, not a memory-size or vector issue. FRED and EIA are data/context sources. Marketaux/news headlines are catalyst triggers.
+
+### Fix
+
+- Removed FRED headline generation from `fetchOfficialCatalystLayer()`.
+- `fetchOfficialCatalystLayer()` now returns only real official news/release headlines from Federal Reserve RSS and Treasury press pages.
+- Added `isDataLakeOnlyHeadline()` to defensively exclude direct FRED/EIA/latest-official-print headlines from Market Room and Ask Market headline queues if they appear from any future path.
+- Added catalyst-source logs:
+  - `[official-news] catalysts=... fred=excluded_data_lake_only eia=excluded_data_lake_only`
+  - `[catalyst-source] market_room ... data_lake_sources=excluded`
+  - `[catalyst-source] ask_market ... data_lake_sources=excluded`
+
+### Files changed
+
+- `apps/api/src/lib/services/officialCatalystService.ts`
+- `apps/api/src/lib/services/marketRoomService.ts`
+- `apps/api/src/lib/services/marketQuestionsService.ts`
+
+### Result
+
+FRED/EIA-style data prints can still support reasoning through the historical/data-lake context path, but they should no longer become the primary headline, posting catalyst, thesis-update reason, or autonomous Market Room trigger.
+
+---
+
 ## 2026-04-19 — Stale Official Print Repetition Guard
 
 ### Root cause

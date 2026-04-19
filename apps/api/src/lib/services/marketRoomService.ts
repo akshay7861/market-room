@@ -33,7 +33,7 @@ import { makePostingDecision, evaluateCommentTarget } from "./postingDecisionSer
 import { listRelevantMarketCasesForAgent } from "./marketCaseService";
 import { findRelevantKnowledgeSnippets, type LocalKnowledgeSnippet } from "./knowledgeSnippetService";
 import { recordDiscussionLearning } from "./learningService";
-import { fetchOfficialCatalystLayer } from "./officialCatalystService";
+import { fetchOfficialCatalystLayer, isDataLakeOnlyHeadline } from "./officialCatalystService";
 import { buildHistoricalDataPromptBlock, buildAnalogContextBlock, type SnapshotSignal } from "./historicalDataContextService";
 import { fetchYahooFinanceBriefing } from "./yahooFinanceNewsService";
 import { fetchMarketauxBriefing } from "./marketauxNewsService";
@@ -269,7 +269,7 @@ export async function runMarketDiscussion(
     ...marketauxBriefing.generalHeadlines,
     ...officialBriefing.generalHeadlines,
     ...yahooBriefing.generalHeadlines
-  ]);
+  ].filter((headline) => !isDataLakeOnlyHeadline(headline)));
   const sectorHeadlinesByAgentId = new Map<string, SnapshotHeadline[]>();
 
   for (const agent of activeAgents) {
@@ -280,9 +280,13 @@ export async function runMarketDiscussion(
         ...(marketauxBriefing.headlinesByAgentId.get(agent.id) || []),
         ...(officialBriefing.headlinesByAgentId.get(agent.id) || []),
         ...(yahooBriefing.headlinesByAgentId.get(agent.id) || [])
-      ])
+      ].filter((headline) => !isDataLakeOnlyHeadline(headline)))
     );
   }
+
+  console.log(
+    `[catalyst-source] market_room eligible=${generalCatalystHeadlines.length} marketaux=${marketauxBriefing.generalHeadlines.length} official_news=${officialBriefing.generalHeadlines.length} yahoo=${yahooBriefing.generalHeadlines.length} data_lake_sources=excluded`
+  );
 
   const enrichedSnapshotPayload = mergeForumHeadlinesIntoSnapshot(
     marketSnapshotPayload,

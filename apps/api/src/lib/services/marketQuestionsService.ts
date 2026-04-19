@@ -13,7 +13,7 @@ import { generateGeminiContent, getLlmModel, isLlmConfigured } from "../gemini";
 import { fetchLatestMarketSnapshot } from "../market-data";
 import { extractResponseOutputText, parseStructuredResponseJson } from "../openAiResponses";
 import { createRepositories } from "../repositories";
-import { fetchOfficialCatalystLayer } from "./officialCatalystService";
+import { fetchOfficialCatalystLayer, isDataLakeOnlyHeadline } from "./officialCatalystService";
 import { findRelevantKnowledgeSnippets, listApprovedKnowledgeDocuments } from "./knowledgeSnippetService";
 import { fetchYahooFinanceBriefing } from "./yahooFinanceNewsService";
 import { listRelevantMarketCasesForAgent } from "./marketCaseService";
@@ -813,7 +813,10 @@ async function generateAgentQuestionReply(
     ...(officialBriefing.headlinesByAgentId.get(agent.id) || []),
     ...(yahooBriefing.headlinesByAgentId.get(agent.id) || []),
     ...marketSnapshot.headlines
-  ]).slice(0, 6);
+  ].filter((headline) => !isDataLakeOnlyHeadline(headline))).slice(0, 6);
+  console.log(
+    `[catalyst-source] ask_market agent=${agent.id} eligible=${headlines.length} official_news=${officialBriefing.headlinesByAgentId.get(agent.id)?.length || 0} yahoo=${yahooBriefing.headlinesByAgentId.get(agent.id)?.length || 0} data_lake_sources=excluded`
+  );
   const relevantCases = await listRelevantMarketCasesForAgent(env, agent, marketSnapshot, "question_thread", 4);
   const equityQuoteContext =
     agent.sector === "Equities" && hasEquityQuoteIntent(latestQuestion)
