@@ -5,6 +5,52 @@ Each session appends a dated entry. Read the most recent entries first.
 
 ---
 
+## 2026-04-19 — Ask Market Chart Rendering + Stored Correlation Charts
+
+### Root cause
+
+Ask Market had a chart marker path (`%%CHART_DATA%%`) but the implementation was too narrow:
+
+- backend chart generation only handled WTI-vs-CPI and M1-vs-CPI;
+- the chart payload assumed a single percent axis;
+- frontend rendering could not show dual-axis overlays or correlation heatmaps;
+- lagged comparisons such as `WTI vs SPY lagged 3 months` were not supported.
+
+### Fix
+
+- Extended deterministic chart generation in `historicalDataContextService.ts`.
+- Added Ask Market charts for:
+  - WTI YoY% vs CPI YoY%;
+  - WTI price vs CPI YoY% on dual axes when the user asks for overlay/price/level/two-axis;
+  - WTI YoY% vs Broad Dollar YoY% (DXY proxy);
+  - WTI YoY% vs SPY YoY%;
+  - M1 YoY% vs CPI YoY%;
+  - cross-asset correlation heatmap.
+- Added lag parsing up to 12 months for user prompts like `WTI vs SPY lagged 3 months`.
+- Extended frontend `ChartBlock` to render:
+  - dual-axis line charts;
+  - chart subtitles with computed correlation;
+  - red/green correlation heatmaps.
+
+### Guardrail
+
+Charts are computed from stored data-lake series only. Agents can explain the chart, but they do not invent the chart values.
+
+### Files changed
+
+- `apps/api/src/lib/services/historicalDataContextService.ts`
+- `apps/web/src/components/ChartBlock.tsx`
+- `apps/web/src/styles/global.css`
+
+### Validation
+
+- `npm run typecheck --workspace @market-room/api` passed.
+- `npm run typecheck --workspace @market-room/web` passed.
+- `npm run build --workspace @market-room/api` passed (`wrangler deploy --dry-run`).
+- `npm run build --workspace @market-room/web` passed.
+
+---
+
 ## 2026-04-19 — Fed RSS Materiality + Anti-Repetition Gate
 
 ### Root cause
