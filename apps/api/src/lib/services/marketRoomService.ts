@@ -2786,7 +2786,11 @@ function buildForumPostPrompt(
       : "Because this is a new thread, make the angle feel distinct from your recent posts.",
     "Do not recycle the same theme if there is another uncovered opportunity in your lane.",
     "If your primary catalyst is not oil, do not let oil become the headline of your post.",
-    "Root your post in sector-specific mechanics, not the broad market backdrop that every agent shares."
+    "Root your post in sector-specific mechanics, not the broad market backdrop that every agent shares.",
+    // ── Hard accuracy & attribution rules ──────────────────────────────────────
+    "FACT ATTRIBUTION RULE: when multiple company events (layoffs, earnings, guidance cuts, M&A) appear in the same headline batch, every statistic must be preceded by the exact company name it belongs to. Never merge figures from different companies into a single clause. Example — correct: 'Meta announced 8,000 cuts; Amazon announced 16,000 cuts.' Example — wrong: 'the company cut 16,000 jobs.' If you cannot confirm which number belongs to which company, omit the specific figure rather than attributing it incorrectly.",
+    "STORED DATA CITATION RULE: when citing a correlation coefficient, beta, ratio, or quantitative figure from the historical data blocks above, reproduce the figure exactly as it appears in those blocks. Do not round, adjust, or recall it from any other context. Example: if the block says 'Broad Dollar YoY% vs WTI YoY% correlation approximately -0.55', write -0.55 — not -0.83 or any other value. Discrepancies between what is in the data block and what you recall from training must always resolve in favour of the data block.",
+    "CATALYST QUALITY RULE: if the top headline appears to be a stock-screener list (e.g. 'N Most Undervalued Stocks to Buy Now', 'Best Dividend Stocks for 2025') treat it as noise. Do not use it as your primary catalyst. Instead, identify the specific company or macro development embedded in it — if no concrete company or data point can be extracted, skip the headline entirely and build your post from the next substantive catalyst in the list."
   ].filter(Boolean).join("\n");
 }
 
@@ -2880,12 +2884,14 @@ function relevantHeadlinesForAgent(agent: Agent, headlines: SnapshotHeadline[]):
   const scored = dedupeHeadlines(headlines)
     .map((headline) => ({
       headline,
-      score: scoreHeadlineForKeywords(headline, keywords)
+      // Demote screener / "N stocks to buy" listicles so they never land in
+      // the top slot and trigger a weak catalyst analysis.
+      score: isListicleHeadline(headline) ? -99 : scoreHeadlineForKeywords(headline, keywords)
     }))
     .sort((left, right) => right.score - left.score || compareHeadlineTimes(right.headline, left.headline));
 
   const filtered = scored.filter((item) => item.score > 0).map((item) => item.headline);
-  return filtered.length > 0 ? filtered : dedupeHeadlines(headlines);
+  return filtered.length > 0 ? filtered : dedupeHeadlines(headlines).filter((h) => !isListicleHeadline(h));
 }
 
 function postStyleFor(
@@ -3302,6 +3308,32 @@ function dedupeHeadlines(headlines: SnapshotHeadline[]): SnapshotHeadline[] {
 function scoreHeadlineForKeywords(headline: SnapshotHeadline, keywords: string[]): number {
   const text = `${headline.title} ${headline.source}`.toLowerCase();
   return keywords.reduce((score, keyword) => score + (text.includes(keyword) ? 1 : 0), 0);
+}
+
+/**
+ * Returns true for stock-screener / clickbait listicle headlines that carry no
+ * market signal — e.g. "12 Most Undervalued Natural Gas Stocks to Buy Now".
+ * These headlines should be demoted to the bottom of the sorted slate so they
+ * never become the top-of-post catalyst.
+ */
+function isListicleHeadline(headline: SnapshotHeadline): boolean {
+  // Pattern: "N best/top/undervalued/... stocks ..."
+  if (/\b\d+\s+(?:best|top|most|worst|cheapest|undervalued|overvalued|high[- ]?dividend|growth|value|small[- ]?cap)\b.*\bstock/i.test(headline.title)) {
+    return true;
+  }
+  // Pattern: "stocks to buy now", "stocks to watch", "stocks to sell"
+  if (/\bstocks?\s+to\s+(buy|sell|watch|avoid|own)\b/i.test(headline.title)) {
+    return true;
+  }
+  // Pattern: "best stocks under $N" or "top stocks for 2025"
+  if (/\b(best|top)\s+stocks?\s+(under|for|in|to)\b/i.test(headline.title)) {
+    return true;
+  }
+  // Pattern: "N ETFs/funds to buy/own/watch"
+  if (/\b\d+\s+\w+\s+(etfs?|funds?|reits?)\s+to\s+(buy|own|watch)\b/i.test(headline.title)) {
+    return true;
+  }
+  return false;
 }
 
 function compareHeadlineTimes(left: SnapshotHeadline, right: SnapshotHeadline): number {
