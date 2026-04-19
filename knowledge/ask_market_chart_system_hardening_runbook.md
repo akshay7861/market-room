@@ -34,6 +34,7 @@ Examples:
 - `WTI absolute vs inflation MoM%` -> `wti:level:left`, `cpi:mom_pct:right`
 - `WTI YoY% vs CPI index` -> `wti:yoy_pct:left`, `cpi:level:right`
 - `WTI vs SPY lagged 3 months` -> `wti:yoy_pct:left`, `spy:yoy_pct:right:lag3m`
+- `WTI leads inflation by 2 months` -> `wti:yoy_pct:left`, `cpi:yoy_pct:right:lag2m`
 
 The parser chooses the shortest phrase segment that contains each asset before applying transforms. This prevents duplicated thread text from leaking `YoY`/`MoM` from one side of a `vs` comparison into the other side.
 

@@ -1039,7 +1039,7 @@ export function buildChartDataFromIntent(intent: ChartIntent): ChartData | null 
     chartType: "line",
     series: [
       { key: "left", label: left.label, color: leftColorFor(left.key), unit: left.unit, yAxisId: "left" },
-      { key: "right", label: intent.lagMonths ? `${right.label} (+${intent.lagMonths}m)` : right.label, color: rightColorFor(right.key), unit: right.unit, yAxisId: dualAxis ? "right" : "left" }
+      { key: "right", label: rightIntent.lagMonths ? `${right.label} (+${rightIntent.lagMonths}m)` : right.label, color: rightColorFor(right.key), unit: right.unit, yAxisId: dualAxis ? "right" : "left" }
     ],
     yAxes: dualAxis
       ? [
@@ -1395,19 +1395,20 @@ function transformAliasPattern(transform: ChartTransform, asset: ChartAsset): Re
 
 function inferLaggedAsset(text: string, availableAssets: ChartAsset[]): ChartAsset | null {
   const lower = text.toLowerCase();
+  const segments = lower.replace(/\n+/g, " ").split(/\b(?:vs|versus|against|compared to|with)\b|[,;]/i);
+
   for (const asset of availableAssets) {
     const alias = assetAliasPattern(asset);
-    if (
-      new RegExp(`${alias.source}(?:\\W+\\w+){0,4}\\W+(?:lags?|lagged)`, "i").test(lower) ||
-      new RegExp(`(?:lag|lagged)\\W+${alias.source}`, "i").test(lower)
-    ) {
+    const segment = segments.find((item) => alias.test(item));
+    if (segment && /\b(lags?|lagged)\b/i.test(segment)) {
       return asset;
     }
   }
 
   for (const asset of availableAssets) {
     const alias = assetAliasPattern(asset);
-    if (new RegExp(`${alias.source}(?:\\W+\\w+){0,4}\\W+(?:leads?)`, "i").test(lower)) {
+    const segment = segments.find((item) => alias.test(item));
+    if (segment && /\b(leads?)\b/i.test(segment)) {
       return availableAssets.find((candidate) => candidate !== asset) || null;
     }
   }
@@ -1549,7 +1550,10 @@ function buildCorrelationHeatmapChart(start: string, end: string | undefined, wi
 function extractRequestedLagMonths(lowerQuestion: string): number {
   const match =
     lowerQuestion.match(/\blag(?:ged)?\s*(?:by|of)?\s*(\d{1,2})\s*(?:m|mo|month|months)\b/) ||
-    lowerQuestion.match(/\b(\d{1,2})\s*(?:m|mo|month|months)\s*lag\b/);
+    lowerQuestion.match(/\b(\d{1,2})\s*(?:m|mo|month|months)\s*lag\b/) ||
+    lowerQuestion.match(/\bleads?\s*(?:by|of)?\s*(\d{1,2})\s*(?:m|mo|month|months)\b/) ||
+    lowerQuestion.match(/\bleads?\b.{0,48}?\b(?:by|of)\s*(\d{1,2})\s*(?:m|mo|month|months)\b/) ||
+    lowerQuestion.match(/\b(\d{1,2})\s*(?:m|mo|month|months)\s*lead\b/);
   if (!match) return 0;
   const months = Number(match[1]);
   return Number.isFinite(months) ? Math.min(Math.max(months, 0), 12) : 0;
