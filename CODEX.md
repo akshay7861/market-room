@@ -51,6 +51,46 @@ Charts are computed from stored data-lake series only. Agents can explain the ch
 
 ---
 
+## 2026-04-19 — Ask Market Thread-Aware Chart Follow-Ups
+
+### Root cause
+
+Ask Market could render an initial deterministic chart, but follow-up requests such as `make it two axis`, `use absolute values`, or `show it again` were treated as ordinary text. The chart builder only inspected the latest user message, so follow-ups without the original subject (`WTI`, `CPI`, `SPY`) did not generate a fresh chart payload. The agent then described a chart that did not exist or claimed the old chart had a different axis setup.
+
+### Fix
+
+- Added thread-aware chart intent extraction.
+- Chart follow-ups now reuse the previous chart subject in the thread.
+- Added explicit chart modes:
+  - `yoy_same_axis`
+  - `yoy_dual_axis`
+  - `absolute_dual_axis`
+  - `correlation_heatmap`
+- Added CPI index-level support, so `WTI absolute values vs CPI absolute values in two axis` renders WTI `$ / bbl` against CPI index level.
+- Added chart payload validation before appending `%%CHART_DATA%%`.
+- Added chart prompt context so the agent knows exactly whether a chart will render and what axis setup it has.
+- Added chart logs:
+  - `[chart-intent] ...`
+  - `[chart-render] generated ...`
+  - `[chart-render] skipped ...`
+- Added frontend axis badges so the rendered chart visibly says `Left: ...` and `Right: ...`.
+
+### Expected behavior
+
+- `Plot WTI vs inflation over the last 10 years` -> WTI YoY% vs CPI YoY%, single axis.
+- `make it two axis` -> same WTI/CPI subject, WTI YoY% left axis and CPI YoY% right axis.
+- `make the chart as WTI absolute values vs CPI absolute values in two axis` -> WTI `$ / bbl` left axis and CPI index right axis.
+- `show it again` -> preserves the previous chart subject and mode.
+
+### Files changed
+
+- `apps/api/src/lib/services/historicalDataContextService.ts`
+- `apps/api/src/lib/services/marketQuestionsService.ts`
+- `apps/web/src/components/ChartBlock.tsx`
+- `apps/web/src/styles/global.css`
+
+---
+
 ## 2026-04-19 — Fed RSS Materiality + Anti-Repetition Gate
 
 ### Root cause

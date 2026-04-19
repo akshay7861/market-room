@@ -925,6 +925,18 @@ export function buildAnalogContextBlock(
 type ChartSeries = { key: string; label: string; color: string; unit?: string; yAxisId?: "left" | "right" };
 type ChartPoint = { date: string; [key: string]: number | string };
 type HeatmapCell = { row: string; column: string; value: number };
+type ChartMode = "yoy_same_axis" | "yoy_dual_axis" | "absolute_dual_axis" | "correlation_heatmap";
+type ChartPair = "wti_cpi" | "m1_cpi" | "wti_dollar" | "wti_spy" | "cross_asset";
+
+export type ChartIntent = {
+  pair: ChartPair;
+  mode: ChartMode;
+  lagMonths: number;
+  windowStart: string;
+  windowEnd?: string;
+  windowLabel: string;
+  sourceText: string;
+};
 
 export type ChartData = {
   title: string;
@@ -941,106 +953,141 @@ export type ChartData = {
 };
 
 export function buildChartDataFromQuestion(question: string): ChartData | null {
-  const lower = question.toLowerCase();
-  const asksForCorrelation = /\b(correlation|correlat|relationship|similarity|regression|chart|plot)\b/.test(lower);
-  const mentionsOil = /\b(wti|crude|oil)\b/.test(lower);
-  const mentionsInflation = /\b(cpi|inflation|headline inflation)\b/.test(lower);
-  const mentionsMoneySupply = /\b(m1|money supply|liquidity)\b/.test(lower);
-  const mentionsCrisis = /\b(2008|crisis|gfc|war|middle east|gulf war|iraq|iran|conflict)\b/.test(lower);
-  const mentionsFX = /\b(dollar|dxy|usd|fx|currency|eurusd|usdjpy|yen|euro|sterling|gbp|jpy)\b/.test(lower);
-  const mentionsEquities = /\b(spy|s&p|spx|equities|stocks|equity|stock market)\b/.test(lower);
-  const asksForHeatmap = /\b(heat.?map|correlation map|matrix|cross.?asset map)\b/.test(lower);
-  const asksForLevelOverlay = /\b(two axis|dual axis|overlay|level|price)\b/.test(lower);
-  const lagMonths = extractRequestedLagMonths(lower);
+  const intent = buildChartIntentFromQuestion(question);
+  return intent ? buildChartDataFromIntent(intent) : null;
+}
 
+export function buildChartIntentFromThread(messages: Array<{ role: string; content: string }>): ChartIntent | null {
+  const userMessages = messages.filter((message) => message.role === "user").map((message) => message.content);
+  const latest = userMessages[userMessages.length - 1] || "";
+  if (!latest.trim()) {
+    return null;
+  }
+
+  const latestHasChartIntent = hasChartRequestLanguage(latest) || hasChartModificationLanguage(latest);
+  if (!latestHasChartIntent) {
+    return null;
+  }
+
+  const baseMessage =
+    userMessages
+      .slice(0, -1)
+      .reverse()
+      .find((message) => Boolean(inferChartPair(message))) || latest;
+  const sourceText = `${latest}\n${baseMessage}`;
+  const modifierText = /\b(show it again|do it again|same chart|again)\b/i.test(latest)
+    ? sourceText
+    : latest;
+  return buildChartIntentFromQuestion(sourceText, modifierText);
+}
+
+export function buildChartDataFromIntent(intent: ChartIntent): ChartData | null {
+  if (intent.mode === "correlation_heatmap" || intent.pair === "cross_asset") {
+    return buildCorrelationHeatmapChart(intent.windowStart, intent.windowEnd, intent.windowLabel);
+  }
+
+  const left = leftSeriesForIntent(intent);
+  const right = rightSeriesForIntent(intent);
+  const points = alignedSeriesPoints(left, right, intent.windowStart, intent.windowEnd, intent.lagMonths);
+  if (points.length < 6) {
+    return null;
+  }
+
+  const dualAxis = intent.mode === "absolute_dual_axis" || intent.mode === "yoy_dual_axis";
+  const lagLabel = intent.lagMonths ? `, ${right.label} lagged ${intent.lagMonths}m` : "";
+  return {
+    title: `${left.label} vs ${right.label}${lagLabel} — ${intent.windowLabel}`,
+    subtitle: `Stored monthly data. Correlation: ${formatCorrelation(pearson(points))}.`,
+    chartType: "line",
+    series: [
+      { key: "left", label: left.label, color: leftColorFor(left.key), unit: left.unit, yAxisId: "left" },
+      { key: "right", label: intent.lagMonths ? `${right.label} (+${intent.lagMonths}m)` : right.label, color: rightColorFor(right.key), unit: right.unit, yAxisId: dualAxis ? "right" : "left" }
+    ],
+    yAxes: dualAxis
+      ? [
+          { id: "left", label: left.label, unit: left.unit },
+          { id: "right", label: right.label, unit: right.unit }
+        ]
+      : [{ id: "left", label: commonAxisLabelFor(left, right), unit: left.unit === right.unit ? left.unit : undefined }],
+    data: points.map((p) => ({ date: p.date.slice(0, 7), left: roundChartValue(p.left), right: roundChartValue(p.right) }))
+  };
+}
+
+export function validateChartData(data: ChartData | null): data is ChartData {
+  if (!data?.title) return false;
+  if (data.chartType === "heatmap") {
+    return Boolean(data.heatmap?.rows.length && data.heatmap.columns.length && data.heatmap.cells.length);
+  }
+  if (!data.series.length || data.data.length < 6) return false;
+  const firstPoint = data.data[0] || {};
+  return data.series.every((series) => series.key in firstPoint);
+}
+
+export function describeChartDataForPrompt(data: ChartData | null): string {
+  if (!validateChartData(data)) {
+    return "No chart will render for this answer.";
+  }
+  if (data.chartType === "heatmap") {
+    return [
+      "A computed chart WILL render below your answer.",
+      `Chart title: ${data.title}`,
+      "Chart type: red/green correlation heatmap.",
+      "Do not say you cannot plot or draw the chart. Refer to it as the chart below."
+    ].join("\n");
+  }
+  const axes = data.yAxes || [];
+  const axisLines = axes.map((axis) => `${axis.id === "left" ? "Left" : "Right"} axis: ${axis.label}${axis.unit ? ` (${axis.unit})` : ""}`);
+  return [
+    "A computed chart WILL render below your answer.",
+    `Chart title: ${data.title}`,
+    `Chart type: ${axes.length > 1 ? "dual-axis line chart" : "single-axis line chart"}.`,
+    ...axisLines,
+    "Do not say you cannot plot or draw the chart. Do not describe a different axis setup. Refer to it as the chart below."
+  ].join("\n");
+}
+
+function buildChartIntentFromQuestion(question: string, modifierText = question): ChartIntent | null {
+  const lower = question.toLowerCase();
+  const modifier = modifierText.toLowerCase();
+  const mentionsCrisis = /\b(2008|crisis|gfc|war|middle east|gulf war|iraq|iran|conflict)\b/.test(lower);
+  const pair = inferChartPair(lower);
+  if (!pair) {
+    return null;
+  }
   const windowStart = mentionsCrisis ? "2007-01" : tenYearsAgo();
   const windowEnd = mentionsCrisis ? "2009-12" : undefined;
   const windowLabel = mentionsCrisis ? "2007–2009 crisis window" : "last 10 years";
+  const wantsHeatmap = /\b(heat.?map|correlation map|matrix|cross.?asset map)\b/.test(modifier);
+  const wantsAbsolute = /\b(absolute|level|price|index level|cpi index)\b/.test(modifier);
+  const wantsDualAxis = /\b(two axis|dual axis|primary|secondary|separate axis|separate axes)\b/.test(modifier);
+  const mode: ChartMode =
+    wantsHeatmap || pair === "cross_asset"
+      ? "correlation_heatmap"
+      : wantsAbsolute
+        ? "absolute_dual_axis"
+        : wantsDualAxis
+          ? "yoy_dual_axis"
+          : "yoy_same_axis";
 
-  if (asksForHeatmap) {
-    return buildCorrelationHeatmapChart(windowStart, windowEnd, windowLabel);
-  }
-
-  if (asksForCorrelation && mentionsOil && mentionsInflation) {
-    const points = asksForLevelOverlay
-      ? alignedSeriesPoints(seriesDefinition("wti_price"), seriesDefinition("cpi_yoy"), windowStart, windowEnd, lagMonths)
-      : alignedSeriesPoints(seriesDefinition("wti_yoy"), seriesDefinition("cpi_yoy"), windowStart, windowEnd, lagMonths);
-    if (points.length < 6) return null;
-    return {
-      title: `${asksForLevelOverlay ? "WTI price" : "WTI YoY%"} vs CPI YoY%${lagMonths ? `, CPI lagged ${lagMonths}m` : ""} — ${windowLabel}`,
-      subtitle: `Stored monthly data. Correlation: ${formatCorrelation(pearson(points))}.`,
-      chartType: "line",
-      series: [
-        { key: "left", label: asksForLevelOverlay ? "WTI $/bbl" : "WTI YoY%", color: "#d97706", unit: asksForLevelOverlay ? "$/bbl" : "%", yAxisId: "left" },
-        { key: "right", label: lagMonths ? `CPI YoY% (+${lagMonths}m)` : "CPI YoY%", color: "#2563eb", unit: "%", yAxisId: asksForLevelOverlay ? "right" : "left" }
-      ],
-      yAxes: asksForLevelOverlay
-        ? [
-            { id: "left", label: "WTI price", unit: "$/bbl" },
-            { id: "right", label: "CPI YoY", unit: "%" }
-          ]
-        : [{ id: "left", label: "YoY change", unit: "%" }],
-      data: points.map((p) => ({ date: p.date.slice(0, 7), left: +p.left.toFixed(1), right: +p.right.toFixed(1) }))
-    };
-  }
-
-  if (asksForCorrelation && mentionsMoneySupply && mentionsInflation) {
-    const points = alignedSeriesPoints(seriesDefinition("m1_yoy"), seriesDefinition("cpi_yoy"), windowStart, windowEnd, lagMonths);
-    if (points.length < 6) return null;
-    return {
-      title: `M1 YoY% vs CPI YoY%${lagMonths ? `, CPI lagged ${lagMonths}m` : ""} — ${windowLabel}`,
-      subtitle: `Stored monthly data. Correlation: ${formatCorrelation(pearson(points))}.`,
-      chartType: "line",
-      series: [
-        { key: "left", label: "M1 YoY%", color: "#059669", unit: "%", yAxisId: "left" },
-        { key: "right", label: lagMonths ? `CPI YoY% (+${lagMonths}m)` : "CPI YoY%", color: "#2563eb", unit: "%", yAxisId: "left" }
-      ],
-      yAxes: [{ id: "left", label: "YoY change", unit: "%" }],
-      data: points.map((p) => ({ date: p.date.slice(0, 7), left: +p.left.toFixed(1), right: +p.right.toFixed(1) }))
-    };
-  }
-
-  if (asksForCorrelation && mentionsOil && mentionsFX) {
-    const points = alignedSeriesPoints(seriesDefinition("wti_yoy"), seriesDefinition("dollar_yoy"), windowStart, windowEnd, lagMonths);
-    if (points.length < 6) return null;
-    return {
-      title: `WTI YoY% vs Broad Dollar YoY%${lagMonths ? `, dollar lagged ${lagMonths}m` : ""} — ${windowLabel}`,
-      subtitle: `Stored monthly data. Correlation: ${formatCorrelation(pearson(points))}. Broad Dollar is the stored DXY proxy.`,
-      chartType: "line",
-      series: [
-        { key: "left", label: "WTI YoY%", color: "#d97706", unit: "%", yAxisId: "left" },
-        { key: "right", label: lagMonths ? `Broad Dollar YoY% (+${lagMonths}m)` : "Broad Dollar YoY%", color: "#0f766e", unit: "%", yAxisId: "left" }
-      ],
-      yAxes: [{ id: "left", label: "YoY change", unit: "%" }],
-      data: points.map((p) => ({ date: p.date.slice(0, 7), left: +p.left.toFixed(1), right: +p.right.toFixed(1) }))
-    };
-  }
-
-  if (asksForCorrelation && mentionsOil && mentionsEquities) {
-    const points = alignedSeriesPoints(seriesDefinition("wti_yoy"), seriesDefinition("spy_yoy"), windowStart, windowEnd, lagMonths);
-    if (points.length < 6) return null;
-    return {
-      title: `WTI YoY% vs SPY YoY%${lagMonths ? `, SPY lagged ${lagMonths}m` : ""} — ${windowLabel}`,
-      subtitle: `Stored monthly data. Correlation: ${formatCorrelation(pearson(points))}.`,
-      chartType: "line",
-      series: [
-        { key: "left", label: "WTI YoY%", color: "#d97706", unit: "%", yAxisId: "left" },
-        { key: "right", label: lagMonths ? `SPY YoY% (+${lagMonths}m)` : "SPY YoY%", color: "#16a34a", unit: "%", yAxisId: "left" }
-      ],
-      yAxes: [{ id: "left", label: "YoY change", unit: "%" }],
-      data: points.map((p) => ({ date: p.date.slice(0, 7), left: +p.left.toFixed(1), right: +p.right.toFixed(1) }))
-    };
-  }
-
-  return null;
+  return {
+    pair,
+    mode,
+    lagMonths: extractRequestedLagMonths(modifier) || extractRequestedLagMonths(lower),
+    windowStart,
+    windowEnd,
+    windowLabel,
+    sourceText: question
+  };
 }
 
 type StoredChartSeriesKey =
   | "wti_price"
   | "wti_yoy"
+  | "cpi_level"
   | "cpi_yoy"
   | "m1_yoy"
   | "dollar_yoy"
+  | "spy_price"
   | "spy_yoy"
   | "vix_level"
   | "hy_spread"
@@ -1052,12 +1099,16 @@ function seriesDefinition(key: StoredChartSeriesKey): { key: StoredChartSeriesKe
       return { key, label: "WTI $/bbl", data: toMonthlyMap(wtiMonthlySeries().observations), unit: "$/bbl" };
     case "wti_yoy":
       return { key, label: "WTI YoY%", data: yoyMap(toMonthlyMap(wtiMonthlySeries().observations)), unit: "%" };
+    case "cpi_level":
+      return { key, label: "CPI index", data: toMonthlyMap(cpiHeadlineSeries().observations), unit: "index" };
     case "cpi_yoy":
       return { key, label: "CPI YoY%", data: yoyMap(toMonthlyMap(cpiHeadlineSeries().observations)), unit: "%" };
     case "m1_yoy":
       return { key, label: "M1 YoY%", data: yoyMap(toMonthlyMap(m1MonthlySeries().observations)), unit: "%" };
     case "dollar_yoy":
       return { key, label: "Broad Dollar YoY%", data: yoyMap(toMonthlyMap(broadDollarSeries().observations)), unit: "%" };
+    case "spy_price":
+      return { key, label: "SPY price", data: toMonthlyMap(spyMonthlySeries().observations), unit: "index" };
     case "spy_yoy":
       return { key, label: "SPY YoY%", data: yoyMap(toMonthlyMap(spyMonthlySeries().observations)), unit: "%" };
     case "vix_level":
@@ -1067,6 +1118,82 @@ function seriesDefinition(key: StoredChartSeriesKey): { key: StoredChartSeriesKe
     case "us10y":
       return { key, label: "US 10Y yield", data: toMonthlyMap(us10ySeries().observations), unit: "%" };
   }
+}
+
+function leftSeriesForIntent(intent: ChartIntent): ReturnType<typeof seriesDefinition> {
+  switch (intent.pair) {
+    case "m1_cpi":
+      return seriesDefinition("m1_yoy");
+    case "wti_cpi":
+    case "wti_dollar":
+    case "wti_spy":
+    default:
+      return seriesDefinition(intent.mode === "absolute_dual_axis" ? "wti_price" : "wti_yoy");
+  }
+}
+
+function rightSeriesForIntent(intent: ChartIntent): ReturnType<typeof seriesDefinition> {
+  switch (intent.pair) {
+    case "wti_cpi":
+      return seriesDefinition(intent.mode === "absolute_dual_axis" ? "cpi_level" : "cpi_yoy");
+    case "m1_cpi":
+      return seriesDefinition("cpi_yoy");
+    case "wti_dollar":
+      return seriesDefinition("dollar_yoy");
+    case "wti_spy":
+      return seriesDefinition(intent.mode === "absolute_dual_axis" ? "spy_price" : "spy_yoy");
+    case "cross_asset":
+    default:
+      return seriesDefinition("cpi_yoy");
+  }
+}
+
+function inferChartPair(text: string): ChartPair | null {
+  const lower = text.toLowerCase();
+  if (/\b(heat.?map|correlation map|matrix|cross.?asset map)\b/.test(lower)) {
+    return "cross_asset";
+  }
+  const mentionsOil = /\b(wti|crude|oil)\b/.test(lower);
+  const mentionsInflation = /\b(cpi|inflation|headline inflation)\b/.test(lower);
+  const mentionsMoneySupply = /\b(m1|money supply|liquidity)\b/.test(lower);
+  const mentionsFX = /\b(dollar|dxy|usd|fx|currency|eurusd|usdjpy|yen|euro|sterling|gbp|jpy)\b/.test(lower);
+  const mentionsEquities = /\b(spy|s&p|spx|equities|stocks|equity|stock market)\b/.test(lower);
+
+  if (mentionsOil && mentionsInflation) return "wti_cpi";
+  if (mentionsMoneySupply && mentionsInflation) return "m1_cpi";
+  if (mentionsOil && mentionsFX) return "wti_dollar";
+  if (mentionsOil && mentionsEquities) return "wti_spy";
+  return null;
+}
+
+function hasChartRequestLanguage(text: string): boolean {
+  return /\b(correlation|correlat|relationship|similarity|regression|chart|plot|draw|graph|visuali[sz]e|heat.?map)\b/i.test(text);
+}
+
+function hasChartModificationLanguage(text: string): boolean {
+  return /\b(two axis|dual axis|primary|secondary|absolute|level|price|index level|lag(?:ged)?|show it again|do it again|same chart|make it|chart as)\b/i.test(text);
+}
+
+function leftColorFor(key: StoredChartSeriesKey): string {
+  if (key.startsWith("wti")) return "#d97706";
+  if (key.startsWith("m1")) return "#059669";
+  return "#64748b";
+}
+
+function rightColorFor(key: StoredChartSeriesKey): string {
+  if (key.startsWith("cpi")) return "#2563eb";
+  if (key.startsWith("dollar")) return "#0f766e";
+  if (key.startsWith("spy")) return "#16a34a";
+  return "#7c3aed";
+}
+
+function commonAxisLabelFor(left: ReturnType<typeof seriesDefinition>, right: ReturnType<typeof seriesDefinition>): string {
+  if (left.unit === "%" && right.unit === "%") return "YoY change";
+  return `${left.label} / ${right.label}`;
+}
+
+function roundChartValue(value: number): number {
+  return +value.toFixed(Math.abs(value) >= 100 ? 0 : 1);
 }
 
 function alignedSeriesPoints(

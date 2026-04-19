@@ -30,6 +30,15 @@ export function ChartBlock({ data }: Props) {
     <div className="chart-block">
       <p className="chart-block__title">{data.title}</p>
       {data.subtitle ? <p className="chart-block__subtitle">{data.subtitle}</p> : null}
+      {data.yAxes?.length ? (
+        <div className="chart-block__axes" aria-label="Chart axes">
+          {data.yAxes.map((axis) => (
+            <span key={axis.id} className={`chart-block__axis chart-block__axis--${axis.id}`}>
+              {axis.id === "left" ? "Left" : "Right"}: {axis.label}{axis.unit ? ` (${axis.unit})` : ""}
+            </span>
+          ))}
+        </div>
+      ) : null}
       <ResponsiveContainer width="100%" height={220}>
         <LineChart data={data.data} margin={{ top: 4, right: 12, left: 0, bottom: 4 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--panel-border)" />

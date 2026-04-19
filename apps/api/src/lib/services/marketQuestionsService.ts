@@ -23,7 +23,13 @@ import {
   buildEquityQuotePromptBlock,
   type EquityQuoteContext
 } from "./equityQuoteService";
-import { buildHistoricalDataPromptBlock, buildChartDataFromQuestion } from "./historicalDataContextService";
+import {
+  buildChartDataFromIntent,
+  buildChartIntentFromThread,
+  buildHistoricalDataPromptBlock,
+  describeChartDataForPrompt,
+  validateChartData
+} from "./historicalDataContextService";
 
 type RoutingBreakdown = {
   agent: Agent;
@@ -834,11 +840,25 @@ async function generateAgentQuestionReply(
     4
   );
   const dynamicMemory = await buildDynamicMemoryContext(env, agent);
-  const chartData = buildChartDataFromQuestion(latestQuestion);
+  const chartIntent = buildChartIntentFromThread(messages);
+  const chartDataCandidate = chartIntent ? buildChartDataFromIntent(chartIntent) : null;
+  const chartData = validateChartData(chartDataCandidate) ? chartDataCandidate : null;
+  if (chartIntent) {
+    console.log(
+      `[chart-intent] thread=${messages[0]?.threadId || "new"} pair=${chartIntent.pair} mode=${chartIntent.mode} lag=${chartIntent.lagMonths} chart=${chartData ? "generated" : "skipped"}`
+    );
+    if (chartData) {
+      console.log(
+        `[chart-render] generated title="${chartData.title}" points=${chartData.chartType === "heatmap" ? chartData.heatmap?.cells.length || 0 : chartData.data.length} axes=${chartData.yAxes?.map((axis) => axis.id).join(",") || "none"}`
+      );
+    } else {
+      console.log(`[chart-render] skipped reason=missing_or_invalid_data pair=${chartIntent.pair} mode=${chartIntent.mode}`);
+    }
+  }
 
   const content =
     isLlmConfigured(env)
-      ? await requestAgentQuestionReply(env, agent, messages, marketSnapshot, headlines, relevantCases, knowledgeSnippets, dynamicMemory, equityQuoteContext, Boolean(chartData))
+      ? await requestAgentQuestionReply(env, agent, messages, marketSnapshot, headlines, relevantCases, knowledgeSnippets, dynamicMemory, equityQuoteContext, describeChartDataForPrompt(chartData))
       : fallbackQuestionReply(agent, marketSnapshot, latestQuestion);
 
   const finalContent = chartData ? `${content}\n%%CHART_DATA%%${JSON.stringify(chartData)}` : content;
@@ -865,7 +885,7 @@ async function requestAgentQuestionReply(
   knowledgeSnippets: import("./knowledgeSnippetService").LocalKnowledgeSnippet[],
   dynamicMemory: import("@market-room/shared").DynamicMemoryContext,
   equityQuoteContext: EquityQuoteContext | null,
-  chartDataAvailable: boolean
+  chartPromptBlock: string
 ): Promise<string> {
   try {
     const payload = await generateGeminiContent(env, {
@@ -879,9 +899,7 @@ async function requestAgentQuestionReply(
         "Use actual available market context before agreeing with the user.",
         "Do not claim another agent is working behind the scenes. If a different specialist is needed, answer only if you are that selected agent; otherwise say the thread should be routed to that specialist.",
         "Do not invent exact correlations, charts, or backtest numbers. Use only supplied historical-data context for exact statistics, and say when a requested series is not currently available.",
-        chartDataAvailable
-          ? "The system will render a computed chart below your answer. Do not say you cannot plot or draw the chart. Refer to it as 'the chart below' and explain what it shows."
-          : "",
+        chartPromptBlock,
         "Be conversational and helpful, not defensive or robotic.",
         "Keep the reply under 220 words and end with one follow-up prompt or one next thing to watch."
       ].join("\n"),
