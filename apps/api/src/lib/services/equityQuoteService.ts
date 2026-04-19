@@ -36,6 +36,22 @@ type EquityFundamentals = {
   fiftyTwoWeekRange: string | null;
 };
 
+type EquityCatalystType =
+  | "single_company"
+  | "sector_or_industry"
+  | "index_or_factor"
+  | "macro_to_equity"
+  | "noise_or_listicle";
+
+type SubjectMatchConfidence = "explicit_symbol" | "exact_name" | "partial_name";
+
+type SubjectCompanyMatch = {
+  entry: EquityUniverseEntry;
+  score: number;
+  confidence: SubjectMatchConfidence;
+  matchedText: string;
+};
+
 const YF_CHART_BASE = "https://query1.finance.yahoo.com/v8/finance/chart";
 const YF_QUOTE_BASE = "https://query1.finance.yahoo.com/v7/finance/quote";
 const YF_SUMMARY_BASE = "https://query1.finance.yahoo.com/v10/finance/quoteSummary";
@@ -48,6 +64,47 @@ const quoteCache = new Map<string, { expiresAt: number; quote: EquityQuote }>();
 const fundamentalsCache = new Map<string, { expiresAt: number; data: EquityFundamentals | null }>();
 
 const EARNINGS_KEYWORDS = /\b(earnings|eps|revenue|beat|miss|guidance|quarter|q[1-4]|results|profit|loss|outlook|forecast)\b/i;
+
+const SINGLE_COMPANY_CATALYST_KEYWORDS =
+  /\b(earnings|eps|revenue|beat|miss|guidance|quarter|q[1-4]|results|profit|loss|outlook|forecast|upgrade|downgrade|rating|price target|target raise|target cut|dividend|buyback|repurchase|ceo|cfo|management|margin|margins|cost cut|cost cuts|layoff|layoffs|capex|restructuring|agm|egm|annual meeting|shareholder meeting|regulatory change|settlement|lawsuit|approval|contract|revenue target|growth cut|growth outlook)\b/i;
+
+const SECTOR_OR_INDUSTRY_KEYWORDS =
+  /\b(sector|industry|stocks?|equities|majors|banks?|semiconductors?|chips?|oilsands?|oil sands|energy equities|airlines?|retailers?|builders?|homebuilders?|software|hardware|automakers?|insurers?|financials?|cyclicals?|defensives?|small caps?|large caps?)\b/i;
+
+const INDEX_OR_FACTOR_KEYWORDS =
+  /\b(s&p|spx|sp 500|s&p 500|nasdaq|ndx|dow|russell|iwm|qqq|spy|index|indices|breadth|growth|value|momentum|quality|low vol|duration-sensitive|multiple compression|multiple expansion|leadership|rotation)\b/i;
+
+const MACRO_TO_EQUITY_KEYWORDS =
+  /\b(cpi|pce|payrolls?|nfp|unemployment|jobs?|wages?|fed|fomc|rates?|yields?|treasury|liquidity|dollar|dxy|credit|spreads?|oil|wti|brent|inflation|recession|growth scare|soft landing|hard landing|pmi|ism|tariff)\b/i;
+
+const COMPANY_SUFFIX_WORDS = new Set([
+  "inc", "incorporated", "corp", "corporation", "co", "company", "plc", "adr", "ads", "asa",
+  "se", "sa", "nv", "ag", "ltd", "limited", "holdings", "holding", "group", "lp", "llc",
+  "class", "ordinary", "shares", "common", "stock", "the"
+]);
+
+const GENERIC_COMPANY_WORDS = new Set([
+  "energy", "technologies", "technology", "industrial", "industrials", "resources", "capital",
+  "financial", "financials", "global", "international", "american", "national", "first",
+  "trust", "fund", "etf", "select", "sector", "spdr", "ishares", "invesco", "nasdaq"
+]);
+
+const KNOWN_COMPANY_ALIASES: Record<string, string[]> = {
+  "AMZN": ["amazon"],
+  "NFLX": ["netflix"],
+  "DAL": ["delta"],
+  "EQNR": ["equinor"],
+  "EQNR.OL": ["equinor"],
+  "AAOI": ["applied optoelectronics"],
+  "PARR": ["par pacific"],
+  "VSH": ["vishay", "vishay intertechnology"],
+  "FRU.TO": ["freehold royalties"],
+  "TSM": ["tsm", "tsmc", "taiwan semiconductor"],
+  "WMB": ["williams companies", "williams"],
+  "ET": ["energy transfer"],
+  "EPD": ["enterprise products"],
+  "MS": ["morgan stanley"]
+};
 
 const curatedEntries: EquityUniverseEntry[] = [
   { symbol: "TAN", bbg: "TAN US", ric: "TAN", name: "Invesco Solar ETF", region: "US" },
@@ -163,21 +220,51 @@ export async function buildEquityFundamentalsForPost(
   headlineTitle: string,
   sectorHeadlines: Array<{ title: string; description?: string | null }>
 ): Promise<string> {
-  // Combine top 3 headline titles for better signal
+  const primaryHeadline = sectorHeadlines.find((h) => h.title === headlineTitle) ?? sectorHeadlines[0];
+  const primaryText = [headlineTitle, primaryHeadline?.description || ""].filter(Boolean).join(" ");
   const combinedText = [
-    headlineTitle,
-    ...sectorHeadlines.slice(0, 2).map((h) => h.title)
+    primaryText,
+    ...sectorHeadlines
+      .filter((h) => h.title !== headlineTitle)
+      .slice(0, 2)
+      .map((h) => [h.title, h.description || ""].filter(Boolean).join(" "))
   ].join(" ");
 
-  const topCandidate = selectTopCandidate(combinedText);
-  if (!topCandidate) {
-    console.log(`[equity-fundamentals] no confident company match for headlines="${headlineTitle.slice(0, 80)}"`);
+  const subjectMatch = identifySubjectCompany(primaryText, combinedText);
+  const catalystType = classifyMarketRoomEquityCatalyst(primaryText, combinedText, subjectMatch);
+  const theme = detectTheme(primaryText);
+
+  if (theme && (!subjectMatch || !preferredThemeSymbols[theme]?.includes(subjectMatch.entry.symbol))) {
+    const rejectedSymbol = preferredThemeSymbols[theme]?.[0];
+    if (rejectedSymbol) {
+      console.log(
+        `[equity-catalyst] rejected_theme_only symbol=${rejectedSymbol} theme=${theme} reason=subject_not_named`
+      );
+    }
+  }
+
+  if (catalystType === "noise_or_listicle") {
+    console.log(`[equity-catalyst] type=noise_or_listicle no_single_stock=true headline="${headlineTitle.slice(0, 100)}"`);
     return "";
   }
 
-  const { entry, score } = topCandidate;
-  const isEarningsHeadline = EARNINGS_KEYWORDS.test(headlineTitle);
-  console.log(`[equity-fundamentals] matched ${entry.symbol} (${entry.name}) score=${score} earnings=${isEarningsHeadline}`);
+  if (catalystType !== "single_company") {
+    console.log(`[equity-catalyst] type=${catalystType} no_single_stock=true headline="${headlineTitle.slice(0, 100)}"`);
+    return buildEquityCatalystContextBlock(catalystType, headlineTitle);
+  }
+
+  if (!subjectMatch) {
+    console.log(
+      `[equity-fundamentals] skipped reason=unsafe_subject_match headline="${headlineTitle.slice(0, 100)}"`
+    );
+    return "";
+  }
+
+  const { entry, score, confidence, matchedText } = subjectMatch;
+  const isEarningsHeadline = EARNINGS_KEYWORDS.test(primaryText);
+  console.log(
+    `[equity-catalyst] type=single_company subject=${entry.name} symbol=${entry.symbol} confidence=${confidence} matched="${matchedText}" score=${score}`
+  );
 
   const fundamentals = await fetchEquityFundamentals(entry.symbol, entry.name, isEarningsHeadline);
   if (!fundamentals) {
@@ -185,7 +272,227 @@ export async function buildEquityFundamentalsForPost(
     return "";
   }
 
-  return formatFundamentalsBlock(fundamentals);
+  const block = formatFundamentalsBlock(fundamentals);
+  if (!block) {
+    console.log(`[equity-fundamentals] skipped reason=insufficient_fields symbol=${entry.symbol}`);
+    return "";
+  }
+
+  console.log(
+    `[equity-fundamentals] injected symbol=${entry.symbol} fields=${fundamentalFieldList(fundamentals).join(",")}`
+  );
+  return block;
+}
+
+function classifyMarketRoomEquityCatalyst(
+  primaryText: string,
+  combinedText: string,
+  subjectMatch: SubjectCompanyMatch | null
+): EquityCatalystType {
+  if (isMarketRoomListicle(primaryText)) {
+    return "noise_or_listicle";
+  }
+
+  if (subjectMatch) {
+    return "single_company";
+  }
+
+  if (SECTOR_OR_INDUSTRY_KEYWORDS.test(primaryText)) {
+    return "sector_or_industry";
+  }
+
+  if (INDEX_OR_FACTOR_KEYWORDS.test(primaryText)) {
+    return "index_or_factor";
+  }
+
+  if (MACRO_TO_EQUITY_KEYWORDS.test(primaryText) || MACRO_TO_EQUITY_KEYWORDS.test(combinedText)) {
+    return "macro_to_equity";
+  }
+
+  return "sector_or_industry";
+}
+
+function identifySubjectCompany(primaryText: string, combinedText: string): SubjectCompanyMatch | null {
+  const primaryMatch = identifySubjectCompanyInText(primaryText);
+  if (primaryMatch) return primaryMatch;
+
+  // Fallback to the combined top-headline slate only when the primary headline
+  // has single-company language but lacks the full name/ticker in the title.
+  if (!SINGLE_COMPANY_CATALYST_KEYWORDS.test(primaryText)) {
+    return null;
+  }
+  return identifySubjectCompanyInText(combinedText);
+}
+
+function identifySubjectCompanyInText(text: string): SubjectCompanyMatch | null {
+  const normalizedText = normalizeForCompanyMatch(text);
+  const explicitSymbols = extractExplicitSymbols(text);
+  const candidates: SubjectCompanyMatch[] = [];
+
+  for (const entry of equityUniverse) {
+    const symbol = entry.symbol.toUpperCase();
+    const bbgSymbol = entry.bbg.split(" ")[0]?.toUpperCase() || "";
+    const aliases = companyAliases(entry);
+
+    if (explicitSymbols.has(symbol) || (bbgSymbol && explicitSymbols.has(bbgSymbol))) {
+      candidates.push({
+        entry,
+        score: 220,
+        confidence: "explicit_symbol",
+        matchedText: explicitSymbols.has(symbol) ? symbol : bbgSymbol
+      });
+      continue;
+    }
+
+    const exactAlias = aliases.find((alias) => alias.kind === "exact" && normalizedText.includes(` ${alias.value} `));
+    if (exactAlias) {
+      candidates.push({
+        entry,
+        score: 180 + exactAlias.value.split(" ").length * 12,
+        confidence: "exact_name",
+        matchedText: exactAlias.value
+      });
+      continue;
+    }
+
+    const partialAlias = aliases.find((alias) => alias.kind === "partial" && normalizedText.includes(` ${alias.value} `));
+    if (partialAlias) {
+      candidates.push({
+        entry,
+        score: 120 + partialAlias.value.split(" ").length * 8,
+        confidence: "partial_name",
+        matchedText: partialAlias.value
+      });
+    }
+  }
+
+  if (candidates.length === 0) return null;
+  candidates.sort(compareSubjectMatches);
+  const best = candidates[0];
+  if (!best || best.score < 100) return null;
+  return best;
+}
+
+function compareSubjectMatches(left: SubjectCompanyMatch, right: SubjectCompanyMatch): number {
+  if (right.score !== left.score) return right.score - left.score;
+  const confidenceRank: Record<SubjectMatchConfidence, number> = {
+    explicit_symbol: 3,
+    exact_name: 2,
+    partial_name: 1
+  };
+  const confidenceDelta = confidenceRank[right.confidence] - confidenceRank[left.confidence];
+  if (confidenceDelta !== 0) return confidenceDelta;
+
+  const leftIsUs = left.entry.region.toUpperCase() === "US" ? 1 : 0;
+  const rightIsUs = right.entry.region.toUpperCase() === "US" ? 1 : 0;
+  if (rightIsUs !== leftIsUs) return rightIsUs - leftIsUs;
+
+  const leftHasDot = left.entry.symbol.includes(".") ? 1 : 0;
+  const rightHasDot = right.entry.symbol.includes(".") ? 1 : 0;
+  if (leftHasDot !== rightHasDot) return leftHasDot - rightHasDot;
+
+  return left.entry.symbol.length - right.entry.symbol.length;
+}
+
+function companyAliases(entry: EquityUniverseEntry): Array<{ value: string; kind: "exact" | "partial" }> {
+  const aliases = new Map<string, "exact" | "partial">();
+  const add = (value: string, kind: "exact" | "partial") => {
+    const normalized = normalizeCompanyAlias(value);
+    if (!normalized || normalized.length < 3) return;
+    const existing = aliases.get(normalized);
+    if (existing === "exact") return;
+    aliases.set(normalized, kind);
+  };
+
+  add(entry.name, "exact");
+  add(entry.name.replace(/\([^)]*\)/g, " "), "exact");
+  for (const alias of KNOWN_COMPANY_ALIASES[entry.symbol.toUpperCase()] || []) {
+    add(alias, "exact");
+  }
+
+  const tokens = normalizeCompanyAlias(entry.name)
+    .split(" ")
+    .filter((token) => token && !COMPANY_SUFFIX_WORDS.has(token));
+  const meaningfulTokens = tokens.filter((token) => !GENERIC_COMPANY_WORDS.has(token));
+
+  if (meaningfulTokens.length >= 2) {
+    add(meaningfulTokens.slice(0, 2).join(" "), "partial");
+  }
+  if (meaningfulTokens.length === 1 && meaningfulTokens[0].length >= 5) {
+    add(meaningfulTokens[0], "partial");
+  }
+
+  return [...aliases.entries()].map(([value, kind]) => ({ value, kind }));
+}
+
+function normalizeCompanyAlias(value: string): string {
+  const tokens = value
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/\([^)]*\)/g, " ")
+    .replace(/[^a-z0-9\s.]/g, " ")
+    .replace(/\bcom\b/g, " ")
+    .split(/\s+/)
+    .map((token) => token.trim().replace(/\.$/, ""))
+    .filter((token) => token && !COMPANY_SUFFIX_WORDS.has(token));
+  return tokens.join(" ").trim();
+}
+
+function normalizeForCompanyMatch(value: string): string {
+  return ` ${value
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9\s.]/g, " ")
+    .replace(/\bcom\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()} `;
+}
+
+function isMarketRoomListicle(text: string): boolean {
+  return (
+    /\b\d+\s+(?:best|top|most|worst|cheapest|undervalued|overvalued|high[- ]?dividend|growth|value|small[- ]?cap)\b.*\bstock/i.test(text) ||
+    /\bstocks?\s+to\s+(buy|sell|watch|avoid|own)\b/i.test(text) ||
+    /\b(best|top)\s+stocks?\s+(under|for|in|to)\b/i.test(text) ||
+    /\b\d+\s+\w+\s+(etfs?|funds?|reits?)\s+to\s+(buy|own|watch)\b/i.test(text)
+  );
+}
+
+function buildEquityCatalystContextBlock(type: Exclude<EquityCatalystType, "single_company" | "noise_or_listicle">, headlineTitle: string): string {
+  const instructions: Record<typeof type, string[]> = {
+    sector_or_industry: [
+      "This is a sector/industry catalyst, not a single-company catalyst.",
+      "Do not pretend one ticker is the article subject. Discuss representative names only as examples.",
+      "Frame the view through sector earnings sensitivity, margins, valuation, leadership, and confirmation data."
+    ],
+    index_or_factor: [
+      "This is an index/factor catalyst, not a single-company catalyst.",
+      "Frame the view through breadth, multiple expansion/compression, growth vs value, duration exposure, and liquidity.",
+      "Do not inject or invent company-specific fundamentals."
+    ],
+    macro_to_equity: [
+      "This is a macro-to-equity catalyst, not a single-company catalyst.",
+      "Frame the view through rates, growth, liquidity, earnings expectations, and sector winners/losers.",
+      "Do not force a stock-specific view unless a named company is the actual subject."
+    ]
+  };
+
+  return [
+    `## Equity Catalyst Context — ${type.replace(/_/g, " ")}`,
+    `Primary headline: ${headlineTitle}`,
+    ...instructions[type]
+  ].join("\n");
+}
+
+function fundamentalFieldList(f: EquityFundamentals): string[] {
+  return [
+    f.marketCap ? "marketCap" : null,
+    f.peTrailing ? "peTrailing" : null,
+    f.peForward ? "peForward" : null,
+    f.epsTrailing ? "epsTrailing" : null,
+    f.epsEstimate ? "epsEstimate" : null,
+    f.revenueEstimate ? "revenueEstimate" : null,
+    f.fiftyTwoWeekRange ? "fiftyTwoWeekRange" : null
+  ].filter((field): field is string => Boolean(field));
 }
 
 // ─── Universe candidate selection ─────────────────────────────────────────────
@@ -564,7 +871,7 @@ function extractExplicitSymbols(question: string): Set<string> {
     "ETF", "ETFS", "WTI", "DXY", "CPI", "PCE", "FED", "US", "UK", "AI",
     "GDP", "PMI", "ISM", "IPO", "CEO", "CFO", "COO", "BOJ", "ECB", "IMF",
     "EST", "BPS", "YOY", "QOQ", "TTM", "EPS", "REV", "NII", "NIM", "NFP",
-    "EM", "FX", "HY", "IG", "PE", "VC", "RV", "IV", "ATH", "ATL"
+    "EM", "FX", "HY", "IG", "PE", "VC", "RV", "IV", "ATH", "ATL", "AGM", "EGM"
   ]);
   const matches = question.match(/\b[A-Z]{1,5}(?:\.[A-Z]{1,3})?\b/g) || [];
   return new Set(matches.filter((match) => !excluded.has(match)).map((match) => match.toUpperCase()));

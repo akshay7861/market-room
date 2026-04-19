@@ -5,6 +5,32 @@ Each session appends a dated entry. Read the most recent entries first.
 
 ---
 
+## 2026-04-19 — Market Room Equities Subject-First Fundamentals
+
+### What changed
+
+**`equityQuoteService.ts` — Market Room-only safety refactor:**
+- `buildEquityFundamentalsForPost()` now classifies the autonomous Equities catalyst before trying to identify a stock.
+- Catalyst types: `single_company`, `sector_or_industry`, `index_or_factor`, `macro_to_equity`, `noise_or_listicle`.
+- Single-company fundamentals now require subject identity from explicit ticker, exact company name, or strong partial company-name match.
+- Theme baskets (`green_energy`, `ai_infrastructure`, `banks`, etc.) remain available for Ask Market discovery, but cannot create a Market Room stock-specific fundamentals block by themselves.
+- Sector/index/macro equity catalysts now inject a short equity-context block instead of forcing one company’s fundamentals.
+- `AGM` and `EGM` added to explicit-symbol exclusions so governance headlines do not resolve to unrelated tickers.
+
+### Specific false positives addressed
+- Equinor + renewable context must not resolve to FSLR.
+- Applied Optoelectronics + datacenter context must not resolve to NVDA.
+- Vishay AGM must not parse AGM as an Agilent/other ticker.
+
+### New logs
+- `[equity-catalyst] type=single_company ...`
+- `[equity-catalyst] type=sector_or_industry no_single_stock=true ...`
+- `[equity-catalyst] rejected_theme_only ...`
+- `[equity-fundamentals] injected symbol=... fields=...`
+- `[equity-fundamentals] skipped reason=unsafe_subject_match`
+
+---
+
 ## 2026-04-19 — Equity Fundamentals + Ticker Validation (commit 09e1423)
 
 ### What was added
