@@ -52,6 +52,10 @@ type SubjectCompanyMatch = {
   matchedText: string;
 };
 
+type SubjectCompanyMatchOptions = {
+  allowPartialNameMatch: boolean;
+};
+
 const YF_CHART_BASE = "https://query1.finance.yahoo.com/v8/finance/chart";
 const YF_QUOTE_BASE = "https://query1.finance.yahoo.com/v7/finance/quote";
 const YF_SUMMARY_BASE = "https://query1.finance.yahoo.com/v10/finance/quoteSummary";
@@ -89,10 +93,36 @@ const GENERIC_COMPANY_WORDS = new Set([
   "trust", "fund", "etf", "select", "sector", "spdr", "ishares", "invesco", "nasdaq"
 ]);
 
+const AMBIGUOUS_SUBJECT_ALIASES = new Set([
+  "dow",
+  "nasdaq",
+  "nyse",
+  "tsx",
+  "occ",
+  "td",
+  "bnp",
+  "jd",
+  "a"
+]);
+
+const MARKET_ROOM_SYMBOL_EXCLUSIONS = new Set([
+  "AGM",
+  "EGM",
+  "JD",
+  "TD",
+  "BNP",
+  "OCC",
+  "NYSE",
+  "NASDAQ",
+  "TSX",
+  "DOW"
+]);
+
 const KNOWN_COMPANY_ALIASES: Record<string, string[]> = {
   "AMZN": ["amazon"],
   "NFLX": ["netflix"],
   "DAL": ["delta"],
+  "META": ["meta", "meta platforms", "facebook"],
   "EQNR": ["equinor"],
   "EQNR.OL": ["equinor"],
   "AAOI": ["applied optoelectronics"],
@@ -114,7 +144,8 @@ const curatedEntries: EquityUniverseEntry[] = [
   { symbol: "XOP", bbg: "XOP US", ric: "XOP", name: "SPDR S&P Oil & Gas Exploration & Production ETF", region: "US" },
   { symbol: "OIH", bbg: "OIH US", ric: "OIH", name: "VanEck Oil Services ETF", region: "US" },
   { symbol: "SHEL", bbg: "SHEL US", ric: "SHEL", name: "Shell PLC ADR", region: "US" },
-  { symbol: "TTE", bbg: "TTE US", ric: "TTE", name: "TotalEnergies SE ADR", region: "US" }
+  { symbol: "TTE", bbg: "TTE US", ric: "TTE", name: "TotalEnergies SE ADR", region: "US" },
+  { symbol: "BSVN", bbg: "BSVN US", ric: "BSVN.O", name: "Bank7 Corp", region: "US" }
 ];
 
 const equityUniverse = dedupeUniverse([...curatedEntries, ...rawUniverse]);
@@ -313,20 +344,28 @@ function classifyMarketRoomEquityCatalyst(
 }
 
 function identifySubjectCompany(primaryText: string, combinedText: string): SubjectCompanyMatch | null {
-  const primaryMatch = identifySubjectCompanyInText(primaryText);
+  const hasSingleCompanyLanguage = SINGLE_COMPANY_CATALYST_KEYWORDS.test(primaryText);
+  const primaryMatch = identifySubjectCompanyInText(primaryText, {
+    allowPartialNameMatch: hasSingleCompanyLanguage
+  });
   if (primaryMatch) return primaryMatch;
 
   // Fallback to the combined top-headline slate only when the primary headline
   // has single-company language but lacks the full name/ticker in the title.
-  if (!SINGLE_COMPANY_CATALYST_KEYWORDS.test(primaryText)) {
+  if (!hasSingleCompanyLanguage) {
     return null;
   }
-  return identifySubjectCompanyInText(combinedText);
+  return identifySubjectCompanyInText(combinedText, {
+    allowPartialNameMatch: true
+  });
 }
 
-function identifySubjectCompanyInText(text: string): SubjectCompanyMatch | null {
+function identifySubjectCompanyInText(
+  text: string,
+  options: SubjectCompanyMatchOptions
+): SubjectCompanyMatch | null {
   const normalizedText = normalizeForCompanyMatch(text);
-  const explicitSymbols = extractExplicitSymbols(text);
+  const explicitSymbols = extractMarketRoomSubjectSymbols(text);
   const candidates: SubjectCompanyMatch[] = [];
 
   for (const entry of equityUniverse) {
@@ -344,7 +383,11 @@ function identifySubjectCompanyInText(text: string): SubjectCompanyMatch | null 
       continue;
     }
 
-    const exactAlias = aliases.find((alias) => alias.kind === "exact" && normalizedText.includes(` ${alias.value} `));
+    const exactAlias = aliases.find((alias) =>
+      alias.kind === "exact" &&
+      !isAmbiguousSubjectAlias(alias.value, normalizedText) &&
+      normalizedText.includes(` ${alias.value} `)
+    );
     if (exactAlias) {
       candidates.push({
         entry,
@@ -355,7 +398,15 @@ function identifySubjectCompanyInText(text: string): SubjectCompanyMatch | null 
       continue;
     }
 
-    const partialAlias = aliases.find((alias) => alias.kind === "partial" && normalizedText.includes(` ${alias.value} `));
+    if (!options.allowPartialNameMatch) {
+      continue;
+    }
+
+    const partialAlias = aliases.find((alias) =>
+      alias.kind === "partial" &&
+      !isAmbiguousSubjectAlias(alias.value, normalizedText) &&
+      normalizedText.includes(` ${alias.value} `)
+    );
     if (partialAlias) {
       candidates.push({
         entry,
@@ -371,6 +422,16 @@ function identifySubjectCompanyInText(text: string): SubjectCompanyMatch | null 
   const best = candidates[0];
   if (!best || best.score < 100) return null;
   return best;
+}
+
+function isAmbiguousSubjectAlias(alias: string, normalizedText: string): boolean {
+  if (!AMBIGUOUS_SUBJECT_ALIASES.has(alias)) {
+    return false;
+  }
+
+  // Require explicit company wording for ambiguous single-token names. This
+  // blocks Dow Jones -> DOW Inc, NASDAQ:BSVN -> Nasdaq Inc, TD Cowen -> TD Bank.
+  return !normalizedText.includes(` ${alias} inc `) && !normalizedText.includes(` ${alias} corp `);
 }
 
 function compareSubjectMatches(left: SubjectCompanyMatch, right: SubjectCompanyMatch): number {
@@ -875,6 +936,52 @@ function extractExplicitSymbols(question: string): Set<string> {
   ]);
   const matches = question.match(/\b[A-Z]{1,5}(?:\.[A-Z]{1,3})?\b/g) || [];
   return new Set(matches.filter((match) => !excluded.has(match)).map((match) => match.toUpperCase()));
+}
+
+function extractMarketRoomSubjectSymbols(text: string): Set<string> {
+  const explicitSymbols = extractExplicitSymbols(text);
+  const allowed = new Set<string>();
+
+  for (const symbol of explicitSymbols) {
+    if (MARKET_ROOM_SYMBOL_EXCLUSIONS.has(symbol)) {
+      continue;
+    }
+
+    if (symbol.length === 1 && !hasStrongTickerContext(text, symbol)) {
+      continue;
+    }
+
+    if (isLikelyBrokerOrPersonContext(text, symbol)) {
+      continue;
+    }
+
+    allowed.add(symbol);
+  }
+
+  return allowed;
+}
+
+function hasStrongTickerContext(text: string, symbol: string): boolean {
+  const escaped = escapeRegex(symbol);
+  return (
+    new RegExp(`\\(${escaped}\\)`).test(text) ||
+    new RegExp(`\\b(?:NYSE|NASDAQ|Nasdaq|NasdaqGS|NasdaqCM|AMEX|LSE|TSX|ASX|HKEX|TSE)\\s*:\\s*${escaped}\\b`).test(text) ||
+    new RegExp(`\\$${escaped}\\b`).test(text)
+  );
+}
+
+function isLikelyBrokerOrPersonContext(text: string, symbol: string): boolean {
+  const escaped = escapeRegex(symbol);
+  const brokerOrSourcePattern = new RegExp(
+    `\\b${escaped}\\b\\s+(?:cowen|securities|capital|markets|analyst|analysts|research|upgrade|downgrade|raises?|cuts?|initiates?|reaffirms?)`,
+    "i"
+  );
+
+  return brokerOrSourcePattern.test(text);
+}
+
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function tokenize(value: string): string[] {

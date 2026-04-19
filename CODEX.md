@@ -5,6 +5,48 @@ Each session appends a dated entry. Read the most recent entries first.
 
 ---
 
+## 2026-04-19 — Equities Market Room Subject Disambiguation Pass
+
+### Root cause
+
+The first subject-first Equities catalyst logic fixed the biggest theme-basket mistakes (`Equinor -> FSLR`, `Applied Optoelectronics -> NVDA`), but backtesting old Market Room triggers exposed a second class of false positives: broker/source names and ambiguous market words could still resolve as the company subject.
+
+Examples:
+- `TD Cowen downgrade of Microsoft` could resolve to `TD`.
+- `BNP upgrade on Nvidia` could resolve to `BNP.PA`.
+- `Dow Jones` could resolve to `DOW`.
+- `NASDAQ:BSVN` could resolve to Nasdaq Inc rather than Bank7.
+- `JD Vance` could resolve to `JD`.
+- one-letter ticker `A` could be parsed from prose in a Vishay AGM headline.
+- generic `TSX oilsands major` could infer a single oilsands company from a partial word match.
+
+### Fix
+
+- Added Market Room-only strict subject-symbol extraction; Ask Market broad stock discovery remains unchanged.
+- Excluded broker/source/person/venue symbols from autonomous subject ownership: `JD`, `TD`, `BNP`, `OCC`, `NYSE`, `NASDAQ`, `TSX`, `DOW`, `AGM`, `EGM`.
+- One-letter tickers are accepted only with strong ticker context such as `(A)`, `$A`, or `NYSE:A`.
+- Ambiguous aliases such as `dow`, `nasdaq`, `td`, `bnp`, and `jd` cannot become subject matches unless explicit company wording is present.
+- Partial company-name matches are allowed only when the headline has single-company catalyst language; this blocks generic sector headlines like `TSX oilsands major` from forcing one stock.
+- Added `META` aliases for Meta/Facebook and a curated `BSVN` entry for Bank7, which was absent from the imported universe.
+
+### Backtest checkpoint
+
+Focused checkpoint on prior failure classes:
+- `BATL shares ... JD Vance` -> `BATL`
+- `TSX oilsands major` -> sector-level, no single-stock fundamentals
+- `Amazon ... Dow Jones` -> `AMZN`
+- `Vishay AGM` -> `VSH`
+- `TD Cowen downgrade of Microsoft` -> `MSFT`
+- `Bank7 Q1 (NASDAQ:BSVN)` -> `BSVN`
+- `Natural gas stocks to buy` -> `noise_or_listicle`, no fundamentals
+- `Meta job cuts` -> `META`
+
+### Files changed
+
+- `apps/api/src/lib/services/equityQuoteService.ts`
+
+---
+
 ## 2026-04-19 — FRED/EIA Removed From Catalyst Trigger Lane
 
 ### Root cause
