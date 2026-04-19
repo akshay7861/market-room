@@ -140,6 +140,8 @@ type PlannedForumEntry = {
   thesisWrite: ThesisWritePlan | null;
 };
 
+type CatalystFilterScope = "general" | "sector";
+
 export async function listAgents(env: Env): Promise<Agent[]> {
   return createRepositories(env).agents.list();
 }
@@ -265,27 +267,44 @@ export async function runMarketDiscussion(
     fetchMarketauxBriefing(env, activeAgents)
   ]);
 
-  const generalCatalystHeadlines = dedupeHeadlines([
+  const recentCatalystMessages = flattenThreadPosts(priorRoomThreads, 80);
+  const generalCatalystHeadlines = filterEligibleHeadlinesForAgent({
+    headlines: dedupeHeadlines([
+      ...marketauxBriefing.generalHeadlines,
+      ...yahooBriefing.generalHeadlines,
+      ...officialBriefing.generalHeadlines
+    ].filter((headline) => !isDataLakeOnlyHeadline(headline))),
+    recentMessages: recentCatalystMessages,
+    scope: "general"
+  });
+  const sectorHeadlinesByAgentId = new Map<string, SnapshotHeadline[]>();
+
+  for (const agent of activeAgents) {
+    // Priority order: Marketaux first, Yahoo second, high-tier official news last.
+    // Fed RSS low/medium items are already suppressed/context-only in officialCatalystService.
+    sectorHeadlinesByAgentId.set(
+      agent.id,
+      filterEligibleHeadlinesForAgent({
+        agent,
+        headlines: dedupeHeadlines([
+          ...(marketauxBriefing.headlinesByAgentId.get(agent.id) || []),
+          ...(yahooBriefing.headlinesByAgentId.get(agent.id) || []),
+          ...(officialBriefing.headlinesByAgentId.get(agent.id) || [])
+        ].filter((headline) => !isDataLakeOnlyHeadline(headline))),
+        recentMessages: recentCatalystMessages,
+        scope: "sector"
+      })
+    );
+  }
+
+  const rawGeneralCatalystCount = dedupeHeadlines([
     ...marketauxBriefing.generalHeadlines,
     ...officialBriefing.generalHeadlines,
     ...yahooBriefing.generalHeadlines
   ].filter((headline) => !isDataLakeOnlyHeadline(headline)));
-  const sectorHeadlinesByAgentId = new Map<string, SnapshotHeadline[]>();
-
-  for (const agent of activeAgents) {
-    // Marketaux headlines go first so analyzeTopHeadlinesForAgent prioritises them
-    sectorHeadlinesByAgentId.set(
-      agent.id,
-      dedupeHeadlines([
-        ...(marketauxBriefing.headlinesByAgentId.get(agent.id) || []),
-        ...(officialBriefing.headlinesByAgentId.get(agent.id) || []),
-        ...(yahooBriefing.headlinesByAgentId.get(agent.id) || [])
-      ].filter((headline) => !isDataLakeOnlyHeadline(headline)))
-    );
-  }
 
   console.log(
-    `[catalyst-source] market_room eligible=${generalCatalystHeadlines.length} marketaux=${marketauxBriefing.generalHeadlines.length} official_news=${officialBriefing.generalHeadlines.length} yahoo=${yahooBriefing.generalHeadlines.length} data_lake_sources=excluded`
+    `[catalyst-source] market_room eligible=${generalCatalystHeadlines.length}/${rawGeneralCatalystCount.length} marketaux=${marketauxBriefing.generalHeadlines.length} yahoo=${yahooBriefing.generalHeadlines.length} official_news_high=${officialBriefing.generalHeadlines.length} data_lake_sources=excluded`
   );
 
   const enrichedSnapshotPayload = mergeForumHeadlinesIntoSnapshot(
@@ -954,7 +973,7 @@ async function generateAgentForumPosts({
       candidateStance: stanceFor(agent),
       agentSector: agent.sector,
       agentRecentPosts: recentPosts,
-      roomRecentPosts: flattenThreadPosts(priorRoomThreads),
+      roomRecentPosts: flattenThreadPosts(priorRoomThreads, 24),
       agentState,
       roomCoverage,
       hasMeaningfulFreshSignal: topicPlan.hasMeaningfulFreshSignal,
@@ -964,7 +983,7 @@ async function generateAgentForumPosts({
     // Analyze top 3 sector headlines for this agent (heuristic, zero LLM calls).
     // Pass room-wide recent posts (not just this agent's) so isNewInformation is cross-agent aware:
     // if another agent already posted on NFP, this agent won't treat NFP as new information.
-    const roomWidePosts = flattenThreadPosts(priorRoomThreads).slice(0, 24); // 24 not 8 — deeper history
+    const roomWidePosts = flattenThreadPosts(priorRoomThreads, 24); // 24 not 8 — deeper history
     const topSectorHeadlines = (sectorHeadlinesByAgentId.get(agent.id) || []).slice(0, 3);
     const headlineAnalysis: HeadlineAnalysis | null = topSectorHeadlines.length > 0
       ? analyzeTopHeadlinesForAgent(topSectorHeadlines, agent, {
@@ -1057,10 +1076,19 @@ async function generateAgentForumPosts({
       headlineAnalysis
     });
 
+    const repetitionAdjustedDecision = applyRepeatedCatalystDecisionGate({
+      agent,
+      postingDecision: materialityAdjustedDecision,
+      headlineAnalysis,
+      topicPlan,
+      recentMessages: [...flattenThreadPosts(priorRoomThreads, 80), ...thisRunPosts],
+      recentAgentMessages: recentPosts
+    });
+
     // Pre-generate message ID so it can be linked in the decision log
     const willPost =
-      materialityAdjustedDecision.actionType === "new_post" ||
-      materialityAdjustedDecision.actionType === "update_existing";
+      repetitionAdjustedDecision.actionType === "new_post" ||
+      repetitionAdjustedDecision.actionType === "update_existing";
     const preGeneratedMessageId = willPost ? crypto.randomUUID() : null;
 
     // Log all decisions including silent ones (fire-and-forget)
@@ -1068,13 +1096,13 @@ async function generateAgentForumPosts({
       id: crypto.randomUUID(),
       agentId: agent.id,
       roomId,
-      actionType: materialityAdjustedDecision.actionType,
-      reasonCodes: materialityAdjustedDecision.reasonCodes,
-      noveltyScore: materialityAdjustedDecision.noveltyScore,
-      candidateThemeKey: materialityAdjustedDecision.suggestedTopic?.themeKey ?? null,
-      targetThesisId: materialityAdjustedDecision.targetThesisId,
+      actionType: repetitionAdjustedDecision.actionType,
+      reasonCodes: repetitionAdjustedDecision.reasonCodes,
+      noveltyScore: repetitionAdjustedDecision.noveltyScore,
+      candidateThemeKey: repetitionAdjustedDecision.suggestedTopic?.themeKey ?? null,
+      targetThesisId: repetitionAdjustedDecision.targetThesisId,
       messageId: preGeneratedMessageId,
-      decidedAt: materialityAdjustedDecision.decidedAt,
+      decidedAt: repetitionAdjustedDecision.decidedAt,
       headlineAnalysisJson: headlineAnalysis ? JSON.stringify(headlineAnalysis) : null
     });
 
@@ -1103,13 +1131,13 @@ async function generateAgentForumPosts({
     });
 
     const createdAt = offsetTimestamp(index * 3);
-    const isUpdate = materialityAdjustedDecision.actionType === "update_existing";
+    const isUpdate = repetitionAdjustedDecision.actionType === "update_existing";
     const thesisId =
-      materialityAdjustedDecision.targetThesisId ||
+      repetitionAdjustedDecision.targetThesisId ||
       topicPlan.matchedThesis?.id ||
       (isUpdate ? null : crypto.randomUUID());
     const parentPostId =
-      materialityAdjustedDecision.targetPostId ||
+      repetitionAdjustedDecision.targetPostId ||
       (isUpdate ? topicPlan.updateTargetPostId : null);
     const resolvedContent = trimToWordLimit(
       result?.content || fallbackForumPost(agent, marketSnapshot, previousSnapshot),
@@ -1130,10 +1158,10 @@ async function generateAgentForumPosts({
       titleFlags: titleResolution.flags,
       content: resolvedContent,
       hasStoredContext: knowledgeSnippets.length > 0,
-      postingDecision: materialityAdjustedDecision
+      postingDecision: repetitionAdjustedDecision
     });
     const postingDecisionWithQualityFlags: PostingDecision = {
-      ...materialityAdjustedDecision,
+      ...repetitionAdjustedDecision,
       qualityFlags: postQualityFlags
     };
 
@@ -1268,6 +1296,16 @@ async function generateAgentForumComments({
     });
 
     if (!commentEval.shouldComment) {
+      continue;
+    }
+
+    if (shouldSkipRepeatedComment({
+      responder,
+      post,
+      commentPurpose,
+      priorRoomThreads,
+      currentComments: comments.map((entry) => entry.message)
+    })) {
       continue;
     }
 
@@ -1570,8 +1608,8 @@ function checkMeaningfulFreshSignal(
   );
 }
 
-function flattenThreadPosts(threads: AgentDiscussionThread[]): AgentMessage[] {
-  return threads.flatMap((t) => [t.post, ...t.comments]).slice(0, 12);
+function flattenThreadPosts(threads: AgentDiscussionThread[], limit = 12): AgentMessage[] {
+  return threads.flatMap((t) => [t.post, ...t.comments]).slice(0, limit);
 }
 
 function findBestMatchingThesis(themeKey: string, recentTheses: Thesis[]): Thesis | null {
@@ -3331,6 +3369,241 @@ function dedupeHeadlines(headlines: SnapshotHeadline[]): SnapshotHeadline[] {
     seen.add(key);
     return true;
   });
+}
+
+function filterEligibleHeadlinesForAgent({
+  agent,
+  headlines,
+  recentMessages,
+  scope
+}: {
+  agent?: Agent;
+  headlines: SnapshotHeadline[];
+  recentMessages: AgentMessage[];
+  scope: CatalystFilterScope;
+}): SnapshotHeadline[] {
+  const eligible: SnapshotHeadline[] = [];
+  let skippedFirstTitle: string | null = null;
+
+  for (const [index, headline] of headlines.entries()) {
+    const repeat = findRecentCatalystRepeat({
+      key: headlineCatalystKey(headline),
+      recentMessages,
+      agentId: agent?.id,
+      roomLookbackHours: 48,
+      agentLookbackHours: 72
+    });
+
+    if (repeat) {
+      if (index === 0) {
+        skippedFirstTitle = headline.title;
+      }
+      console.log(
+        `[catalyst-filter] skipped repeated title="${truncateText(headline.title, 110)}" agent=${agent?.name || "room"} scope=${scope} matched=${repeat.matchScope} prior="${truncateText(repeat.message.title || repeat.message.catalyst || "", 90)}"`
+      );
+      continue;
+    }
+
+    eligible.push(headline);
+  }
+
+  if (skippedFirstTitle && eligible.length > 0) {
+    console.log(
+      `[catalyst-filter] selected alternate title="${truncateText(eligible[0].title, 110)}" source=${eligible[0].source} agent=${agent?.name || "room"} skipped="${truncateText(skippedFirstTitle, 90)}"`
+    );
+  }
+
+  return eligible;
+}
+
+function applyRepeatedCatalystDecisionGate({
+  agent,
+  postingDecision,
+  headlineAnalysis,
+  topicPlan,
+  recentMessages,
+  recentAgentMessages
+}: {
+  agent: Agent;
+  postingDecision: PostingDecision;
+  headlineAnalysis: HeadlineAnalysis | null;
+  topicPlan: AgentTopicPlan;
+  recentMessages: AgentMessage[];
+  recentAgentMessages: AgentMessage[];
+}): PostingDecision {
+  if (postingDecision.actionType !== "new_post" && postingDecision.actionType !== "update_existing") {
+    return postingDecision;
+  }
+
+  const catalystText =
+    headlineAnalysis?.headline_title ||
+    topicPlan.primary.catalyst ||
+    postingDecision.suggestedTopic?.catalyst ||
+    "";
+  const catalystKey = normalizeCatalystKey(catalystText);
+  if (!catalystKey) {
+    return postingDecision;
+  }
+
+  const agentRepeat = findRecentCatalystRepeat({
+    key: catalystKey,
+    recentMessages: recentAgentMessages,
+    agentId: agent.id,
+    roomLookbackHours: 72,
+    agentLookbackHours: 72
+  });
+  const roomRepeat = findRecentCatalystRepeat({
+    key: catalystKey,
+    recentMessages,
+    agentId: agent.id,
+    roomLookbackHours: 48,
+    agentLookbackHours: 72
+  });
+
+  const repeat = agentRepeat || roomRepeat;
+  if (!repeat) {
+    return postingDecision;
+  }
+
+  console.log(
+    `[catalyst-filter] decision_gate repeated title="${truncateText(catalystText, 110)}" agent=${agent.name} matched=${repeat.matchScope} prior="${truncateText(repeat.message.title || repeat.message.catalyst || "", 90)}"`
+  );
+
+  return {
+    ...postingDecision,
+    actionType: "stay_silent",
+    reasonCodes: [...postingDecision.reasonCodes, "repeated_catalyst_no_delta" as const]
+  };
+}
+
+function shouldSkipRepeatedComment({
+  responder,
+  post,
+  commentPurpose,
+  priorRoomThreads,
+  currentComments
+}: {
+  responder: Agent;
+  post: AgentMessage;
+  commentPurpose: CommentPurpose;
+  priorRoomThreads: AgentDiscussionThread[];
+  currentComments: AgentMessage[];
+}): boolean {
+  const targetKey = messageCatalystKey(post);
+  if (!targetKey) {
+    return false;
+  }
+
+  const existingThreadComments = priorRoomThreads.find((thread) => thread.post.id === post.id)?.comments || [];
+  const candidateMessages = [
+    ...existingThreadComments,
+    ...flattenThreadPosts(priorRoomThreads, 80),
+    ...currentComments
+  ].filter((message) => message.agentId === responder.id);
+  const repeat = findRecentCatalystRepeat({
+    key: targetKey,
+    recentMessages: candidateMessages,
+    agentId: responder.id,
+    roomLookbackHours: 72,
+    agentLookbackHours: 72
+  });
+
+  if (repeat) {
+    console.log(
+      `[catalyst-filter] skipped repeated comment title="${truncateText(post.title || post.catalyst || "", 110)}" agent=${responder.name} matched=${repeat.matchScope}`
+    );
+    return true;
+  }
+
+  const postAgeHours = ageHoursFor(post.createdAt);
+  if (commentPurpose === "confirm_existing_thesis" && postAgeHours > 6) {
+    console.log(
+      `[catalyst-filter] skipped confirm_existing_thesis without new catalyst title="${truncateText(post.title || post.catalyst || "", 110)}" agent=${responder.name}`
+    );
+    return true;
+  }
+
+  return false;
+}
+
+function findRecentCatalystRepeat({
+  key,
+  recentMessages,
+  agentId,
+  roomLookbackHours,
+  agentLookbackHours
+}: {
+  key: string;
+  recentMessages: AgentMessage[];
+  agentId?: string;
+  roomLookbackHours: number;
+  agentLookbackHours: number;
+}): { message: AgentMessage; matchScope: "agent" | "room" } | null {
+  if (!key) {
+    return null;
+  }
+
+  const nowMs = Date.now();
+  for (const message of recentMessages) {
+    const messageKey = messageCatalystKey(message);
+    if (!messageKey || !sameCatalystFamily(key, messageKey)) {
+      continue;
+    }
+
+    const createdAtMs = Date.parse(message.createdAt);
+    const ageHours = Number.isFinite(createdAtMs) ? Math.max(0, (nowMs - createdAtMs) / 3600000) : 0;
+    const isSameAgent = Boolean(agentId && message.agentId === agentId);
+    if (isSameAgent && ageHours <= agentLookbackHours) {
+      return { message, matchScope: "agent" };
+    }
+    if (ageHours <= roomLookbackHours) {
+      return { message, matchScope: "room" };
+    }
+  }
+
+  return null;
+}
+
+function ageHoursFor(createdAt: string): number {
+  const createdAtMs = Date.parse(createdAt);
+  return Number.isFinite(createdAtMs) ? Math.max(0, (Date.now() - createdAtMs) / 3600000) : 0;
+}
+
+function headlineCatalystKey(headline: SnapshotHeadline): string {
+  return normalizeCatalystKey(`${headline.title} ${headline.description || ""}`);
+}
+
+function messageCatalystKey(message: AgentMessage): string {
+  return normalizeCatalystKey(`${message.title || ""} ${message.catalyst || ""}`);
+}
+
+function normalizeCatalystKey(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/https?:\/\/\S+/g, " ")
+    .replace(/['’]s\b/g, "")
+    .replace(/\b(inc|incorporated|corp|corporation|co|company|companies|ltd|limited|plc|llc|group|holdings|bankshares|bancorp)\b/g, " ")
+    .replace(/\b(the|a|an|and|or|of|to|for|with|on|in|by|from|about|amid|over|after|before)\b/g, " ")
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function sameCatalystFamily(left: string, right: string): boolean {
+  if (!left || !right) {
+    return false;
+  }
+  if (left === right || left.includes(right) || right.includes(left)) {
+    return true;
+  }
+  const leftTokens = new Set(left.split(/\s+/).filter((token) => token.length > 3));
+  const rightTokens = new Set(right.split(/\s+/).filter((token) => token.length > 3));
+  if (leftTokens.size === 0 || rightTokens.size === 0) {
+    return false;
+  }
+  const overlap = [...leftTokens].filter((token) => rightTokens.has(token)).length;
+  const union = new Set([...leftTokens, ...rightTokens]).size;
+  return overlap / union >= 0.72;
 }
 
 function scoreHeadlineForKeywords(headline: SnapshotHeadline, keywords: string[]): number {

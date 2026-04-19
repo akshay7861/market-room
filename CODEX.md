@@ -5,6 +5,63 @@ Each session appends a dated entry. Read the most recent entries first.
 
 ---
 
+## 2026-04-19 — Fed RSS Materiality + Anti-Repetition Gate
+
+### Root cause
+
+Fed RSS was still treated as a first-class autonomous catalyst source after FRED/EIA were removed from the trigger lane. That allowed low-materiality supervisory items to create Market Room posts and comments:
+
+- `Federal Reserve Board issues enforcement action with Community Bankshares, Inc.`
+- `former employee of United Bank`
+- `Burke & Herbert application approval`
+- `Morgan Stanley Section 23A exemption`
+- `FedNow intermediaries proposal`
+
+Remote D1 confirmed this was a real production failure, not just a UI artifact:
+
+- `+178k NFP official print`: 136 messages
+- `Morgan Stanley Section 23A`: 34 messages
+- `former employee of United Bank`: 22 messages
+- `Community Bankshares`: 16 messages
+- `FedNow intermediaries`: 9 messages
+- `Burke & Herbert approval`: 7 messages
+
+### Fix
+
+- Added Fed RSS materiality tiering in `officialCatalystService.ts`.
+- Only `high` official headlines enter autonomous catalyst queues.
+- `medium` items are context-only and not eligible for autonomous Market Room posts.
+- `low` items are suppressed at source.
+- Reordered catalyst priority to `Marketaux -> Yahoo -> high-tier official news`.
+- Added normalized catalyst-family matching before headline analysis.
+- Added final direct-post safety gate for repeated catalyst families.
+- Added comment repetition gate so an agent cannot keep commenting on the same parent/catalyst family.
+- Added catalyst-filter logs for skipped repeated catalysts, low-materiality official suppression, and alternate headline selection.
+
+### Materiality behavior
+
+- `Community Bankshares enforcement` -> `low`, suppressed.
+- `former employee of United Bank` -> `low`, suppressed.
+- `Burke & Herbert approval` -> `low`, suppressed.
+- `Morgan Stanley Section 23A` -> `medium`, context-only.
+- `FedNow intermediaries` -> `medium`, context-only.
+- `discount-rate meeting minutes` -> `medium`, context-only.
+- `FOMC statement`, `FOMC minutes`, `SEP/economic projections`, and broad capital-framework proposals -> `high`, eligible.
+
+### Files changed
+
+- `apps/api/src/lib/services/officialCatalystService.ts`
+- `apps/api/src/lib/services/marketRoomService.ts`
+- `packages/shared/src/index.ts`
+
+### Validation
+
+- `npm run typecheck --workspace @market-room/api` passed.
+- `npm run build --workspace @market-room/api` passed (`wrangler deploy --dry-run`).
+- Backtest table showed the known repeated Fed RSS items now suppress/context-only correctly while true FOMC/capital-framework items remain eligible.
+
+---
+
 ## 2026-04-19 — Equities Market Room Subject Disambiguation Pass
 
 ### Root cause

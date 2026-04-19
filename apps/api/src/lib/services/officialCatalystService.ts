@@ -4,6 +4,13 @@ import type { Env } from "../../index";
 const fedRssUrl = "https://www.federalreserve.gov/feeds/press_all.xml";
 const treasuryPressUrl = "https://home.treasury.gov/news/press-releases";
 
+export type OfficialNewsMaterialityTier = "high" | "medium" | "low";
+
+export type OfficialNewsMateriality = {
+  tier: OfficialNewsMaterialityTier;
+  reason: string;
+};
+
 export async function fetchOfficialCatalystLayer(
   env: Env,
   agents: Agent[]
@@ -51,15 +58,66 @@ async function fetchFedHeadlines(): Promise<SnapshotHeadline[]> {
     }
 
     const xml = await response.text();
-    return extractRssItems(xml).slice(0, 6).map((item) => ({
-      title: item.title,
-      source: "Federal Reserve",
-      url: item.link,
-      publishedAt: item.pubDate
-    }));
+    const tierCounts: Record<OfficialNewsMaterialityTier, number> = {
+      high: 0,
+      medium: 0,
+      low: 0
+    };
+    const classified = extractRssItems(xml).slice(0, 14).map((item) => {
+      const headline: SnapshotHeadline = {
+        title: item.title,
+        source: "Federal Reserve",
+        url: item.link,
+        publishedAt: item.pubDate
+      };
+      const materiality = classifyOfficialNewsMateriality(headline);
+      tierCounts[materiality.tier] += 1;
+      if (materiality.tier !== "high") {
+        const logPrefix = materiality.tier === "low"
+          ? "[catalyst-filter] skipped low_materiality_official"
+          : "[official-news] context_only";
+        console.log(`${logPrefix} tier=${materiality.tier} reason=${materiality.reason} title="${truncateForLog(headline.title)}"`);
+      }
+      return { headline, materiality };
+    });
+
+    console.log(
+      `[official-news] fed_materiality high=${tierCounts.high} medium_context=${tierCounts.medium} low_suppressed=${tierCounts.low}`
+    );
+
+    return classified
+      .filter((item) => item.materiality.tier === "high")
+      .map((item) => item.headline)
+      .slice(0, 6);
   } catch {
     return [];
   }
+}
+
+export function classifyOfficialNewsMateriality(headline: SnapshotHeadline): OfficialNewsMateriality {
+  const text = `${headline.title} ${headline.description || ""}`.toLowerCase();
+
+  const isSystemicInstitution = /\b(goldman|morgan stanley|jpmorgan|jp morgan|citigroup|bank of america|wells fargo|deutsche bank|ubs|credit suisse|barclays|hsbc|bnpp|bnp paribas|soci[eé]t[eé] g[eé]n[eé]rale|standard chartered|industrial and commercial bank of china|icbc|gsib|g-sib)\b/i.test(text);
+
+  if (/\b(fomc statement|federal open market committee statement|minutes of the federal open market committee|economic projections|summary of economic projections|sep\b|monetary policy report)\b/i.test(text)) {
+    return { tier: "high", reason: "monetary_policy_core_release" };
+  }
+
+  if (/\b(stress tests?|ccar|capital framework|bank capital|liquidity rulemaking|liquidity rule|basel|emergency lending|liquidity facility|discount window policy|discount window program|standing repo facility|broad capital framework)\b/i.test(text)) {
+    return { tier: "high", reason: "systemic_capital_or_liquidity_framework" };
+  }
+
+  if (/\b(discount rate meetings?|discount-rate meetings?|fednow|tokeni[sz]ed securities|section 23a|proposal|request for comment|proposed rule)\b/i.test(text)) {
+    return { tier: "medium", reason: "official_context_no_immediate_market_trigger" };
+  }
+
+  if (/\b(termination|cease and desist|enforcement action|prohibition order|former employee|approval of application|applications? by|bank holding company|annual audited financial statements|financial statements)\b/i.test(text)) {
+    return isSystemicInstitution
+      ? { tier: "medium", reason: "systemic_institution_legal_or_plumbing_context" }
+      : { tier: "low", reason: "single_institution_or_routine_supervisory_item" };
+  }
+
+  return { tier: "low", reason: "unclassified_fed_release_not_autonomous_catalyst" };
 }
 
 async function fetchTreasuryHeadlines(): Promise<SnapshotHeadline[]> {
@@ -166,6 +224,11 @@ function decodeHtmlEntities(value: string): string {
     .replace(/&quot;/g, "\"")
     .replace(/&#039;/g, "'")
     .replace(/&nbsp;/g, " ");
+}
+
+function truncateForLog(value: string, maxLength = 120): string {
+  const normalized = value.replace(/\s+/g, " ").trim();
+  return normalized.length <= maxLength ? normalized : `${normalized.slice(0, maxLength - 1)}…`;
 }
 
 export function isDataLakeOnlyHeadline(headline: SnapshotHeadline): boolean {

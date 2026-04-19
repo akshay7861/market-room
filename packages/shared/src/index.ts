@@ -589,7 +589,12 @@ export type PostingReasonCode =
   // Macro materiality gate — agent silenced due to low novelty within cooldown window
   | "macro_low_novelty_cooldown"
   // Quality gate — prevents weak/noisy catalysts from being upgraded into forced views
-  | "weak_catalyst_materiality_gate";
+  | "weak_catalyst_materiality_gate"
+  // Official-news materiality and repetition gates
+  | "low_materiality_official_news"
+  | "repeated_catalyst_no_delta"
+  | "comment_repetition_gate"
+  | "alternate_catalyst_selected";
 
 export type PostQualityFlag =
   | "missing_title"
