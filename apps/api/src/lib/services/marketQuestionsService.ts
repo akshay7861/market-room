@@ -834,13 +834,13 @@ async function generateAgentQuestionReply(
     4
   );
   const dynamicMemory = await buildDynamicMemoryContext(env, agent);
+  const chartData = buildChartDataFromQuestion(latestQuestion);
 
   const content =
     isLlmConfigured(env)
-      ? await requestAgentQuestionReply(env, agent, messages, marketSnapshot, headlines, relevantCases, knowledgeSnippets, dynamicMemory, equityQuoteContext)
+      ? await requestAgentQuestionReply(env, agent, messages, marketSnapshot, headlines, relevantCases, knowledgeSnippets, dynamicMemory, equityQuoteContext, Boolean(chartData))
       : fallbackQuestionReply(agent, marketSnapshot, latestQuestion);
 
-  const chartData = buildChartDataFromQuestion(latestQuestion);
   const finalContent = chartData ? `${content}\n%%CHART_DATA%%${JSON.stringify(chartData)}` : content;
 
   return {
@@ -864,7 +864,8 @@ async function requestAgentQuestionReply(
   relevantCases: import("@market-room/shared").MarketCase[],
   knowledgeSnippets: import("./knowledgeSnippetService").LocalKnowledgeSnippet[],
   dynamicMemory: import("@market-room/shared").DynamicMemoryContext,
-  equityQuoteContext: EquityQuoteContext | null
+  equityQuoteContext: EquityQuoteContext | null,
+  chartDataAvailable: boolean
 ): Promise<string> {
   try {
     const payload = await generateGeminiContent(env, {
@@ -878,6 +879,9 @@ async function requestAgentQuestionReply(
         "Use actual available market context before agreeing with the user.",
         "Do not claim another agent is working behind the scenes. If a different specialist is needed, answer only if you are that selected agent; otherwise say the thread should be routed to that specialist.",
         "Do not invent exact correlations, charts, or backtest numbers. Use only supplied historical-data context for exact statistics, and say when a requested series is not currently available.",
+        chartDataAvailable
+          ? "The system will render a computed chart below your answer. Do not say you cannot plot or draw the chart. Refer to it as 'the chart below' and explain what it shows."
+          : "",
         "Be conversational and helpful, not defensive or robotic.",
         "Keep the reply under 220 words and end with one follow-up prompt or one next thing to watch."
       ].join("\n"),
