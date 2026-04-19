@@ -1324,7 +1324,11 @@ function segmentForAsset(text: string, asset: ChartAsset): string | null {
   const assetPattern = assetAliasPattern(asset);
   const normalized = text.toLowerCase().replace(/\n+/g, " ");
   const segments = normalized.split(/\b(?:vs|versus|against|compared to|with)\b|[,;]/i);
-  return segments.find((segment) => assetPattern.test(segment))?.trim() || null;
+  const matchingSegments = segments
+    .map((segment) => segment.trim())
+    .filter((segment) => assetPattern.test(segment))
+    .sort((a, b) => a.length - b.length);
+  return matchingSegments[0] || null;
 }
 
 function hasBroadMomRequest(text: string): boolean {

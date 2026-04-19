@@ -35,6 +35,8 @@ Examples:
 - `WTI YoY% vs CPI index` -> `wti:yoy_pct:left`, `cpi:level:right`
 - `WTI vs SPY lagged 3 months` -> `wti:yoy_pct:left`, `spy:yoy_pct:right:lag3m`
 
+The parser chooses the shortest phrase segment that contains each asset before applying transforms. This prevents duplicated thread text from leaking `YoY`/`MoM` from one side of a `vs` comparison into the other side.
+
 ## Supported chart families
 
 Currently supported:
