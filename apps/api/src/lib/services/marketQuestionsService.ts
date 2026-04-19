@@ -28,7 +28,8 @@ import {
   buildChartIntentFromThread,
   buildHistoricalDataPromptBlock,
   describeChartDataForPrompt,
-  validateChartData
+  validateChartData,
+  type ChartData
 } from "./historicalDataContextService";
 
 type RoutingBreakdown = {
@@ -861,7 +862,9 @@ async function generateAgentQuestionReply(
       ? await requestAgentQuestionReply(env, agent, messages, marketSnapshot, headlines, relevantCases, knowledgeSnippets, dynamicMemory, equityQuoteContext, describeChartDataForPrompt(chartData))
       : fallbackQuestionReply(agent, marketSnapshot, latestQuestion);
 
-  const finalContent = chartData ? `${content}\n%%CHART_DATA%%${JSON.stringify(chartData)}` : content;
+  const finalContent = chartData
+    ? `${sanitizeChartGroundedReply(content, chartData)}\n%%CHART_DATA%%${JSON.stringify(chartData)}`
+    : content;
 
   return {
     id: crypto.randomUUID(),
@@ -903,7 +906,7 @@ async function requestAgentQuestionReply(
         "Be conversational and helpful, not defensive or robotic.",
         "Keep the reply under 220 words and end with one follow-up prompt or one next thing to watch."
       ].join("\n"),
-      prompt: buildQuestionThreadPrompt(agent, messages, marketSnapshot, headlines, relevantCases, knowledgeSnippets, dynamicMemory, equityQuoteContext),
+      prompt: buildQuestionThreadPrompt(agent, messages, marketSnapshot, headlines, relevantCases, knowledgeSnippets, dynamicMemory, equityQuoteContext, chartPromptBlock),
       maxOutputTokens: equityQuoteContext ? 900 : 700,
       temperature: 0.3
     });
@@ -914,6 +917,44 @@ async function requestAgentQuestionReply(
   }
 }
 
+function sanitizeChartGroundedReply(content: string, chartData: ChartData): string {
+  const allowedLabels = new Set(chartData.series.map((series) => series.label.toLowerCase()));
+  const hasInventoryOrCurve = [...allowedLabels].some((label) =>
+    /inventory|curve|backwardation|contango|eia/.test(label)
+  );
+
+  const lines = content
+    .replace(/!\[[^\]]*]\([^)]*\)/g, "")
+    .split("\n");
+  const sanitized: string[] = [];
+  let skippingUnsupportedOverlayBlock = false;
+
+  for (const line of lines) {
+    const lower = line.toLowerCase();
+
+    if (!hasInventoryOrCurve && /\b(i['’]?ve also included|also included|included eia|included inventory|included .*curve|as overlays)\b/i.test(line)) {
+      skippingUnsupportedOverlayBlock = true;
+      continue;
+    }
+
+    if (skippingUnsupportedOverlayBlock) {
+      if (!line.trim() || !/^\s*[-*•]/.test(line)) {
+        skippingUnsupportedOverlayBlock = false;
+      } else {
+        continue;
+      }
+    }
+
+    if (!hasInventoryOrCurve && /\b(the chart|overlay|overlays).*\b(eia|inventory|inventories|curve structure|backwardation|contango)\b/i.test(lower)) {
+      continue;
+    }
+
+    sanitized.push(line);
+  }
+
+  return sanitized.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+
 function buildQuestionThreadPrompt(
   agent: Agent,
   messages: MarketQuestionMessage[],
@@ -922,7 +963,8 @@ function buildQuestionThreadPrompt(
   relevantCases: import("@market-room/shared").MarketCase[],
   knowledgeSnippets: import("./knowledgeSnippetService").LocalKnowledgeSnippet[],
   dynamicMemory: import("@market-room/shared").DynamicMemoryContext,
-  equityQuoteContext: EquityQuoteContext | null
+  equityQuoteContext: EquityQuoteContext | null,
+  chartPromptBlock: string = ""
 ): string {
   const relevantInstruments = relevantInstrumentsForQuestion(agent, marketSnapshot);
   const latestUserMessage = [...messages].reverse().find((message) => message.role === "user")?.content || "";
@@ -937,6 +979,7 @@ function buildQuestionThreadPrompt(
     headlines.length > 0 ? "Relevant headlines:" : "No fresh headlines available.",
     ...headlines.map((headline, index) => `${index + 1}. ${headline.title} (${headline.source})`),
     buildEquityQuotePromptBlock(equityQuoteContext),
+    chartPromptBlock ? `## Chart Rendering Context\n${chartPromptBlock}` : "",
     buildHistoricalDataPromptBlock(latestUserMessage),
     stockIdeaMode ? buildStockIdeaAnswerModeBlock(latestUserMessage) : "",
     buildDynamicMemoryPromptBlock(agent, dynamicMemory),

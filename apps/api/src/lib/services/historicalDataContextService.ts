@@ -535,6 +535,17 @@ function yoyMap(monthly: Map<string, number>): Map<string, number> {
   return map;
 }
 
+function momPctMap(monthly: Map<string, number>): Map<string, number> {
+  const map = new Map<string, number>();
+  for (const [month, value] of monthly) {
+    const prior = monthly.get(shiftMonth(month, -1));
+    if (typeof prior === "number" && prior !== 0) {
+      map.set(month, ((value - prior) / prior) * 100);
+    }
+  }
+  return map;
+}
+
 function shiftMonth(month: string, offset: number): string {
   const [year, monthNumber] = month.split("-").map(Number);
   const date = new Date(Date.UTC(year, monthNumber - 1 + offset, 1));
@@ -931,6 +942,7 @@ type ChartPair = "wti_cpi" | "m1_cpi" | "wti_dollar" | "wti_spy" | "cross_asset"
 export type ChartIntent = {
   pair: ChartPair;
   mode: ChartMode;
+  inflationMode?: "yoy" | "mom" | "level";
   lagMonths: number;
   windowStart: string;
   windowEnd?: string;
@@ -964,7 +976,14 @@ export function buildChartIntentFromThread(messages: Array<{ role: string; conte
     return null;
   }
 
-  const latestHasChartIntent = hasChartRequestLanguage(latest) || hasChartModificationLanguage(latest);
+  const priorChartModification = userMessages
+    .slice(0, -1)
+    .reverse()
+    .find((message) => hasChartRequestLanguage(message) || hasChartModificationLanguage(message));
+  const latestHasChartIntent =
+    hasChartRequestLanguage(latest) ||
+    hasChartModificationLanguage(latest) ||
+    (isAffirmativeChartFollowUp(latest) && Boolean(priorChartModification));
   if (!latestHasChartIntent) {
     return null;
   }
@@ -974,10 +993,10 @@ export function buildChartIntentFromThread(messages: Array<{ role: string; conte
       .slice(0, -1)
       .reverse()
       .find((message) => Boolean(inferChartPair(message))) || latest;
-  const sourceText = `${latest}\n${baseMessage}`;
+  const sourceText = `${latest}\n${priorChartModification || ""}\n${baseMessage}`;
   const modifierText = /\b(show it again|do it again|same chart|again)\b/i.test(latest)
     ? sourceText
-    : latest;
+    : `${latest}\n${priorChartModification || ""}`;
   return buildChartIntentFromQuestion(sourceText, modifierText);
 }
 
@@ -1072,6 +1091,7 @@ function buildChartIntentFromQuestion(question: string, modifierText = question)
   return {
     pair,
     mode,
+    inflationMode: inferInflationMode(modifier, lower, mode),
     lagMonths: extractRequestedLagMonths(modifier) || extractRequestedLagMonths(lower),
     windowStart,
     windowEnd,
@@ -1084,6 +1104,7 @@ type StoredChartSeriesKey =
   | "wti_price"
   | "wti_yoy"
   | "cpi_level"
+  | "cpi_mom"
   | "cpi_yoy"
   | "m1_yoy"
   | "dollar_yoy"
@@ -1101,6 +1122,8 @@ function seriesDefinition(key: StoredChartSeriesKey): { key: StoredChartSeriesKe
       return { key, label: "WTI YoY%", data: yoyMap(toMonthlyMap(wtiMonthlySeries().observations)), unit: "%" };
     case "cpi_level":
       return { key, label: "CPI index", data: toMonthlyMap(cpiHeadlineSeries().observations), unit: "index" };
+    case "cpi_mom":
+      return { key, label: "CPI MoM%", data: momPctMap(toMonthlyMap(cpiHeadlineSeries().observations)), unit: "%" };
     case "cpi_yoy":
       return { key, label: "CPI YoY%", data: yoyMap(toMonthlyMap(cpiHeadlineSeries().observations)), unit: "%" };
     case "m1_yoy":
@@ -1135,7 +1158,13 @@ function leftSeriesForIntent(intent: ChartIntent): ReturnType<typeof seriesDefin
 function rightSeriesForIntent(intent: ChartIntent): ReturnType<typeof seriesDefinition> {
   switch (intent.pair) {
     case "wti_cpi":
-      return seriesDefinition(intent.mode === "absolute_dual_axis" ? "cpi_level" : "cpi_yoy");
+      return seriesDefinition(
+        intent.inflationMode === "mom"
+          ? "cpi_mom"
+          : intent.inflationMode === "level" || intent.mode === "absolute_dual_axis"
+            ? "cpi_level"
+            : "cpi_yoy"
+      );
     case "m1_cpi":
       return seriesDefinition("cpi_yoy");
     case "wti_dollar":
@@ -1171,7 +1200,21 @@ function hasChartRequestLanguage(text: string): boolean {
 }
 
 function hasChartModificationLanguage(text: string): boolean {
-  return /\b(two axis|dual axis|primary|secondary|absolute|level|price|index level|lag(?:ged)?|show it again|do it again|same chart|make it|chart as)\b/i.test(text);
+  return /\b(two axis|dual axis|primary|secondary|absolute|level|price|index level|mom|m\/m|month.?over.?month|monthly %|lag(?:ged)?|show it again|do it again|same chart|make it|chart as|replace)\b/i.test(text);
+}
+
+function isAffirmativeChartFollowUp(text: string): boolean {
+  return /^\s*(yes|yeah|yep|please|ok|okay|do it|prepare|yes prepare|go ahead|show it)\s*[.!?]*\s*$/i.test(text);
+}
+
+function inferInflationMode(modifier: string, fullText: string, mode: ChartMode): "yoy" | "mom" | "level" {
+  if (/\b(mom|m\/m|m-o-m|month.?over.?month|monthly %|monthly percent)\b/i.test(`${modifier}\n${fullText}`)) {
+    return "mom";
+  }
+  if (/\b(cpi index|inflation index|index level)\b/i.test(`${modifier}\n${fullText}`)) {
+    return "level";
+  }
+  return mode === "absolute_dual_axis" ? "level" : "yoy";
 }
 
 function leftColorFor(key: StoredChartSeriesKey): string {

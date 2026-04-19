@@ -82,6 +82,13 @@ Ask Market could render an initial deterministic chart, but follow-up requests s
 - `make the chart as WTI absolute values vs CPI absolute values in two axis` -> WTI `$ / bbl` left axis and CPI index right axis.
 - `show it again` -> preserves the previous chart subject and mode.
 
+### Follow-up hardening
+
+- Added CPI month-over-month percent support (`CPI MoM%`) so requests such as `replace CPI index with CPI mom %` and `WTI absolute vs inflation MOM %` generate a real chart instead of prose only.
+- Affirmative follow-ups such as `yes prepare` now inherit the previous chart modification request.
+- The exact chart rendering context is now included in the user prompt body as well as model instructions.
+- Added a sanitizer that removes unsupported chart claims such as `I also included EIA inventory / WTI curve overlays` unless those series are actually present in the chart payload.
+
 ### Files changed
 
 - `apps/api/src/lib/services/historicalDataContextService.ts`
