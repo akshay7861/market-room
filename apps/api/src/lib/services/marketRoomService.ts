@@ -768,13 +768,21 @@ function buildDiscussionThreads(posts: AgentMessage[], comments: AgentMessage[])
   }
 
   return [...posts]
-    .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+    .sort((left, right) => latestThreadActivityAt(right, commentsByParent).localeCompare(latestThreadActivityAt(left, commentsByParent)))
     .map((post) => ({
       post,
       comments: [...(commentsByParent.get(post.id) || [])].sort((left, right) =>
         left.createdAt.localeCompare(right.createdAt)
       )
     }));
+}
+
+function latestThreadActivityAt(post: AgentMessage, commentsByParent: Map<string, AgentMessage[]>): string {
+  const latestCommentAt = (commentsByParent.get(post.id) || []).reduce(
+    (latest, comment) => (comment.createdAt > latest ? comment.createdAt : latest),
+    post.createdAt
+  );
+  return latestCommentAt;
 }
 
 function dedupeDisplayThreads(threads: AgentDiscussionThread[]): AgentDiscussionThread[] {

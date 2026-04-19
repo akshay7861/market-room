@@ -5,6 +5,21 @@ Each session appends a dated entry. Read the most recent entries first.
 
 ---
 
+## 2026-04-19 — Market Room Feed Freshness Fix
+
+### What was fixed
+
+Market Room was still generating hourly updates, but many were `update_existing` comments attached to older parent threads. The backend repository query already ordered parent threads by latest child activity, but `buildDiscussionThreads()` re-sorted them by the original parent post timestamp, hiding fresh updates under older thread dates.
+
+### Files changed
+- `apps/api/src/lib/services/marketRoomService.ts`
+
+### Result
+- Market Room threads now sort by latest activity across parent post + child comments.
+- Fresh thesis updates/comments should lift their parent thread back to the top of the public Market Room feed.
+
+---
+
 ## 2026-04-19 — Market Room Equities Subject-First Fundamentals
 
 ### What changed
