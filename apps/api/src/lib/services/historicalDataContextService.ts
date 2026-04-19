@@ -1200,7 +1200,7 @@ function hasChartRequestLanguage(text: string): boolean {
 }
 
 function hasChartModificationLanguage(text: string): boolean {
-  return /\b(two axis|dual axis|primary|secondary|absolute|level|price|index level|mom|m\/m|month.?over.?month|monthly %|lag(?:ged)?|show it again|do it again|same chart|make it|chart as|replace)\b/i.test(text);
+  return /\b(two axis|dual axis|primary|secondary|absolute|level|price|index level|mom|m\/m|month.?over.?month|monthly %|yoy|y\/y|y-o-y|year.?over.?year|year.?on.?year|annual %|annual percent|12.?month|lag(?:ged)?|show it again|do it again|same chart|make it|chart as|replace)\b/i.test(text);
 }
 
 function isAffirmativeChartFollowUp(text: string): boolean {
@@ -1208,10 +1208,18 @@ function isAffirmativeChartFollowUp(text: string): boolean {
 }
 
 function inferInflationMode(modifier: string, fullText: string, mode: ChartMode): "yoy" | "mom" | "level" {
-  if (/\b(mom|m\/m|m-o-m|month.?over.?month|monthly %|monthly percent)\b/i.test(`${modifier}\n${fullText}`)) {
+  const text = `${modifier}\n${fullText}`;
+
+  // Explicit transform requests must beat generic words such as "absolute".
+  // Example: "WTI absolute vs inflation YoY%" means WTI price vs CPI YoY,
+  // not WTI price vs CPI index.
+  if (/\b(mom|m\/m|m-o-m|month.?over.?month|monthly %|monthly percent)\b/i.test(text)) {
     return "mom";
   }
-  if (/\b(cpi index|inflation index|index level)\b/i.test(`${modifier}\n${fullText}`)) {
+  if (/\b(yoy|y\/y|y-o-y|year.?over.?year|year.?on.?year|annual inflation|annual %|annual percent|12.?month)\b/i.test(text)) {
+    return "yoy";
+  }
+  if (/\b(cpi index|inflation index|index level)\b/i.test(text)) {
     return "level";
   }
   return mode === "absolute_dual_axis" ? "level" : "yoy";

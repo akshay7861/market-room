@@ -443,6 +443,24 @@ Pass 2 (temp 0.72, 3000 tokens): writes full post defending it
 
 ## Architecture Reference
 
+## 2026-04-19 — Ask Market Chart Transform Precedence Fix
+
+### Problem
+- Ask Market correctly rendered `WTI absolute vs inflation MoM%`, but `WTI absolute vs inflation YoY%` incorrectly rendered CPI index level.
+- Root cause: chart intent parsing gave explicit `MoM` precedence, but did not give explicit `YoY` the same precedence. Generic words like `absolute` therefore forced inflation to `level`.
+
+### Fix
+- `historicalDataContextService.ts` now treats explicit transform words as stronger than generic chart-shape words:
+  - `MoM`, `month-over-month`, `monthly %` -> CPI MoM%.
+  - `YoY`, `Y/Y`, `year-over-year`, `year-on-year`, `annual %`, `12-month` -> CPI YoY%.
+  - `CPI index`, `inflation index`, `index level` -> CPI index level.
+- `YoY` terms now also count as chart modification language, so follow-ups like "make it YoY instead" keep the chart path active.
+
+### Expected behavior
+- `WTI absolute vs inflation YoY%` -> WTI $/bbl on left axis, CPI YoY% on right axis.
+- `WTI absolute vs inflation MoM%` -> WTI $/bbl on left axis, CPI MoM% on right axis.
+- `WTI absolute vs inflation` with no explicit transform -> WTI $/bbl and CPI index level.
+
 | Layer | Technology | Location |
 |-------|-----------|---------|
 | Backend | Cloudflare Workers | `apps/api` |
