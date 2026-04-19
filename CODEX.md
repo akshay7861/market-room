@@ -5,6 +5,27 @@ Each session appends a dated entry. Read the most recent entries first.
 
 ---
 
+## 2026-04-19 — Stale Official Print Repetition Guard
+
+### Root cause
+
+The official FRED catalyst layer re-emits durable monthly/latest observations every scheduled run, e.g. `Nonfarm payrolls latest official print: +178 jobs change context (2026-03-01)`.
+
+Headline analysis correctly marked repeated NFP prints as `is_new_information=false`, but `postingDecisionService.ts` had an exception: stale headline + matched thesis → `update_existing`. That was useful for evolving stories, but it let unchanged official prints repeatedly update old Risk/Sentiment/Macro theses.
+
+This was not a vector, memory-size, or knowledge-base shortage problem. The memory/thesis layer was doing its job by matching existing theses; the posting gate was too permissive for unchanged official data prints.
+
+### Fix
+- Added `stale_official_print_no_update` posting reason.
+- If a headline is not new and matches `latest official print` for durable data (`NFP/payrolls`, `Fed funds`, `CPI`, `PCE`, `unemployment rate`, `US 10Y Treasury`), it now stays silent before the matched-thesis update branch.
+- Official prints can still be used as background context and can still post when the observation is genuinely new.
+
+### Files changed
+- `apps/api/src/lib/services/postingDecisionService.ts`
+- `packages/shared/src/index.ts`
+
+---
+
 ## 2026-04-19 — Market Room Feed Freshness Fix
 
 ### What was fixed

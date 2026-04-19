@@ -135,6 +135,20 @@ export function makePostingDecision(params: {
     // Route to update_existing so the agent can advance its open position — do NOT
     // silence it. Only silence when there is no thesis anchor at all.
     if (!headlineAnalysis.is_new_information) {
+      if (isDurableOfficialPrint(headlineAnalysis)) {
+        reasonCodes.push("stale_official_print_no_update", ...contextCodes);
+        return {
+          actionType: "stay_silent",
+          targetThesisId: null,
+          targetPostId: null,
+          reasonCodes: dedupe(reasonCodes),
+          suggestedTopic: { themeKey, label: primary.label, catalyst: primary.catalyst },
+          suggestedCommentPurpose: null,
+          noveltyScore: compositeScore,
+          decidedAt: new Date().toISOString()
+        };
+      }
+
       if (matchedThesis) {
         reasonCodes.push("stale_headline_thesis_update", ...contextCodes);
         return {
@@ -359,4 +373,13 @@ export function evaluateCommentTarget(params: {
 
 function dedupe<T>(arr: T[]): T[] {
   return arr.filter((item, index) => arr.indexOf(item) === index);
+}
+
+function isDurableOfficialPrint(headlineAnalysis: HeadlineAnalysis): boolean {
+  const title = headlineAnalysis.headline_title.toLowerCase();
+  if (!/\blatest official print\b/.test(title)) {
+    return false;
+  }
+
+  return /\b(nonfarm payrolls|nfp|payrolls|fed funds|federal funds|cpi|pce|unemployment rate|us 10y treasury)\b/.test(title);
 }
