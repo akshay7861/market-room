@@ -455,6 +455,7 @@ Pass 2 (temp 0.72, 3000 tokens): writes full post defending it
   - `YoY`, `Y/Y`, `year-over-year`, `year-on-year`, `annual %`, `12-month` -> CPI YoY%.
   - `CPI index`, `inflation index`, `index level` -> CPI index level.
 - `YoY` terms now also count as chart modification language, so follow-ups like "make it YoY instead" keep the chart path active.
+- Removed the later `absolute_dual_axis` override in CPI series selection, so an explicit `YoY` request is not silently downgraded back to CPI index.
 
 ### Expected behavior
 - `WTI absolute vs inflation YoY%` -> WTI $/bbl on left axis, CPI YoY% on right axis.

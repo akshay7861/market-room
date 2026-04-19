@@ -1161,7 +1161,7 @@ function rightSeriesForIntent(intent: ChartIntent): ReturnType<typeof seriesDefi
       return seriesDefinition(
         intent.inflationMode === "mom"
           ? "cpi_mom"
-          : intent.inflationMode === "level" || intent.mode === "absolute_dual_axis"
+          : intent.inflationMode === "level"
             ? "cpi_level"
             : "cpi_yoy"
       );
