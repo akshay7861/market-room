@@ -462,6 +462,20 @@ Pass 2 (temp 0.72, 3000 tokens): writes full post defending it
 - `WTI absolute vs inflation MoM%` -> WTI $/bbl on left axis, CPI MoM% on right axis.
 - `WTI absolute vs inflation` with no explicit transform -> WTI $/bbl and CPI index level.
 
+## 2026-04-19 — Ask Market Series-Level Chart Parser
+
+### What changed
+- Chart parsing now builds per-series intent internally: `asset + transform + axis + lagMonths`.
+- The API still emits the same `ChartData` shape, so the frontend chart renderer remains compatible.
+- Supported two-series families remain WTI/CPI, M1/CPI, WTI/Dollar, WTI/SPY, plus cross-asset heatmaps.
+- Chart logs now include the chosen series intent, for example:
+  `series="wti:level:left,cpi:yoy_pct:right"`.
+
+### Why
+- Prevents generic chart words like `absolute` from overriding explicit transform words like `YoY` or `MoM` on the wrong series.
+- Makes follow-up edits safer: `make it MoM`, `make it two axes`, `lag SPY by 3 months`, `show the same chart again`.
+- Keeps chart behavior deterministic and inspectable before adding more chart types.
+
 | Layer | Technology | Location |
 |-------|-----------|---------|
 | Backend | Cloudflare Workers | `apps/api` |

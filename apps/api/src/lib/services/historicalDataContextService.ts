@@ -938,11 +938,24 @@ type ChartPoint = { date: string; [key: string]: number | string };
 type HeatmapCell = { row: string; column: string; value: number };
 type ChartMode = "yoy_same_axis" | "yoy_dual_axis" | "absolute_dual_axis" | "correlation_heatmap";
 type ChartPair = "wti_cpi" | "m1_cpi" | "wti_dollar" | "wti_spy" | "cross_asset";
+type ChartAsset = "wti" | "cpi" | "dollar" | "spy" | "m1" | "vix" | "hy_oas" | "us10y";
+type ChartTransform = "level" | "yoy_pct" | "mom_pct";
+type ChartAxis = "left" | "right";
+
+type ChartSeriesIntent = {
+  asset: ChartAsset;
+  transform: ChartTransform;
+  axis: ChartAxis;
+  lagMonths: number;
+};
 
 export type ChartIntent = {
   pair: ChartPair;
   mode: ChartMode;
   inflationMode?: "yoy" | "mom" | "level";
+  seriesIntents: ChartSeriesIntent[];
+  confidence: "high" | "medium" | "low";
+  warnings: string[];
   lagMonths: number;
   windowStart: string;
   windowEnd?: string;
@@ -1005,15 +1018,21 @@ export function buildChartDataFromIntent(intent: ChartIntent): ChartData | null 
     return buildCorrelationHeatmapChart(intent.windowStart, intent.windowEnd, intent.windowLabel);
   }
 
-  const left = leftSeriesForIntent(intent);
-  const right = rightSeriesForIntent(intent);
-  const points = alignedSeriesPoints(left, right, intent.windowStart, intent.windowEnd, intent.lagMonths);
+  const leftIntent = intent.seriesIntents.find((series) => series.axis === "left") || intent.seriesIntents[0];
+  const rightIntent = intent.seriesIntents.find((series) => series.axis === "right") || intent.seriesIntents[1];
+  if (!leftIntent || !rightIntent) {
+    return null;
+  }
+
+  const left = seriesDefinitionForIntent(leftIntent);
+  const right = seriesDefinitionForIntent(rightIntent);
+  const points = alignedSeriesPoints(left, right, intent.windowStart, intent.windowEnd, rightIntent.lagMonths);
   if (points.length < 6) {
     return null;
   }
 
-  const dualAxis = intent.mode === "absolute_dual_axis" || intent.mode === "yoy_dual_axis";
-  const lagLabel = intent.lagMonths ? `, ${right.label} lagged ${intent.lagMonths}m` : "";
+  const dualAxis = shouldUseDualAxis(intent.seriesIntents, intent.mode);
+  const lagLabel = rightIntent.lagMonths ? `, ${right.label} lagged ${rightIntent.lagMonths}m` : "";
   return {
     title: `${left.label} vs ${right.label}${lagLabel} — ${intent.windowLabel}`,
     subtitle: `Stored monthly data. Correlation: ${formatCorrelation(pearson(points))}.`,
@@ -1087,12 +1106,17 @@ function buildChartIntentFromQuestion(question: string, modifierText = question)
         : wantsDualAxis
           ? "yoy_dual_axis"
           : "yoy_same_axis";
+  const lagMonths = extractRequestedLagMonths(modifier) || extractRequestedLagMonths(lower);
+  const seriesIntents = buildSeriesIntents(pair, modifier, lower, mode, lagMonths);
 
   return {
     pair,
     mode,
-    inflationMode: inferInflationMode(modifier, lower, mode),
-    lagMonths: extractRequestedLagMonths(modifier) || extractRequestedLagMonths(lower),
+    inflationMode: transformToInflationMode(seriesIntents.find((series) => series.asset === "cpi")?.transform),
+    seriesIntents,
+    confidence: seriesIntents.length >= 2 ? "high" : "low",
+    warnings: [],
+    lagMonths,
     windowStart,
     windowEnd,
     windowLabel,
@@ -1175,6 +1199,223 @@ function rightSeriesForIntent(intent: ChartIntent): ReturnType<typeof seriesDefi
     default:
       return seriesDefinition("cpi_yoy");
   }
+}
+
+function buildSeriesIntents(
+  pair: ChartPair,
+  modifier: string,
+  fullText: string,
+  mode: ChartMode,
+  lagMonths: number
+): ChartSeriesIntent[] {
+  if (pair === "cross_asset") {
+    return [];
+  }
+
+  const defaults = defaultSeriesForPair(pair);
+  const text = `${modifier}\n${fullText}`;
+  const laggedAsset = inferLaggedAsset(text, defaults.map((item) => item.asset));
+
+  return defaults.map((item) => ({
+    ...item,
+    transform: inferTransformForAsset(item.asset, modifier, fullText, mode, item.transform),
+    lagMonths: laggedAsset === item.asset || (!laggedAsset && item.axis === "right") ? lagMonths : 0
+  }));
+}
+
+function defaultSeriesForPair(pair: Exclude<ChartPair, "cross_asset">): ChartSeriesIntent[] {
+  switch (pair) {
+    case "m1_cpi":
+      return [
+        { asset: "m1", transform: "yoy_pct", axis: "left", lagMonths: 0 },
+        { asset: "cpi", transform: "yoy_pct", axis: "right", lagMonths: 0 }
+      ];
+    case "wti_dollar":
+      return [
+        { asset: "wti", transform: "yoy_pct", axis: "left", lagMonths: 0 },
+        { asset: "dollar", transform: "yoy_pct", axis: "right", lagMonths: 0 }
+      ];
+    case "wti_spy":
+      return [
+        { asset: "wti", transform: "yoy_pct", axis: "left", lagMonths: 0 },
+        { asset: "spy", transform: "yoy_pct", axis: "right", lagMonths: 0 }
+      ];
+    case "wti_cpi":
+    default:
+      return [
+        { asset: "wti", transform: "yoy_pct", axis: "left", lagMonths: 0 },
+        { asset: "cpi", transform: "yoy_pct", axis: "right", lagMonths: 0 }
+      ];
+  }
+}
+
+function seriesDefinitionForIntent(intent: ChartSeriesIntent): ReturnType<typeof seriesDefinition> {
+  switch (intent.asset) {
+    case "wti":
+      return seriesDefinition(intent.transform === "level" ? "wti_price" : "wti_yoy");
+    case "cpi":
+      return seriesDefinition(
+        intent.transform === "mom_pct"
+          ? "cpi_mom"
+          : intent.transform === "level"
+            ? "cpi_level"
+            : "cpi_yoy"
+      );
+    case "spy":
+      return seriesDefinition(intent.transform === "level" ? "spy_price" : "spy_yoy");
+    case "m1":
+      return seriesDefinition("m1_yoy");
+    case "dollar":
+      return seriesDefinition("dollar_yoy");
+    case "vix":
+      return seriesDefinition("vix_level");
+    case "hy_oas":
+      return seriesDefinition("hy_spread");
+    case "us10y":
+      return seriesDefinition("us10y");
+  }
+}
+
+function shouldUseDualAxis(seriesIntents: ChartSeriesIntent[], mode: ChartMode): boolean {
+  if (mode === "absolute_dual_axis" || mode === "yoy_dual_axis") {
+    return true;
+  }
+  const [left, right] = seriesIntents.map(seriesDefinitionForIntent);
+  if (!left || !right) {
+    return false;
+  }
+  return left.unit !== right.unit;
+}
+
+function inferTransformForAsset(
+  asset: ChartAsset,
+  modifier: string,
+  fullText: string,
+  mode: ChartMode,
+  fallback: ChartTransform
+): ChartTransform {
+  const text = `${modifier}\n${fullText}`;
+  const assetSegment = segmentForAsset(text, asset);
+
+  if (assetSegment && hasBroadMomRequest(assetSegment)) {
+    return supportsTransform(asset, "mom_pct") ? "mom_pct" : fallback;
+  }
+  if (assetSegment && hasBroadYoYRequest(assetSegment)) {
+    return supportsTransform(asset, "yoy_pct") ? "yoy_pct" : fallback;
+  }
+  if (assetSegment && hasBroadLevelRequest(assetSegment)) {
+    return supportsTransform(asset, "level") ? "level" : fallback;
+  }
+
+  if ((asset === "cpi" && hasBroadMomRequest(modifier)) || (!assetSegment && hasBroadMomRequest(modifier))) {
+    return supportsTransform(asset, "mom_pct") ? "mom_pct" : fallback;
+  }
+  if (hasBroadYoYRequest(modifier)) {
+    return supportsTransform(asset, "yoy_pct") ? "yoy_pct" : fallback;
+  }
+  if (hasBroadLevelRequest(modifier) || mode === "absolute_dual_axis") {
+    return supportsTransform(asset, "level") ? "level" : fallback;
+  }
+
+  return fallback;
+}
+
+function segmentForAsset(text: string, asset: ChartAsset): string | null {
+  const assetPattern = assetAliasPattern(asset);
+  const normalized = text.toLowerCase().replace(/\n+/g, " ");
+  const segments = normalized.split(/\b(?:vs|versus|against|compared to|with)\b|[,;]/i);
+  return segments.find((segment) => assetPattern.test(segment))?.trim() || null;
+}
+
+function hasBroadMomRequest(text: string): boolean {
+  return /\b(mom|m\/m|m-o-m|month.?over.?month|monthly %|monthly percent)\b/i.test(text);
+}
+
+function hasBroadYoYRequest(text: string): boolean {
+  return /\b(yoy|y\/y|y-o-y|year.?over.?year|year.?on.?year|annual inflation|annual %|annual percent|12.?month)\b/i.test(text);
+}
+
+function hasBroadLevelRequest(text: string): boolean {
+  return /\b(absolute|absolute values?|level|price|index level|cpi index|inflation index)\b/i.test(text);
+}
+
+function supportsTransform(asset: ChartAsset, transform: ChartTransform): boolean {
+  if (transform === "mom_pct") {
+    return asset === "cpi";
+  }
+  if (transform === "level") {
+    return asset === "wti" || asset === "cpi" || asset === "spy" || asset === "vix" || asset === "hy_oas" || asset === "us10y";
+  }
+  return asset === "wti" || asset === "cpi" || asset === "m1" || asset === "dollar" || asset === "spy";
+}
+
+function assetAliasPattern(asset: ChartAsset): RegExp {
+  switch (asset) {
+    case "wti":
+      return /\b(wti|crude|oil|oil price|crude oil)\b/;
+    case "cpi":
+      return /\b(cpi|inflation|headline cpi|headline inflation)\b/;
+    case "dollar":
+      return /\b(dollar|dxy|usd|broad dollar|trade.?weighted dollar)\b/;
+    case "spy":
+      return /\b(spy|s&p|spx|s&p 500|equities|stocks|stock market)\b/;
+    case "m1":
+      return /\b(m1|money supply|liquidity)\b/;
+    case "vix":
+      return /\b(vix|volatility)\b/;
+    case "hy_oas":
+      return /\b(hy oas|high yield|credit spreads?|spreads?)\b/;
+    case "us10y":
+      return /\b(10y|10-year|10 year|treasury yield|us10y|ust 10y)\b/;
+  }
+}
+
+function transformAliasPattern(transform: ChartTransform, asset: ChartAsset): RegExp {
+  if (transform === "mom_pct") {
+    return /\b(mom|m\/m|m-o-m|month.?over.?month|monthly %|monthly percent)\b/;
+  }
+  if (transform === "yoy_pct") {
+    return /\b(yoy|y\/y|y-o-y|year.?over.?year|year.?on.?year|annual inflation|annual %|annual percent|12.?month)\b/;
+  }
+  if (asset === "cpi") {
+    return /\b(absolute|absolute values?|level|index level|cpi index|inflation index)\b/;
+  }
+  if (asset === "spy") {
+    return /\b(absolute|absolute values?|level|price|index level|spy price|s&p level|spx level)\b/;
+  }
+  if (asset === "wti") {
+    return /\b(absolute|absolute values?|level|price|oil price|wti price|\$\/bbl)\b/;
+  }
+  return /\b(absolute|absolute values?|level|price|index level)\b/;
+}
+
+function inferLaggedAsset(text: string, availableAssets: ChartAsset[]): ChartAsset | null {
+  const lower = text.toLowerCase();
+  for (const asset of availableAssets) {
+    const alias = assetAliasPattern(asset);
+    if (
+      new RegExp(`${alias.source}(?:\\W+\\w+){0,4}\\W+(?:lags?|lagged)`, "i").test(lower) ||
+      new RegExp(`(?:lag|lagged)\\W+${alias.source}`, "i").test(lower)
+    ) {
+      return asset;
+    }
+  }
+
+  for (const asset of availableAssets) {
+    const alias = assetAliasPattern(asset);
+    if (new RegExp(`${alias.source}(?:\\W+\\w+){0,4}\\W+(?:leads?)`, "i").test(lower)) {
+      return availableAssets.find((candidate) => candidate !== asset) || null;
+    }
+  }
+
+  return null;
+}
+
+function transformToInflationMode(transform?: ChartTransform): "yoy" | "mom" | "level" | undefined {
+  if (transform === "mom_pct") return "mom";
+  if (transform === "level") return "level";
+  if (transform === "yoy_pct") return "yoy";
+  return undefined;
 }
 
 function inferChartPair(text: string): ChartPair | null {

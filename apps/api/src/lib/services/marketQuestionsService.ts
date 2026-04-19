@@ -845,8 +845,11 @@ async function generateAgentQuestionReply(
   const chartDataCandidate = chartIntent ? buildChartDataFromIntent(chartIntent) : null;
   const chartData = validateChartData(chartDataCandidate) ? chartDataCandidate : null;
   if (chartIntent) {
+    const chartSeriesLog = chartIntent.seriesIntents
+      .map((series) => `${series.asset}:${series.transform}:${series.axis}${series.lagMonths ? `:lag${series.lagMonths}m` : ""}`)
+      .join(",");
     console.log(
-      `[chart-intent] thread=${messages[0]?.threadId || "new"} pair=${chartIntent.pair} mode=${chartIntent.mode} lag=${chartIntent.lagMonths} chart=${chartData ? "generated" : "skipped"}`
+      `[chart-intent] thread=${messages[0]?.threadId || "new"} pair=${chartIntent.pair} mode=${chartIntent.mode} series="${chartSeriesLog}" lag=${chartIntent.lagMonths} confidence=${chartIntent.confidence} chart=${chartData ? "generated" : "skipped"}`
     );
     if (chartData) {
       console.log(
