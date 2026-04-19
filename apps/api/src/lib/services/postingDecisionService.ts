@@ -129,11 +129,16 @@ export function makePostingDecision(params: {
     // fed funds, unemployment, 10Y, etc.) that remain the latest observation for
     // days/weeks. They are useful as background, but repeated unchanged prints should
     // not keep resurfacing as fresh agent activity.
+    //
+    // EXCEPTION: if a matched thesis exists, the same mechanism/asset match that
+    // marks the headline "stale" is also the signal the thesis needs updating.
+    // Route to update_existing so the agent can advance its open position — do NOT
+    // silence it. Only silence when there is no thesis anchor at all.
     if (!headlineAnalysis.is_new_information) {
       if (matchedThesis) {
         reasonCodes.push("stale_headline_thesis_update", ...contextCodes);
         return {
-          actionType: "stay_silent",
+          actionType: "update_existing",
           targetThesisId: matchedThesis.id,
           targetPostId: matchedThesis.rootMessageId || updateTargetPostId,
           reasonCodes: dedupe(reasonCodes),

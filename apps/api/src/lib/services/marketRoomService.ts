@@ -1022,7 +1022,7 @@ async function generateAgentForumPosts({
       ) {
         const minutesSinceLast =
           (Date.now() - new Date(recentPosts[0].createdAt).getTime()) / 60000;
-        if (minutesSinceLast < 90 && noveltyAssessment.compositeScore < 0.35) {
+        if (minutesSinceLast < 90 && noveltyAssessment.compositeScore < 35) {
           console.log(
             `[macro-gate] ${agent.name} silenced — last post ${minutesSinceLast.toFixed(0)}min ago, novelty=${noveltyAssessment.compositeScore.toFixed(2)}`
           );
@@ -3372,7 +3372,7 @@ function applyCatalystMaterialityGate({
       headlineAnalysis.direct_relevance_score >= 3 &&
       (headlineAnalysis.market_signal_strength === "high" || headlineAnalysis.market_signal_strength === "medium")
   );
-  const topicIsMaterial = topicPlan.hasMeaningfulFreshSignal && noveltyScore >= 55;
+  const topicIsMaterial = topicPlan.hasMeaningfulFreshSignal && noveltyScore >= 35;
   const shouldGate =
     !headlineIsMaterial &&
     !topicIsMaterial &&
