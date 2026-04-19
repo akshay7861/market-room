@@ -5,6 +5,61 @@ Each session appends a dated entry. Read the most recent entries first.
 
 ---
 
+## 2026-04-19 — Equity Fundamentals + Ticker Validation (commit 09e1423)
+
+### What was added
+
+**`equityQuoteService.ts` — four new capabilities:**
+
+1. **`validateCompanyName()`** — word-overlap cross-validation between universe `name` and Yahoo `shortName`. Prevents wrong-company ticker resolution (TCS problem: "TCS" resolves to Tata Consultancy Services in the universe but Yahoo might return a different company). Zero overlap → mark as unavailable. Applied in both `fetchEquityQuote` and `fetchEquityFundamentals`.
+
+2. **`fetchEquityFundamentals()`** — two-tier Yahoo Finance fetch:
+   - Tier 1 (always): `/v7/finance/quote?symbols={symbol}` → price, change%, market cap, P/E TTM, forward P/E, EPS TTM, 52-week range
+   - Tier 2 (earnings headlines only): `/v10/finance/quoteSummary/{symbol}?modules=earningsTrend` → next earnings date, current quarter EPS estimate, revenue estimate
+   - 20-minute in-process cache; null results cached too (avoids hammering failed endpoints)
+   - Earnings detection: `EARNINGS_KEYWORDS` regex on headline title
+
+3. **`buildEquityFundamentalsForPost()`** (exported) — orchestrator for autonomous posting:
+   - Combines top 3 sector headline titles, runs `selectTopCandidate()` (universe scoring)
+   - Requires score ≥ 50 for confidence; returns `""` if no confident match
+   - Returns formatted prompt block (minimum 2 meaningful fields) or `""`
+
+4. **Expanded `extractExplicitSymbols` exclusion set** — added GDP, PMI, ISM, IPO, CEO, CFO, COO, BOJ, ECB, IMF, EST, BPS, YOY, QOQ, TTM, EPS, REV, NII, NIM, NFP, EM, FX, HY, IG, PE, VC, RV, IV, ATH, ATL
+
+**`marketRoomService.ts` — wiring:**
+- Import `buildEquityFundamentalsForPost` from `equityQuoteService`
+- In `requestStructuredForumPost`: Equities Agent gets `buildEquityFundamentalsForPost` call with 5-second `Promise.race` timeout — post never blocked by slow Yahoo call
+- `buildForumPostPrompt` now takes `equityFundamentals: string = ""` as final parameter
+- Injected in prompt array after `analogBlock`
+
+### Prompt block format (when fundamentals available)
+```
+## Company Fundamentals — NVDA (NVIDIA Corporation)
+Live: $875.40 (+2.3% today) | Market cap: $2.15T | 52-week range: $410–$992
+Valuation: P/E 68.2x TTM | Forward P/E 42.1x
+Earnings: EPS $12.84 TTM | Next quarter estimate: $5.58
+Next earnings: est. 2026-05-28
+
+INSTRUCTION — when this block is present you MUST:
+1. Name the specific P/E or EPS figure ...
+⚠ Yahoo Finance data — 15-min delayed. ...
+```
+
+### Fallback rule
+Empty string at every failure point. Post always goes out.
+
+### Files changed
+- `apps/api/src/lib/services/equityQuoteService.ts`
+- `apps/api/src/lib/services/marketRoomService.ts`
+
+### Verification log lines to watch
+- `[equity-fundamentals] identified: NVDA ...` — company found and fundamentals fetched
+- `[equity-fundamentals] name mismatch: universe="..." yahoo="..." symbol=...` — TCS-style validation fired
+- `[equity-fundamentals] no confident match ...` — no company identified (score < 50), post uses qualitative only
+- `[equity-fundamentals] timeout` — Yahoo Finance was slow; 5-second guard kicked in
+
+---
+
 ## 2026-04-19 — Posting Gate Fixes (commit c40205f)
 
 ### What was fixed
