@@ -469,6 +469,39 @@ Pass 2 (temp 0.72, 3000 tokens): writes full post defending it
 - `npm run typecheck --workspace @market-room/api` passes.
 - `npm run build --workspace @market-room/api` Worker dry-run passes.
 
+## 2026-04-20 — Market Room Governance Credibility Guards
+
+### Problem
+- Governance audit flagged credibility risks in autonomous Market Room posts: inconsistent live metric citations, weak/missing conviction conditions, irrelevant catalyst ownership, same-stance lock-in, Equities standalone silence, and stale `posting_decision_json` catalyst metadata.
+- Numeric market truth should not come from vectors. Vectors remain unsuitable as source-of-truth for live HY OAS, 2Y, 10Y, Fed Funds, WTI, DXY, VIX, or SPY values.
+
+### Fix
+- Added deterministic verified metrics grounding for Market Room prompts:
+  - live snapshot values where available: S&P/SPY, Nasdaq, DXY, US10Y, WTI, Brent, gold, copper.
+  - normalized data-lake values for US2Y, Fed Funds, HY OAS, VIX, and unemployment.
+  - prompt rule tells agents to cite only verified metrics, article text, historical-data blocks, analog/chart data, or stored correlations.
+- Added quality flags for metric and falsifiability governance:
+  - `verified_metric_cited`
+  - `unverified_metric_claim`
+  - `metric_missing`
+  - `weak_conviction_condition`
+  - `stance_lock_review_missing`
+  - `resolved_catalyst_corrected`
+- Strengthened View Protocol so top-level posts must include exactly one sentence beginning with `This view changes if...` and containing a metric/event, threshold, and timeframe.
+- Added log-only domain relevance gate by default:
+  - logs `[domain-gate] agent=... verdict=... score=... action=log_only`.
+  - suppressive mode only activates when `MARKET_ROOM_DOMAIN_GATE_SUPPRESS=true` and the catalyst is clearly irrelevant/non-protected.
+- Added stance-lock challenge prompt:
+  - if the latest 5 posts are the same stance or 80% of latest 10 share one stance, injects `STANCE REVIEW REQUIRED`.
+  - logs `[stance-lock] agent=... streak=... stance=... challenge=injected`.
+- Added Equities standalone diagnostics around eligible headlines, posting decisions, and fundamentals injection.
+- Corrected final persisted `posting_decision_json.suggestedTopic.catalyst` after the final message catalyst is resolved, with `[pdj-catalyst] corrected ...` logs.
+
+### Validation
+- `npm run typecheck --workspace @market-room/api` passes.
+- `npm run typecheck --workspace @market-room/shared` passes.
+- `npm run charts:backtest` passes 22/22 to confirm Ask Market chart work was not regressed.
+
 ## 2026-04-19 — Ask Market Chart Transform Precedence Fix
 
 ### Problem

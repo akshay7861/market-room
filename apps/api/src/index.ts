@@ -32,6 +32,7 @@ export interface Env {
   ADMIN_API_ENABLED?: string;
   ADMIN_API_TOKEN?: string;
   KNOWLEDGE_VECTOR_RETRIEVAL?: string;
+  MARKET_ROOM_DOMAIN_GATE_SUPPRESS?: string;
 }
 
 export default {

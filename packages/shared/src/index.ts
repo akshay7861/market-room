@@ -594,7 +594,9 @@ export type PostingReasonCode =
   | "low_materiality_official_news"
   | "repeated_catalyst_no_delta"
   | "comment_repetition_gate"
-  | "alternate_catalyst_selected";
+  | "alternate_catalyst_selected"
+  | "domain_relevance_low"
+  | "stance_lock_challenge";
 
 export type PostQualityFlag =
   | "missing_title"
@@ -605,7 +607,13 @@ export type PostQualityFlag =
   | "data_anchor_present"
   | "data_anchor_missing"
   | "conviction_condition_present"
-  | "conviction_condition_missing";
+  | "conviction_condition_missing"
+  | "verified_metric_cited"
+  | "unverified_metric_claim"
+  | "metric_missing"
+  | "weak_conviction_condition"
+  | "stance_lock_review_missing"
+  | "resolved_catalyst_corrected";
 
 export type PostingDecision = {
   actionType: "new_post" | "update_existing" | "comment_only" | "stay_silent";
