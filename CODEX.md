@@ -594,3 +594,23 @@ Pass 2 (temp 0.72, 3000 tokens): writes full post defending it
 ### Workflow rule (enforced)
 Local edit → `npm run typecheck` → `git commit` + `git push` → `npx wrangler deploy` → production health check
 Never leave changes only local. Never deploy without a matching commit.
+
+## 2026-04-20 — Market Room Multi-Source News Integration
+
+### What changed
+- Added Finnhub and Polygon as parallel Market Room catalyst sources.
+- `finnhubNewsService.ts` fetches `general`, `forex`, and `merger` categories with `Promise.allSettled`, applies 24h freshness filtering, provider-specific cross-run dedupe, Jaccard near-duplicate cleanup, and routes up to 12 selected headlines.
+- `polygonNewsService.ts` fetches `/v2/reference/news` once per run, maps `tickers[]` into headline entities, discards `insights` for now, applies 24h freshness filtering, provider-specific cross-run dedupe, Jaccard cleanup, and routes up to 12 selected headlines.
+- `marketRoomService.ts` now fetches five source layers in the same discussion event: official, Yahoo, Marketaux, Finnhub, and Polygon.
+- Merge priority is Marketaux -> Yahoo -> Finnhub -> Polygon -> Official.
+- `[catalyst-source]` logs now include `finnhub=N polygon=N`.
+- `fetched_news_items` logging now persists Finnhub and Polygon rows after `event.id` is known.
+
+### Secrets
+- `FINNHUB_API_KEY` and `POLYGON_API_KEY` are typed on `Env`.
+- They must be set as Cloudflare secrets via Wrangler, not in `wrangler.jsonc`.
+
+### Validation
+- `npm run typecheck --workspace @market-room/api` passes.
+- `npm run build --workspace @market-room/api` Worker dry-run passes.
+- `npm run charts:backtest` remains 22/22.

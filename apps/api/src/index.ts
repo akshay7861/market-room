@@ -20,6 +20,8 @@ export interface Env {
   BEA_API_KEY?: string;
   CENSUS_API_KEY?: string;
   MARKETAUX_API_KEY?: string;
+  FINNHUB_API_KEY?: string;
+  POLYGON_API_KEY?: string;
   SCHEDULED_DISCUSSIONS_ENABLED?: string;
   SCHEDULED_DISCUSSION_REQUIRE_MATERIALITY?: string;
   SCHEDULED_DISCUSSION_PROMPT?: string;

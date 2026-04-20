@@ -37,6 +37,8 @@ import { fetchOfficialCatalystLayer, isDataLakeOnlyHeadline } from "./officialCa
 import { buildHistoricalDataPromptBlock, buildAnalogContextBlock, type SnapshotSignal } from "./historicalDataContextService";
 import { fetchYahooFinanceBriefing } from "./yahooFinanceNewsService";
 import { fetchMarketauxBriefing } from "./marketauxNewsService";
+import { fetchFinnhubBriefing } from "./finnhubNewsService";
+import { fetchPolygonBriefing } from "./polygonNewsService";
 import { analyzeTopHeadlinesForAgent, type HeadlineAnalysis } from "./headlineAnalysisService";
 import { buildCrossAgentMacroView, buildDynamicMemoryContext, buildDynamicMemoryPromptBlock, refreshDynamicHouseViews } from "./dynamicMemoryService";
 import { buildEquityFundamentalsForPost } from "./equityQuoteService";
@@ -282,10 +284,12 @@ export async function runMarketDiscussion(
   const discussionPlan = buildDiscussionPlan(activeAgents, marketSnapshotPayload);
   const priorRoomThreadBundle = await repositories.messages.listThreadsByRoom(room.id, 24, 4); // 24 threads = ~6 full runs of history for novelty check
   const priorRoomThreads = buildDiscussionThreads(priorRoomThreadBundle.posts, priorRoomThreadBundle.comments);
-  const [officialBriefing, yahooBriefing, marketauxBriefing] = await Promise.all([
+  const [officialBriefing, yahooBriefing, marketauxBriefing, finnhubBriefing, polygonBriefing] = await Promise.all([
     fetchOfficialCatalystLayer(env, activeAgents),
     fetchYahooFinanceBriefing(activeAgents),
-    fetchMarketauxBriefing(env, activeAgents)
+    fetchMarketauxBriefing(env, activeAgents),
+    fetchFinnhubBriefing(env, activeAgents),
+    fetchPolygonBriefing(env, activeAgents)
   ]);
 
   const recentCatalystMessages = flattenThreadPosts(priorRoomThreads, 80);
@@ -293,6 +297,8 @@ export async function runMarketDiscussion(
     headlines: dedupeHeadlines([
       ...marketauxBriefing.generalHeadlines,
       ...yahooBriefing.generalHeadlines,
+      ...finnhubBriefing.generalHeadlines,
+      ...polygonBriefing.generalHeadlines,
       ...officialBriefing.generalHeadlines
     ].filter((headline) => !isDataLakeOnlyHeadline(headline))),
     recentMessages: recentCatalystMessages,
@@ -301,7 +307,8 @@ export async function runMarketDiscussion(
   const sectorHeadlinesByAgentId = new Map<string, SnapshotHeadline[]>();
 
   for (const agent of activeAgents) {
-    // Priority order: Marketaux first, Yahoo second, high-tier official news last.
+    // Priority order: Marketaux first, Yahoo second, Finnhub third, Polygon fourth,
+    // and high-tier official news last.
     // Fed RSS low/medium items are already suppressed/context-only in officialCatalystService.
     sectorHeadlinesByAgentId.set(
       agent.id,
@@ -310,6 +317,8 @@ export async function runMarketDiscussion(
         headlines: dedupeHeadlines([
           ...(marketauxBriefing.headlinesByAgentId.get(agent.id) || []),
           ...(yahooBriefing.headlinesByAgentId.get(agent.id) || []),
+          ...(finnhubBriefing.headlinesByAgentId.get(agent.id) || []),
+          ...(polygonBriefing.headlinesByAgentId.get(agent.id) || []),
           ...(officialBriefing.headlinesByAgentId.get(agent.id) || [])
         ].filter((headline) => !isDataLakeOnlyHeadline(headline))),
         recentMessages: recentCatalystMessages,
@@ -320,12 +329,17 @@ export async function runMarketDiscussion(
 
   const rawGeneralCatalystCount = dedupeHeadlines([
     ...marketauxBriefing.generalHeadlines,
-    ...officialBriefing.generalHeadlines,
-    ...yahooBriefing.generalHeadlines
+    ...yahooBriefing.generalHeadlines,
+    ...finnhubBriefing.generalHeadlines,
+    ...polygonBriefing.generalHeadlines,
+    ...officialBriefing.generalHeadlines
   ].filter((headline) => !isDataLakeOnlyHeadline(headline)));
 
   console.log(
-    `[catalyst-source] market_room eligible=${generalCatalystHeadlines.length}/${rawGeneralCatalystCount.length} marketaux=${marketauxBriefing.generalHeadlines.length} yahoo=${yahooBriefing.generalHeadlines.length} official_news_high=${officialBriefing.generalHeadlines.length} data_lake_sources=excluded`
+    `[catalyst-source] market_room eligible=${generalCatalystHeadlines.length}/${rawGeneralCatalystCount.length} ` +
+    `marketaux=${marketauxBriefing.generalHeadlines.length} yahoo=${yahooBriefing.generalHeadlines.length} ` +
+    `finnhub=${finnhubBriefing.generalHeadlines.length} polygon=${polygonBriefing.generalHeadlines.length} ` +
+    `official_news_high=${officialBriefing.generalHeadlines.length} data_lake_sources=excluded`
   );
 
   const enrichedSnapshotPayload = mergeForumHeadlinesIntoSnapshot(
@@ -392,6 +406,28 @@ export async function runMarketDiscussion(
     }));
     repositories.fetchedNews.logBatch(itemsWithEventId).catch((err) =>
       console.error("[marketaux] Failed to log fetch items:", err)
+    );
+  }
+
+  // Persist Finnhub fetch log after event.id is known
+  if (finnhubBriefing.logItems.length > 0) {
+    const itemsWithEventId = finnhubBriefing.logItems.map((item) => ({
+      ...item,
+      eventId: event.id
+    }));
+    repositories.fetchedNews.logBatch(itemsWithEventId).catch((err) =>
+      console.error("[finnhub] Failed to log fetch items:", err)
+    );
+  }
+
+  // Persist Polygon fetch log after event.id is known
+  if (polygonBriefing.logItems.length > 0) {
+    const itemsWithEventId = polygonBriefing.logItems.map((item) => ({
+      ...item,
+      eventId: event.id
+    }));
+    repositories.fetchedNews.logBatch(itemsWithEventId).catch((err) =>
+      console.error("[polygon] Failed to log fetch items:", err)
     );
   }
 
