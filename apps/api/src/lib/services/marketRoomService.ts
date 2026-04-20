@@ -3508,10 +3508,22 @@ function filterEligibleHeadlinesForAgent({
   recentMessages: AgentMessage[];
   scope: CatalystFilterScope;
 }): SnapshotHeadline[] {
-  const eligible: SnapshotHeadline[] = [];
+  const eligible: Array<{ headline: SnapshotHeadline; score: number }> = [];
   let skippedFirstTitle: string | null = null;
 
   for (const [index, headline] of headlines.entries()) {
+    const quality = scoreCatalystElectionQuality(headline, agent);
+
+    if (quality <= 0) {
+      if (index === 0) {
+        skippedFirstTitle = headline.title;
+      }
+      console.log(
+        `[catalyst-quality] skipped weak title="${truncateText(headline.title, 110)}" source=${headline.source} agent=${agent?.name || "room"} scope=${scope} score=${quality}`
+      );
+      continue;
+    }
+
     const repeat = findRecentCatalystRepeat({
       key: headlineCatalystKey(headline),
       recentMessages,
@@ -3530,16 +3542,20 @@ function filterEligibleHeadlinesForAgent({
       continue;
     }
 
-    eligible.push(headline);
+    eligible.push({ headline, score: quality });
   }
 
-  if (skippedFirstTitle && eligible.length > 0) {
+  const ranked = eligible.sort((left, right) =>
+    right.score - left.score || compareHeadlineTimes(right.headline, left.headline)
+  );
+
+  if (skippedFirstTitle && ranked.length > 0) {
     console.log(
-      `[catalyst-filter] selected alternate title="${truncateText(eligible[0].title, 110)}" source=${eligible[0].source} agent=${agent?.name || "room"} skipped="${truncateText(skippedFirstTitle, 90)}"`
+      `[catalyst-filter] selected alternate title="${truncateText(ranked[0].headline.title, 110)}" source=${ranked[0].headline.source} agent=${agent?.name || "room"} skipped="${truncateText(skippedFirstTitle, 90)}"`
     );
   }
 
-  return eligible;
+  return ranked.map((item) => item.headline);
 }
 
 function applyRepeatedCatalystDecisionGate({
@@ -3733,8 +3749,80 @@ function sameCatalystFamily(left: string, right: string): boolean {
 }
 
 function scoreHeadlineForKeywords(headline: SnapshotHeadline, keywords: string[]): number {
-  const text = `${headline.title} ${headline.source}`.toLowerCase();
-  return keywords.reduce((score, keyword) => score + (text.includes(keyword) ? 1 : 0), 0);
+  const text = `${headline.title} ${headline.description || ""} ${headline.source}`.toLowerCase();
+  return keywords.reduce((score, keyword) => score + (matchesHeadlineKeyword(text, keyword) ? 1 : 0), 0);
+}
+
+function scoreCatalystElectionQuality(headline: SnapshotHeadline, agent?: Agent): number {
+  const title = headline.title || "";
+  const text = `${headline.title} ${headline.description || ""} ${headline.source || ""}`.toLowerCase();
+  let score = 0;
+
+  if (isWeakMarketRoomCatalyst(headline)) {
+    return -100;
+  }
+
+  if (headline.description && headline.description.length > 80) score += 8;
+  if (headline.entities && headline.entities.length > 0) score += 6;
+  if (/\b\d+(?:[.,]\d+)?(?:\s*%|bps|k|bn|b\b|bbl|mmb|\/oz)?\b/i.test(title)) score += 6;
+  if (/\b(?:earnings|revenue|guidance|trading update|beats?|misses?|downgrade|upgrade|acquisition|merger|buyback|dividend|cuts?|hikes?|surges?|plunges?|falls?|rises?|draw|inventory|incident|fire-related|clinical data|phase \d)\b/i.test(text)) score += 10;
+  if (/\b(?:fed|fomc|cpi|pce|payrolls?|nfp|unemployment|gdp|pmi|ism|treasury|yield|bond|oil|wti|brent|gold|copper|dollar|dxy|fx|vix|credit|spread|stocks?|shares?|earnings|revenue|guidance)\b/i.test(text)) score += 8;
+
+  if (/reuters|forexlive|businesswire|globenewswire|polygon|finnhub|marketaux/i.test(headline.source || "")) score += 3;
+  if (/motley fool|benzinga/i.test(headline.source || "")) score -= 8;
+
+  if (agent) {
+    score += scoreHeadlineForKeywords(headline, sectorKeywordsFor(agent)) * 8;
+    if (agent.sector === "Equities" && headline.entities && headline.entities.length > 0) score += 8;
+    if (agent.sector !== "Macro" && scoreHeadlineForKeywords(headline, sectorKeywordsFor(agent)) === 0) score -= 8;
+  }
+
+  return score;
+}
+
+function isWeakMarketRoomCatalyst(headline: SnapshotHeadline): boolean {
+  const text = `${headline.title} ${headline.description || ""} ${headline.source || ""}`.toLowerCase();
+
+  const weakPatterns = [
+    /\bmovie\s+screen\s+count\b/i,
+    /\bscreen\s+count\s+in\s+south\s+india\b/i,
+    /\bembassy\s+staffers?.*\b(?:die|crash|killed)\b/i,
+    /\bmexican\s+officers?.*\b(?:die|crash|killed)\b/i,
+    /\bchihuahua\s+crash\b/i,
+    /\bdekra\b.*\b(?:anniversary|growth trajectory)\b/i,
+    /\bagam\s+isac\b/i,
+    /\bcontinued growth in bermuda\b/i,
+    /\bpsychologist\b|\bhappiest relationships\b|\blifestyle\b|\bcelebrity\b/i,
+    /\bmajor league fishing\b/i,
+    /\bpassive income\b/i,
+    /\bstocks?\s+to\s+(?:buy|own|watch|avoid)\b/i,
+    /\bis\s+.+\s+stock\s+a\s+buy\b/i,
+    /\bwhat lies behind\b/i
+  ];
+
+  if (weakPatterns.some((pattern) => pattern.test(text))) {
+    return true;
+  }
+
+  const hasMarketAnchor =
+    /\b(?:fed|fomc|treasury|yield|bond|cpi|pce|payroll|nfp|jobs|gdp|inflation|dollar|dxy|fx|currency|oil|wti|brent|gold|copper|opec|inventory|stocks?|shares?|equity|earnings|revenue|guidance|acquisition|merger|dividend|buyback|credit|spread|vix|volatility)\b/i.test(text);
+  const hasCompanyEvent =
+    /\b(?:earnings|revenue|guidance|trading update|reports?|announces?|acquires?|acquisition|merger|dividend|buyback|downgrade|upgrade|clinical|phase \d|fire-related incident)\b/i.test(text) &&
+    Boolean(headline.entities && headline.entities.length > 0);
+
+  return !hasMarketAnchor && !hasCompanyEvent;
+}
+
+function matchesHeadlineKeyword(text: string, keyword: string): boolean {
+  const normalizedKeyword = keyword.toLowerCase();
+  if (normalizedKeyword.length <= 3) {
+    return new RegExp(`(^|[^a-z0-9])${escapeHeadlineRegExp(normalizedKeyword)}(?=[^a-z0-9]|$)`, "i").test(text);
+  }
+  return text.includes(normalizedKeyword);
+}
+
+function escapeHeadlineRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 /**

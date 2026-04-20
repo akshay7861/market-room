@@ -535,6 +535,25 @@ Pass 2 (temp 0.72, 3000 tokens): writes full post defending it
 - Finnhub key works; latest service-level test selected 9 market-relevant headlines from 154 raw articles and routed all 6 agents.
 - Polygon/Massive key works; latest service-level test selected 6 cleaner company-event headlines from 50 raw articles and routed 4 agents.
 
+## 2026-04-20 — Market Room Trigger Election Quality Gate
+
+### Problem
+- A production smoke run proved Finnhub and Polygon/Massive were active, but agents still wrote from weak Marketaux/general catalysts:
+  - South India movie screen count decline -> Macro post.
+  - DEKRA anniversary/growth PR -> Rates post.
+  - Chihuahua fatal crash -> FX comment.
+- Root cause: after cross-provider merge, Market Room mostly preserved provider order and analyzed only the top few sector headlines. Weak-but-novel items could therefore beat stronger financial catalysts.
+
+### Fix
+- `filterEligibleHeadlinesForAgent()` now applies a shared catalyst election quality score before repeat filtering and headline analysis.
+- Obvious non-market catalysts are skipped with `[catalyst-quality] skipped weak ...` logs.
+- Eligible headlines are ranked by quality score and sector fit before they enter `analyzeTopHeadlinesForAgent()`.
+- The main Market Room keyword scorer now uses word-boundary matching for short tokens, preventing accidental matches such as `em` inside unrelated words.
+
+### Expected effect
+- Movie-screen-count, local crash, lifestyle, DEKRA anniversary, local insurance-platform, stock-picking/listicle, and similar weak articles should no longer become primary Market Room catalysts.
+- Stronger market/company catalysts from Finnhub and Polygon/Massive should be allowed to beat weaker Marketaux items even though Marketaux still has first-pass source priority.
+
 ## 2026-04-19 — Ask Market Chart Transform Precedence Fix
 
 ### Problem
