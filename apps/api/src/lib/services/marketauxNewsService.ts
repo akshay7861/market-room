@@ -70,9 +70,34 @@ const NOISE_TITLE_PATTERNS: RegExp[] = [
   /mixed\s+(?:signals?|picture|session)/i
 ];
 
+const WEAK_MARKETAUX_TITLE_PATTERNS: RegExp[] = [
+  /\bnew\s+technical\s+director\b/i,
+  /\bdissolve\s+parliament\b/i,
+  /\bmandate\s+is\s+compromised\b/i,
+  /\bwhat\s+lies\s+behind\b/i,
+  /\bmovie\s+screen\s+count\b/i,
+  /\bscreen\s+count\s+in\s+south\s+india\b/i,
+  /\bembassy\s+staffers?.*\b(?:die|crash|killed)\b/i,
+  /\bmexican\s+officers?.*\b(?:die|crash|killed)\b/i,
+  /\bchihuahua\s+crash\b/i,
+  /\bdekra\b.*\b(?:anniversary|growth trajectory)\b/i,
+  /\bagam\s+isac\b/i,
+  /\bcontinued growth in bermuda\b/i,
+  /\bpsychologist\b|\bhappiest relationships\b|\blifestyle\b|\bcelebrity\b/i,
+  /\bmajor league fishing\b/i,
+  /\bpassive income\b/i,
+  /\bstocks?\s+to\s+(?:buy|own|watch|avoid)\b/i,
+  /\bis\s+.+\s+stock\s+a\s+buy\b/i,
+  /\bglobal fintech scaling\b/i
+];
+
 // Words that indicate the headline contains a specific, market-moving event
 const MECHANISM_WORDS = /\b(?:cut|hike|ban|beats?|misses?|surges?|plunges?|spikes?|draw|surplus|deficit|suspend|reject|impose|lift|sanction|merger|acquisition|bankruptcy|default|downgrade|upgrade)\b/i;
 const HAS_NUMBER = /\b\d+(?:[.,]\d+)?(?:\s*%|bps|k|bn|b\b|bbl|mmb|\/oz)?\b/;
+const MARKET_RELEVANCE_WORDS =
+  /\b(?:market|markets|stock|stocks|shares|equity|equities|s&p|nasdaq|dow|russell|bond|bonds|treasury|yield|yields|fed|fomc|inflation|cpi|pce|payroll|jobs|gdp|recession|dollar|currency|forex|fx|euro|yen|oil|wti|brent|crude|gold|copper|commodity|commodities|earnings|revenue|profit|margin|guidance|merger|acquisition|ipo|buyback|dividend|credit|spread|vix|volatility|tariff|sanction|trade|fta|free trade)\b/i;
+const COMPANY_EVENT_WORDS =
+  /\b(?:reports?|reported|announces?|announced|updates?|updated|beats?|misses?|guidance|outlook|trading\s+update|earnings|revenue|profit|margin|sales|orders?|contract|deal|acquires?|acquisition|merger|buyback|dividend|downgrade|upgrade|rating|target|fire|incident|launches?|approval|trial|clinical|preclinical|pipeline)\b/i;
 
 // ---------------------------------------------------------------------------
 // Article selection scoring (0-100)
@@ -156,7 +181,30 @@ function toSnapshotHeadline(article: MarketauxArticle): SnapshotHeadline {
 
 function scoreArticleForSector(article: MarketauxArticle, keywords: string[]): number {
   const text = `${article.title} ${article.description || ""} ${article.snippet || ""}`.toLowerCase();
-  return keywords.filter((kw) => text.includes(kw)).length;
+  return keywords.filter((kw) => matchesKeyword(text, kw)).length;
+}
+
+function hasMarketRelevance(article: MarketauxArticle): boolean {
+  const text = `${article.title} ${article.description || ""} ${article.snippet || ""}`;
+  if (WEAK_MARKETAUX_TITLE_PATTERNS.some((pattern) => pattern.test(text))) {
+    return false;
+  }
+
+  const hasEntity = article.entities.length > 0;
+  const hasMarketAnchor = MARKET_RELEVANCE_WORDS.test(text);
+  const hasCompanyEvent = hasEntity && COMPANY_EVENT_WORDS.test(text);
+  return hasMarketAnchor || hasCompanyEvent;
+}
+
+function matchesKeyword(text: string, keyword: string): boolean {
+  if (keyword.length <= 3) {
+    return new RegExp(`(^|[^a-z0-9])${escapeRegExp(keyword)}(?=[^a-z0-9]|$)`, "i").test(text);
+  }
+  return text.includes(keyword);
+}
+
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 // ---------------------------------------------------------------------------
@@ -320,6 +368,11 @@ export async function fetchMarketauxBriefing(
     // Hard reject: no description
     if (!description || description.length < 20) {
       candidates.push({ ...article, selectionScore: 0, selectionOutcome: "rejected_no_description" });
+      continue;
+    }
+
+    if (!hasMarketRelevance(article)) {
+      candidates.push({ ...article, selectionScore: 0, selectionOutcome: "rejected_noise" });
       continue;
     }
 

@@ -555,6 +555,26 @@ Pass 2 (temp 0.72, 3000 tokens): writes full post defending it
 - Stronger market/company catalysts from Finnhub and Polygon/Massive should be allowed to beat weaker Marketaux items even though Marketaux still has first-pass source priority.
 - Treasury official pages now skip vague/static pages such as "Role of the Treasury"; only concrete catalysts such as refunding, auctions, debt management, sanctions/OFAC, securities, buybacks, and financing estimates enter Market Room.
 
+## 2026-04-20 — Marketaux Cleanup + Equities Standalone Ownership Gate
+
+### Problem
+- Follow-up production retest showed Marketaux still selected weak items into `fetched_news_items`, even if they no longer became posts:
+  - `New technical director for Axter`
+  - Zambia parliament political headline
+- Equities could still open a standalone post on a macro/policy headline with `direct_relevance_score = 0` when thesis/novelty logic was high.
+
+### Fix
+- `marketauxNewsService.ts` now rejects weak/non-market headlines earlier using provider-specific weak patterns plus market/company-event relevance checks.
+- Marketaux routing now uses word-boundary keyword matching for short terms, matching Finnhub and Polygon/Massive behavior.
+- `marketRoomService.ts` now applies an Equities standalone ownership gate:
+  - Equities may open a post for company news, sector/index/equity terms, or direct equity relevance.
+  - If the headline is macro/policy with no equity ownership, Equities is downgraded to `comment_only` and logs `[equities-standalone] downgraded reason=weak_equity_ownership ...`.
+
+### Validation
+- `npm run typecheck --workspace @market-room/api` passes.
+- `npm run build --workspace @market-room/api` Worker dry-run passes.
+- `npm run charts:backtest` remains 22/22.
+
 ## 2026-04-19 — Ask Market Chart Transform Precedence Fix
 
 ### Problem

@@ -1073,6 +1073,12 @@ async function generateAgentForumPosts({
       headlineAnalysis
     });
     const domainAdjustedDecision = applyDomainRelevanceDecisionGate(rawPostingDecision, domainRelevance);
+    const equityAdjustedDecision = applyEquitiesStandaloneDecisionGate({
+      agent,
+      postingDecision: domainAdjustedDecision,
+      headlineAnalysis,
+      topHeadline: topHeadlineForDiagnostics
+    });
 
     // ── Run-level catalyst guard ──────────────────────────────────────────────
     // Prevents two agents from opening separate top-level posts on the same article.
@@ -1085,8 +1091,8 @@ async function generateAgentForumPosts({
     //    one sector should "own". If ANY agent already posted on this article, downgrade
     //    the second one to comment_only.
     const postingDecision = (() => {
-      if (domainAdjustedDecision.actionType !== "new_post" || !headlineAnalysis?.headline_title) {
-        return domainAdjustedDecision;
+      if (equityAdjustedDecision.actionType !== "new_post" || !headlineAnalysis?.headline_title) {
+        return equityAdjustedDecision;
       }
       const hTokens = headlineAnalysis.headline_title
         .toLowerCase()
@@ -1107,11 +1113,11 @@ async function generateAgentForumPosts({
         return hTokens.some((token) => runCat.includes(token) || runTitle.includes(token));
       });
 
-      if (!catalystAlreadyClaimed) return domainAdjustedDecision;
+      if (!catalystAlreadyClaimed) return equityAdjustedDecision;
       return {
-        ...domainAdjustedDecision,
+        ...equityAdjustedDecision,
         actionType: "comment_only" as const,
-        reasonCodes: [...domainAdjustedDecision.reasonCodes, "run_catalyst_claimed" as const]
+        reasonCodes: [...equityAdjustedDecision.reasonCodes, "run_catalyst_claimed" as const]
       };
     })();
 
@@ -3940,6 +3946,57 @@ function applyDomainRelevanceDecisionGate(
     actionType: "stay_silent",
     reasonCodes
   };
+}
+
+function applyEquitiesStandaloneDecisionGate({
+  agent,
+  postingDecision,
+  headlineAnalysis,
+  topHeadline
+}: {
+  agent: Agent;
+  postingDecision: PostingDecision;
+  headlineAnalysis: HeadlineAnalysis | null;
+  topHeadline?: SnapshotHeadline;
+}): PostingDecision {
+  if (agent.sector !== "Equities" || postingDecision.actionType !== "new_post" || !headlineAnalysis) {
+    return postingDecision;
+  }
+
+  if (hasEquityStandaloneOwnership(headlineAnalysis, topHeadline)) {
+    return postingDecision;
+  }
+
+  console.log(
+    `[equities-standalone] downgraded reason=weak_equity_ownership headline="${truncateText(headlineAnalysis.headline_title, 90)}" direct=${headlineAnalysis.direct_relevance_score}`
+  );
+
+  return {
+    ...postingDecision,
+    actionType: "comment_only",
+    reasonCodes: uniqueReasonCodes([...postingDecision.reasonCodes, "domain_relevance_low" as const])
+  };
+}
+
+function hasEquityStandaloneOwnership(
+  headlineAnalysis: HeadlineAnalysis,
+  topHeadline?: SnapshotHeadline
+): boolean {
+  const text = `${headlineAnalysis.headline_title} ${topHeadline?.description || ""} ${topHeadline?.source || ""}`.toLowerCase();
+
+  if (headlineAnalysis.direct_relevance_score >= 3) {
+    return true;
+  }
+
+  if (headlineAnalysis.headline_type === "company_news") {
+    return true;
+  }
+
+  if (/\b(?:stocks?|shares?|equities|s&p|nasdaq|dow|russell|earnings|eps|revenue|guidance|margin|valuation|multiple|financials?|banks?|small[-\s]?caps?|semiconductor|ai)\b/i.test(text)) {
+    return true;
+  }
+
+  return false;
 }
 
 function buildStanceLockChallenge(agent: Agent, recentPosts: AgentMessage[]): StanceLockChallenge | null {
