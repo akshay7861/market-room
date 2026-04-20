@@ -1169,9 +1169,17 @@ async function generateAgentForumPosts({
 
     const weakDomainAdjustedDecision = applyNoFreshWeakDomainDecisionGate(financingOwnershipAdjustedDecision);
 
-    const repetitionAdjustedDecision = applyRepeatedCatalystDecisionGate({
+    const ratesTemplateAdjustedDecision = applyRatesTemplateDecisionGate({
       agent,
       postingDecision: weakDomainAdjustedDecision,
+      headlineAnalysis,
+      topicPlan,
+      recentPosts
+    });
+
+    const repetitionAdjustedDecision = applyRepeatedCatalystDecisionGate({
+      agent,
+      postingDecision: ratesTemplateAdjustedDecision,
       headlineAnalysis,
       topicPlan,
       recentMessages: [...flattenThreadPosts(priorRoomThreads, 80), ...thisRunPosts],
@@ -4563,6 +4571,81 @@ function shouldSuppressUnsafeMetricPost(agent: Agent, flags: PostQualityFlag[]):
   return ["Macro", "Rates", "FX", "Risk/Sentiment", "Commodities"].includes(agent.sector);
 }
 
+function applyRatesTemplateDecisionGate({
+  agent,
+  postingDecision,
+  headlineAnalysis,
+  topicPlan,
+  recentPosts
+}: {
+  agent: Agent;
+  postingDecision: PostingDecision;
+  headlineAnalysis: HeadlineAnalysis | null;
+  topicPlan: AgentTopicPlan;
+  recentPosts: AgentMessage[];
+}): PostingDecision {
+  if (
+    agent.sector !== "Rates" ||
+    postingDecision.actionType === "stay_silent" ||
+    postingDecision.actionType === "comment_only"
+  ) {
+    return postingDecision;
+  }
+
+  const recentBearSteepenerCount = countRecentBearSteepenerPosts(recentPosts, 6);
+  if (recentBearSteepenerCount < 2) {
+    return postingDecision;
+  }
+
+  const candidateText = [
+    headlineAnalysis?.headline_title,
+    headlineAnalysis?.primary_mechanism,
+    headlineAnalysis?.what_changed,
+    topicPlan.primary.catalyst,
+    topicPlan.primary.label
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  if (isHardRatesCatalyst(candidateText)) {
+    return postingDecision;
+  }
+
+  console.log(
+    `[rates-template-gate] suppressed recent_bear_steepeners=${recentBearSteepenerCount} catalyst="${truncateText(candidateText, 110)}"`
+  );
+
+  return {
+    ...postingDecision,
+    actionType: "stay_silent",
+    reasonCodes: uniqueReasonCodes([
+      ...postingDecision.reasonCodes,
+      "rates_template_repetition",
+      "no_fresh_signal"
+    ])
+  };
+}
+
+function countRecentBearSteepenerPosts(recentPosts: AgentMessage[], limit: number): number {
+  return recentPosts
+    .slice(0, limit)
+    .filter(
+      (post) =>
+        post.messageType === "post" &&
+        /\bbear steepener\b/i.test(`${post.title || ""} ${post.content || ""}`)
+    ).length;
+}
+
+function isHardRatesCatalyst(text: string): boolean {
+  const normalized = text.toLowerCase();
+  if (/\b(?:nominee|investors should know|average investors|watchlist|top things|opinion|interview)\b/.test(normalized)) {
+    return false;
+  }
+  return /\b(?:treasury\s+(?:auction|refunding|supply|issuance)|auction|refunding|fomc|minutes|sep|dot plot|cpi|pce|nfp|payroll|jobs report|fed decision|rate decision|policy statement|breakeven|term premium|yield curve|2s10s|10y-2y|bid-to-cover|indirect bidder|dealer takedown|tail(?:ed)?)\b/i.test(
+    text
+  );
+}
+
 function shouldSuppressRatesTemplatePost(
   agent: Agent,
   headlineAnalysis: HeadlineAnalysis | null,
@@ -4573,10 +4656,7 @@ function shouldSuppressRatesTemplatePost(
     return false;
   }
 
-  const recentBearSteepenerCount = recentPosts
-    .slice(0, 4)
-    .filter((post) => /\bbear steepener\b/i.test(`${post.title || ""} ${post.content}`))
-    .length;
+  const recentBearSteepenerCount = countRecentBearSteepenerPosts(recentPosts, 6);
   if (recentBearSteepenerCount < 2) {
     return false;
   }

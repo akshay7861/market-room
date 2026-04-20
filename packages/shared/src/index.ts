@@ -596,7 +596,8 @@ export type PostingReasonCode =
   | "comment_repetition_gate"
   | "alternate_catalyst_selected"
   | "domain_relevance_low"
-  | "stance_lock_challenge";
+  | "stance_lock_challenge"
+  | "rates_template_repetition";
 
 export type PostQualityFlag =
   | "missing_title"

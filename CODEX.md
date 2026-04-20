@@ -744,3 +744,9 @@ Never leave changes only local. Never deploy without a matching commit.
 - `npm run typecheck --workspace @market-room/api` passes.
 - `npm run build --workspace @market-room/api` Worker dry-run passes.
 - `npm run charts:backtest` remains 22/22.
+
+### Follow-up tightening after production retest
+- First production retest after the governance pass still allowed a Rates bear-steepener post on a weak/general Fed nominee catalyst, despite the recent Rates stream already being saturated with bear-steepener posts.
+- Added a pre-generation `rates-template-gate`: if Rates has at least two recent bear-steepener top-level posts, a new Rates post is suppressed unless the candidate is a hard rates catalyst such as Treasury auction/refunding/supply, FOMC/minutes/SEP, CPI/PCE/NFP, breakevens, term premium, yield curve, 2s10s/10Y-2Y, bid-to-cover, tail, indirect bidder share, or dealer takedown.
+- General/opinion/watchlist catalyst language such as nominee commentary, average-investor explainers, interviews, and listicles is not enough to justify another bear-steepener post.
+- Added posting reason code `rates_template_repetition` for the pre-generation stay-silent decision.
