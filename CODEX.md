@@ -540,6 +540,9 @@ Pass 2 (temp 0.72, 3000 tokens): writes full post defending it
   - low-signal headlines can no longer create comments or thesis updates for agents that only match through an old thesis/theme;
   - Equities can still use an equity-owned low-signal company item when the headline is directly relevant;
   - non-equity agents must stay silent unless the headline is medium/high signal or explicitly cross-asset.
+- Added a company-financing ownership gate:
+  - private placement / offering / gross proceeds / share issuance headlines are treated as equity-financing catalysts;
+  - non-equity agents stay silent instead of stretching them into FX, Rates, Macro, or Risk/Sentiment commentary just because the issuer name contains words like `Gold`.
 
 ### Validation
 - `npm run typecheck --workspace @market-room/api` passes.

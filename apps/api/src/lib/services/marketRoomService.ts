@@ -1161,7 +1161,13 @@ async function generateAgentForumPosts({
       topHeadline: topHeadlineForDiagnostics
     });
 
-    const weakDomainAdjustedDecision = applyNoFreshWeakDomainDecisionGate(lowSignalAdjustedDecision);
+    const financingOwnershipAdjustedDecision = applyCompanyFinancingOwnershipGate({
+      agent,
+      postingDecision: lowSignalAdjustedDecision,
+      headlineAnalysis
+    });
+
+    const weakDomainAdjustedDecision = applyNoFreshWeakDomainDecisionGate(financingOwnershipAdjustedDecision);
 
     const repetitionAdjustedDecision = applyRepeatedCatalystDecisionGate({
       agent,
@@ -4013,6 +4019,39 @@ function applyLowSignalThesisOnlyDecisionGate({
 
   console.log(
     `[trigger-election] downgraded action=${postingDecision.actionType}->stay_silent reason=low_signal_thesis_only agent=${agent.sector} direct=${headlineAnalysis.direct_relevance_score} headline="${truncateText(headlineAnalysis.headline_title, 90)}"`
+  );
+
+  return {
+    ...postingDecision,
+    actionType: "stay_silent",
+    reasonCodes: uniqueReasonCodes([...postingDecision.reasonCodes, "weak_catalyst_materiality_gate" as const])
+  };
+}
+
+function applyCompanyFinancingOwnershipGate({
+  agent,
+  postingDecision,
+  headlineAnalysis
+}: {
+  agent: Agent;
+  postingDecision: PostingDecision;
+  headlineAnalysis: HeadlineAnalysis | null;
+}): PostingDecision {
+  if (postingDecision.actionType === "stay_silent" || !headlineAnalysis) {
+    return postingDecision;
+  }
+
+  const financingHeadline =
+    /\b(?:private\s+placement|non-brokered\s+private\s+placement|registered\s+direct\s+offering|public\s+offering|gross\s+proceeds|at-the-market\s+offering|atm\s+offering|equity\s+financing|share\s+issuance)\b/i.test(
+      headlineAnalysis.headline_title
+    );
+
+  if (!financingHeadline || agent.sector === "Equities") {
+    return postingDecision;
+  }
+
+  console.log(
+    `[trigger-election] downgraded action=${postingDecision.actionType}->stay_silent reason=company_financing_not_sector_catalyst agent=${agent.sector} headline="${truncateText(headlineAnalysis.headline_title, 90)}"`
   );
 
   return {
