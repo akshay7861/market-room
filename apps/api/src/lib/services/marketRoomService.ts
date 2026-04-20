@@ -1154,7 +1154,14 @@ async function generateAgentForumPosts({
       headlineAnalysis
     });
 
-    const weakDomainAdjustedDecision = applyNoFreshWeakDomainDecisionGate(materialityAdjustedDecision);
+    const lowSignalAdjustedDecision = applyLowSignalThesisOnlyDecisionGate({
+      agent,
+      postingDecision: materialityAdjustedDecision,
+      headlineAnalysis,
+      topHeadline: topHeadlineForDiagnostics
+    });
+
+    const weakDomainAdjustedDecision = applyNoFreshWeakDomainDecisionGate(lowSignalAdjustedDecision);
 
     const repetitionAdjustedDecision = applyRepeatedCatalystDecisionGate({
       agent,
@@ -3977,6 +3984,41 @@ function applyEquitiesStandaloneDecisionGate({
     ...postingDecision,
     actionType: "comment_only",
     reasonCodes: uniqueReasonCodes([...postingDecision.reasonCodes, "domain_relevance_low" as const])
+  };
+}
+
+function applyLowSignalThesisOnlyDecisionGate({
+  agent,
+  postingDecision,
+  headlineAnalysis,
+  topHeadline
+}: {
+  agent: Agent;
+  postingDecision: PostingDecision;
+  headlineAnalysis: HeadlineAnalysis | null;
+  topHeadline?: SnapshotHeadline;
+}): PostingDecision {
+  if (postingDecision.actionType === "stay_silent" || headlineAnalysis?.market_signal_strength !== "low") {
+    return postingDecision;
+  }
+
+  const equityOwned =
+    agent.sector === "Equities" &&
+    headlineAnalysis.direct_relevance_score >= 3 &&
+    hasEquityStandaloneOwnership(headlineAnalysis, topHeadline);
+
+  if (equityOwned) {
+    return postingDecision;
+  }
+
+  console.log(
+    `[trigger-election] downgraded action=${postingDecision.actionType}->stay_silent reason=low_signal_thesis_only agent=${agent.sector} direct=${headlineAnalysis.direct_relevance_score} headline="${truncateText(headlineAnalysis.headline_title, 90)}"`
+  );
+
+  return {
+    ...postingDecision,
+    actionType: "stay_silent",
+    reasonCodes: uniqueReasonCodes([...postingDecision.reasonCodes, "weak_catalyst_materiality_gate" as const])
   };
 }
 

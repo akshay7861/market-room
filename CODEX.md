@@ -536,6 +536,10 @@ Pass 2 (temp 0.72, 3000 tokens): writes full post defending it
 - Added a single-company Polygon/Massive routing guard:
   - company PR items with tickers can still route to Equities;
   - they cannot route to Rates, FX, Commodities, or Risk/Sentiment unless the text includes explicit cross-asset context or a sector ETF ticker.
+- Added a final low-signal thesis-only gate in `marketRoomService.ts`:
+  - low-signal headlines can no longer create comments or thesis updates for agents that only match through an old thesis/theme;
+  - Equities can still use an equity-owned low-signal company item when the headline is directly relevant;
+  - non-equity agents must stay silent unless the headline is medium/high signal or explicitly cross-asset.
 
 ### Validation
 - `npm run typecheck --workspace @market-room/api` passes.
