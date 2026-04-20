@@ -549,6 +549,30 @@ Pass 2 (temp 0.72, 3000 tokens): writes full post defending it
 - `npm run build --workspace @market-room/api` Worker dry-run passes.
 - `npm run charts:backtest` remains 22/22.
 
+## 2026-04-20 — Equities Company-First Governance Pass
+
+### Root cause
+- Equities was finally receiving clearer stock/deal/earnings catalysts, but its live system prompt still made `IWM vs SPY`, `XLF`, and `VIX` the first instruments.
+- Result: named-company posts such as ThredUp and QXO/TopBuild drifted into broad breadth / small-cap / XLF regime commentary before citing company financial numbers.
+
+### Fix
+- Updated the live D1 `equities-agent` system prompt and `database/seeds/001_seed.sql` so named-company catalysts are company-first.
+- Added an Equities company-first prompt block in `marketRoomService.ts`:
+  - named-company/deal/earnings/ticker catalysts must open on the company/deal;
+  - at least two company/deal-level numbers are required;
+  - `IWM/SPY`, `XLF`, `VIX`, megacap breadth, and `other 490` framing are confirmation context only.
+- Added post-generation suppression for weak stock-specific Equities posts:
+  - if a stock-specific Equities post has fewer than two company/deal-level numbers, it is suppressed before persistence;
+  - major M&A can still publish if the article itself supplies deal economics.
+- Added quality flags:
+  - `stock_specific_no_fundamentals`;
+  - `equity_breadth_overused`.
+
+### Validation
+- `npm run typecheck --workspace @market-room/api` passes.
+- `npm run build --workspace @market-room/api` Worker dry-run passes.
+- `npm run charts:backtest` remains 22/22.
+
 ## 2026-04-20 — Finnhub + Polygon/Massive Provider Validation
 
 ### Massive / Polygon note

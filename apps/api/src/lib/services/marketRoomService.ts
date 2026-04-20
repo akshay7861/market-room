@@ -1283,7 +1283,8 @@ async function generateAgentForumPosts({
       hasStoredContext: knowledgeSnippets.length > 0,
       postingDecision: catalystCorrectedDecision,
       verifiedMetrics,
-      stanceChallengeActive: Boolean(stanceChallenge?.active)
+      stanceChallengeActive: Boolean(stanceChallenge?.active),
+      headlineAnalysis
     });
     const postingDecisionWithQualityFlags: PostingDecision = {
       ...catalystCorrectedDecision,
@@ -1294,6 +1295,13 @@ async function generateAgentForumPosts({
       console.log(
         `[post-quality:${agent.name}] flags=${postQualityFlags.join(",")} title="${titleResolution.title ?? "null"}"`
       );
+    }
+
+    if (shouldSuppressWeakEquityCompanyPost(agent, headlineAnalysis, resolvedContent, finalCatalyst)) {
+      console.log(
+        `[equities-quality] suppressed stock-specific post reason=missing_company_numbers title="${truncateText(titleResolution.title ?? finalCatalyst, 100)}"`
+      );
+      continue;
     }
 
     const message: AgentMessage = {
@@ -2858,6 +2866,13 @@ function buildForumPostPrompt(
   const postType = postStyleFor(agent, marketSnapshot, previousSnapshot, mergedHeadlines);
   const ownedCatalystGuard = mainCatalystGuardFor(agent, mergedHeadlines, availableInstruments);
   const sectorDeltaSummary = buildSectorDeltaSummary(agent, previousSnapshot, marketSnapshot);
+  const equityCompanyFirstBlock = buildEquityCompanyFirstBlock({
+    agent,
+    headlineAnalysis,
+    equityFundamentals,
+    recentPosts,
+    sectorHeadlines
+  });
 
   // Build the primary headline analysis block (shown at top when analysis is available)
   const primaryHeadlineBlock: string[] = [];
@@ -2909,6 +2924,7 @@ function buildForumPostPrompt(
       : "No matching live thesis was found for this angle.",
     // Primary headline analysis block (if available, shown before topic inventory)
     ...primaryHeadlineBlock,
+    equityCompanyFirstBlock,
     `Preferred fresh angle for this run: ${topicPlan.primary.label}.`,
     // When a high-quality headline is identified, lock the catalyst to it so the LLM gets a consistent signal
     headlineAnalysis && headlineAnalysis.market_signal_strength !== "noise" && headlineAnalysis.primary_mechanism !== ""
@@ -3004,6 +3020,52 @@ function buildForumPostPrompt(
     "FACT ATTRIBUTION RULE: when multiple company events (layoffs, earnings, guidance cuts, M&A) appear in the same headline batch, every statistic must be preceded by the exact company name it belongs to. Never merge figures from different companies into a single clause. Example — correct: 'Meta announced 8,000 cuts; Amazon announced 16,000 cuts.' Example — wrong: 'the company cut 16,000 jobs.' If you cannot confirm which number belongs to which company, omit the specific figure rather than attributing it incorrectly.",
     "STORED DATA CITATION RULE: when citing a correlation coefficient, beta, ratio, or quantitative figure from the historical data blocks above, reproduce the figure exactly as it appears in those blocks. Do not round, adjust, or recall it from any other context. Example: if the block says 'Broad Dollar YoY% vs WTI YoY% correlation approximately -0.55', write -0.55 — not -0.83 or any other value. Discrepancies between what is in the data block and what you recall from training must always resolve in favour of the data block.",
     "CATALYST QUALITY RULE: if the top headline appears to be a stock-screener list (e.g. 'N Most Undervalued Stocks to Buy Now', 'Best Dividend Stocks for 2025') treat it as noise. Do not use it as your primary catalyst. Instead, identify the specific company or macro development embedded in it — if no concrete company or data point can be extracted, skip the headline entirely and build your post from the next substantive catalyst in the list."
+  ].filter(Boolean).join("\n");
+}
+
+function buildEquityCompanyFirstBlock({
+  agent,
+  headlineAnalysis,
+  equityFundamentals,
+  recentPosts,
+  sectorHeadlines
+}: {
+  agent: Agent;
+  headlineAnalysis: HeadlineAnalysis | null;
+  equityFundamentals: string;
+  recentPosts: AgentMessage[];
+  sectorHeadlines: SnapshotHeadline[];
+}): string {
+  if (agent.sector !== "Equities") {
+    return "";
+  }
+
+  const catalyst = headlineAnalysis?.headline_title || sectorHeadlines[0]?.title || "";
+  const stockSpecific = isStockSpecificEquityCatalyst(agent, headlineAnalysis, catalyst);
+  const recentBreadthMentions = recentPosts
+    .slice(0, 2)
+    .filter((post) => /\b(?:IWM\/SPY|IWM|SPY|XLF|VIX|breadth|small[-\s]?cap|mega-cap|other 490)\b/i.test(post.content))
+    .length;
+
+  if (!stockSpecific) {
+    return [
+      "EQUITIES MODE: INDEX / SECTOR / FACTOR CATALYST.",
+      "You may use breadth, IWM/SPY, XLF, and VIX because the catalyst is not a single-company event.",
+      "Still cite one concrete index, sector, earnings-revision, valuation, or breadth metric; do not rely on generic regime language."
+    ].join("\n");
+  }
+
+  return [
+    "EQUITIES MODE: NAMED-COMPANY / STOCK-SPECIFIC CATALYST.",
+    "COMPANY-FIRST RULE: the first paragraph must be about the named company or deal in the primary headline. Do NOT open with IWM/SPY, XLF, VIX, megacap breadth, or the other-490 framework.",
+    "REQUIRED NUMBERS: cite at least TWO company/deal-level numbers from the article or fundamentals block: price move, revenue, EPS, guidance, margin, market cap, P/E, EV/EBITDA, debt/leverage, cash flow, deal value, EBITDA, synergy target, dividend, buyback size, or gross proceeds.",
+    equityFundamentals
+      ? "The fundamentals block below is mandatory evidence. Use its actual P/E/EPS/market-cap fields if present."
+      : "No usable fundamentals block was injected. If the article does not provide at least two company/deal numbers, do not fake them; the post may be suppressed after generation.",
+    "BREADTH LIMIT: IWM/SPY, XLF, VIX, and broad market breadth can appear only after the company-specific analysis, and at most once as confirmation context.",
+    recentBreadthMentions > 0
+      ? `RECENT REPETITION WARNING: ${recentBreadthMentions} of your last 2 posts used breadth/IWM-SPY style framing. Avoid that framework here unless it is the catalyst itself.`
+      : ""
   ].filter(Boolean).join("\n");
 }
 
@@ -4256,7 +4318,8 @@ function collectPostQualityFlags({
   hasStoredContext,
   postingDecision,
   verifiedMetrics,
-  stanceChallengeActive
+  stanceChallengeActive,
+  headlineAnalysis
 }: {
   agent: Agent;
   titleFlags: PostQualityFlag[];
@@ -4265,6 +4328,7 @@ function collectPostQualityFlags({
   postingDecision: PostingDecision;
   verifiedMetrics: VerifiedMarketMetricsContext;
   stanceChallengeActive: boolean;
+  headlineAnalysis: HeadlineAnalysis | null;
 }): PostQualityFlag[] {
   const flags = new Set<PostQualityFlag>([
     ...(postingDecision.qualityFlags || []),
@@ -4308,7 +4372,84 @@ function collectPostQualityFlags({
     flags.add("stance_lock_review_missing");
   }
 
+  if (isStockSpecificEquityCatalyst(agent, headlineAnalysis, postingDecision.suggestedTopic?.catalyst || "")) {
+    const companyEvidenceCount = countCompanyLevelNumericEvidence(content);
+    const breadthMentions = countBreadthFrameworkMentions(content);
+    if (companyEvidenceCount < 2) {
+      flags.add("stock_specific_no_fundamentals");
+    }
+    if (breadthMentions >= 2 || (breadthMentions >= 1 && companyEvidenceCount < 2)) {
+      flags.add("equity_breadth_overused");
+    }
+  }
+
   return [...flags];
+}
+
+function shouldSuppressWeakEquityCompanyPost(
+  agent: Agent,
+  headlineAnalysis: HeadlineAnalysis | null,
+  content: string,
+  catalyst: string
+): boolean {
+  if (!isStockSpecificEquityCatalyst(agent, headlineAnalysis, catalyst)) {
+    return false;
+  }
+
+  const evidenceCount = countCompanyLevelNumericEvidence(content);
+  if (evidenceCount >= 2) {
+    return false;
+  }
+
+  const isMajorDeal = /\b(?:acquir|merger|takeover|deal|buyout|all-cash|cash-and-stock)\b/i.test(catalyst) &&
+    /\$\s?\d+(?:\.\d+)?\s?(?:bn|billion|m|million)?/i.test(catalyst);
+
+  // Major M&A can publish if the article itself supplies deal economics even
+  // when Yahoo fundamentals are unavailable. Ordinary earnings/company posts
+  // need company-level numbers or they become generic breadth commentary.
+  return !isMajorDeal;
+}
+
+function isStockSpecificEquityCatalyst(
+  agent: Agent,
+  headlineAnalysis: HeadlineAnalysis | null,
+  catalyst: string
+): boolean {
+  if (agent.sector !== "Equities") {
+    return false;
+  }
+
+  const text = `${headlineAnalysis?.headline_title || ""} ${catalyst}`.toLowerCase();
+  if (headlineAnalysis?.headline_type === "company_news") {
+    return true;
+  }
+
+  return /\b(?:nasdaq|nyse|tsx|lse|asx|ticker|earnings|eps|revenue|guidance|margin|profit|loss|dividend|buyback|share repurchase|acquir|merger|takeover|deal|private placement|offering|gross proceeds|upgrade|downgrade|price target)\b/i.test(text);
+}
+
+function countCompanyLevelNumericEvidence(content: string): number {
+  const evidencePatterns = [
+    /\$\s?\d+(?:\.\d+)?\s?(?:bn|billion|m|million)?\b/gi,
+    /\b\d+(?:\.\d+)?\s?%\s?(?:revenue|sales|margin|gross margin|operating margin|ebitda margin|eps|guidance|growth|decline|beat|miss|stake|ownership|debt|leverage|synerg)/gi,
+    /\b(?:revenue|sales|margin|gross margin|operating margin|ebitda|eps|p\/e|pe|ev\/ebitda|free cash flow|fcf|debt|leverage|net debt|guidance|synerg(?:y|ies)|market cap|valuation|multiple)\s+(?:of|at|near|around|above|below|to|from|by)?\s*\$?\d+(?:\.\d+)?\s?(?:%|x|bn|billion|m|million)?/gi,
+    /\b\d+(?:\.\d+)?x\b/gi
+  ];
+
+  const matches = new Set<string>();
+  for (const pattern of evidencePatterns) {
+    for (const match of content.matchAll(pattern)) {
+      const value = match[0].toLowerCase().replace(/\s+/g, " ").trim();
+      if (!/\b(?:10y|2y|dxy|vix|spy|iwm|xlf|hy oas|bps|wti|brent|gold)\b/i.test(value)) {
+        matches.add(value);
+      }
+    }
+  }
+  return matches.size;
+}
+
+function countBreadthFrameworkMentions(content: string): number {
+  const matches = content.match(/\b(?:IWM\/SPY|IWM|SPY|XLF|VIX|breadth|small[-\s]?cap|mega-cap|other 490|index level|headline indices)\b/gi);
+  return matches?.length || 0;
 }
 
 function isWeakConvictionCondition(content: string): boolean {
@@ -4461,8 +4602,11 @@ function buildSectorSpecificInstructions(agent: Agent): string | null {
     case "Equities":
       return [
         "EQUITY SPECIFICITY RULE: Index-level moves alone (e.g. 'SPY up 1%') are not sufficient anchors.",
-        "Every post must cite at least one equity-specific metric: an earnings result, P/E or valuation multiple, sector relative performance vs. the index, a revenue beat/miss, or a named company's specific move and why it matters.",
-        "Generic index commentary is what a news terminal provides. Analyst work names the stock, the multiple, or the earnings driver.",
+        "If the primary catalyst names a company, deal, earnings report, guidance change, buyback, dividend, financing, upgrade/downgrade, or ticker, your post must be COMPANY-FIRST.",
+        "Company-first means: name the stock/deal in paragraph one, cite at least TWO company/deal-level numbers, and explain revenue/EPS/margin/leverage/valuation/cash-flow implications before any market-breadth discussion.",
+        "IWM/SPY, XLF, VIX, megacap breadth, and 'the other 490 names' are confirmation tools only. They must not be the thesis of a named-company post.",
+        "For index, sector, or factor catalysts, breadth and sector-relative performance are acceptable, but still cite a concrete metric.",
+        "Generic index commentary is what a news terminal provides. Analyst work names the stock, the multiple, the earnings driver, or the balance-sheet constraint.",
       ].join("\n");
     case "FX":
       return [
