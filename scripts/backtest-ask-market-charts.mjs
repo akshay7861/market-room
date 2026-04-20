@@ -170,6 +170,7 @@ const threadCases = [
     messages: [
       { role: "user", content: "FX: Show a cross-asset correlation heatmap" },
       { role: "assistant", content: "Here is the full heatmap." },
+      { role: "user", content: "Now show only oil inflation dollar and SPY" },
       { role: "user", content: "Now show only oil inflation dollar and SPY" }
     ],
     titleIncludes: ["Cross-asset correlation heatmap"],

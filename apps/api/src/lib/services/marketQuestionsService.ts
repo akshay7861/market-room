@@ -180,7 +180,7 @@ export async function replyToMarketQuestionThread(
   const assistantMessage = await generateAgentQuestionReply(
     env,
     agent,
-    [...priorMessages, userMessage],
+    priorMessages,
     question.trim()
   );
 

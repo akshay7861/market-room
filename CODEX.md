@@ -461,6 +461,8 @@ Pass 2 (temp 0.72, 3000 tokens): writes full post defending it
 - Drawdown requests now recognize explicit assets such as SPY, WTI, and DXY/dollar index.
 - Latest user follow-up now overrides older chart context for chart mode, so "now show it as rolling correlation" is not overridden by a previous lead-lag request.
 - Heatmap follow-up subsets now use the latest user message first, so "only oil inflation dollar and SPY" returns a 4x4 matrix instead of the previous full 7x7 matrix.
+- Fixed Ask Market follow-up assembly so the latest user message is not passed twice into the prompt/chart context. The duplicate latest message caused subset follow-ups to lose the original heatmap request and degrade into a WTI/CPI line chart.
+- `buildChartIntentFromThread` defensively dedupes adjacent identical user messages.
 
 ### Validation
 - `npm run charts:backtest` now covers 22 deterministic chart cases and passes 22/22.

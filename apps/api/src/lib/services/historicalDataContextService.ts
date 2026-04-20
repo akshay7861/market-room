@@ -996,7 +996,9 @@ export function buildChartDataFromQuestion(question: string): ChartData | null {
 }
 
 export function buildChartIntentFromThread(messages: Array<{ role: string; content: string }>): ChartIntent | null {
-  const userMessages = messages.filter((message) => message.role === "user").map((message) => message.content);
+  const userMessages = dedupeAdjacentMessages(
+    messages.filter((message) => message.role === "user").map((message) => message.content)
+  );
   const latest = userMessages[userMessages.length - 1] || "";
   if (!latest.trim()) {
     return null;
@@ -1024,6 +1026,17 @@ export function buildChartIntentFromThread(messages: Array<{ role: string; conte
     ? sourceText
     : `${latest}\n${priorChartModification || ""}`;
   return buildChartIntentFromQuestion(sourceText, modifierText);
+}
+
+function dedupeAdjacentMessages(messages: string[]): string[] {
+  const deduped: string[] = [];
+  for (const message of messages) {
+    if (deduped[deduped.length - 1]?.trim() === message.trim()) {
+      continue;
+    }
+    deduped.push(message);
+  }
+  return deduped;
 }
 
 export function buildChartDataFromIntent(intent: ChartIntent): ChartData | null {
