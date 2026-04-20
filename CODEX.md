@@ -553,6 +553,7 @@ Pass 2 (temp 0.72, 3000 tokens): writes full post defending it
 ### Expected effect
 - Movie-screen-count, local crash, lifestyle, DEKRA anniversary, local insurance-platform, stock-picking/listicle, and similar weak articles should no longer become primary Market Room catalysts.
 - Stronger market/company catalysts from Finnhub and Polygon/Massive should be allowed to beat weaker Marketaux items even though Marketaux still has first-pass source priority.
+- Treasury official pages now skip vague/static pages such as "Role of the Treasury"; only concrete catalysts such as refunding, auctions, debt management, sanctions/OFAC, securities, buybacks, and financing estimates enter Market Room.
 
 ## 2026-04-19 — Ask Market Chart Transform Precedence Fix
 

@@ -139,7 +139,7 @@ async function fetchTreasuryHeadlines(): Promise<SnapshotHeadline[]> {
         title: decodeHtmlEntities(match[2].trim()),
         url: match[1].startsWith("http") ? match[1] : `https://home.treasury.gov${match[1]}`
       }))
-      .filter((item) => /(auction|treasury|debt|marketable|bond|security|financing|rates|yield)/i.test(item.title))
+      .filter((item) => isAutonomousTreasuryCatalyst(item.title))
       .slice(0, 5)
       .map((item) => ({
         title: item.title,
@@ -151,6 +151,16 @@ async function fetchTreasuryHeadlines(): Promise<SnapshotHeadline[]> {
   } catch {
     return [];
   }
+}
+
+function isAutonomousTreasuryCatalyst(title: string): boolean {
+  const text = title.toLowerCase();
+  if (/\brole of the treasury\b|\babout treasury\b|\bsecretary\b|\bremarks by\b|\bstatement by\b|\btravel to\b|\bvisit to\b/i.test(text)) {
+    console.log(`[catalyst-filter] skipped low_materiality_official tier=low reason=vague_treasury_page title="${truncateForLog(title)}"`);
+    return false;
+  }
+
+  return /\b(?:quarterly refunding|auction|auction results?|marketable borrowing|debt limit|debt management|treasury securities|treasury bills?|treasury notes?|treasury bonds?|buyback|financing estimates?|sanctions?|ofac|financial stability|currency report)\b/i.test(text);
 }
 
 function extractRssItems(xml: string): Array<{
