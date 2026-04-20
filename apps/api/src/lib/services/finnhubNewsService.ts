@@ -44,6 +44,12 @@ const MECHANISM_WORDS = /\b(?:cut|hike|ban|beats?|misses?|surges?|plunges?|spike
 const HAS_NUMBER = /\b\d+(?:[.,]\d+)?(?:\s*%|bps|k|bn|b\b|bbl|mmb|\/oz)?\b/;
 const FINNHUB_BASE = "https://finnhub.io/api/v1/news";
 const FINNHUB_CATEGORIES = ["general", "forex", "merger"];
+const MARKET_RELEVANCE_WORDS =
+  /\b(?:market|markets|stock|stocks|equity|equities|s&p|nasdaq|dow|russell|bond|bonds|treasury|yield|yields|fed|fomc|inflation|cpi|pce|payroll|jobs|gdp|recession|dollar|currency|forex|fx|euro|yen|rupee|oil|wti|brent|crude|gold|copper|commodity|commodities|earnings|revenue|profit|margin|guidance|merger|acquisition|ipo|buyback|dividend|credit|spread|vix|volatility|tariff|sanction)\b/i;
+const EQUITY_MARKET_PHRASES =
+  /\b(?:shares?\s+(?:rise|rises|rose|fall|falls|fell|drop|drops|jump|jumps|muted|wobble|wobbles|rally|rallies|slide|slides|gain|gains|lose|loses|close|closes|open|opens)|(?:indian|asian|european|u\.?s\.?|wall\s+street)\s+shares?)\b/i;
+const FINANCIAL_RATE_PHRASES =
+  /\b(?:interest\s+rates?|policy\s+rates?|fed\s+funds|rate\s+(?:cut|cuts|hike|hikes|hold|holds)|rates?\s+(?:cut|cuts|hike|hikes|hold|holds|rise|fall|jump|drop))\b/i;
 
 function tokenize(text: string): string[] {
   return text
@@ -79,6 +85,13 @@ function articleDescription(article: FinnhubArticle): string {
 function articleEntities(article: FinnhubArticle): string[] {
   const related = article.related?.trim();
   return related ? [related] : [];
+}
+
+function hasMarketRelevance(article: FinnhubArticle): boolean {
+  if (article.category === "forex" || article.category === "merger") return true;
+  if (articleEntities(article).length > 0) return true;
+  const text = `${article.headline} ${articleDescription(article)}`;
+  return MARKET_RELEVANCE_WORDS.test(text) || EQUITY_MARKET_PHRASES.test(text) || FINANCIAL_RATE_PHRASES.test(text);
 }
 
 function scoreArticle(article: FinnhubArticle): number {
@@ -219,6 +232,11 @@ export async function fetchFinnhubBriefing(
 
     if (!description || description.length < 20) {
       candidates.push({ ...article, selectionScore: 0, selectionOutcome: "rejected_no_description" });
+      continue;
+    }
+
+    if (!hasMarketRelevance(article)) {
+      candidates.push({ ...article, selectionScore: 0, selectionOutcome: "rejected_noise" });
       continue;
     }
 
