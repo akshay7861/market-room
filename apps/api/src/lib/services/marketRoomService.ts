@@ -812,7 +812,7 @@ function buildDiscussionThreads(posts: AgentMessage[], comments: AgentMessage[])
   }
 
   return [...posts]
-    .sort((left, right) => latestThreadActivityAt(right, commentsByParent).localeCompare(latestThreadActivityAt(left, commentsByParent)))
+    .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
     .map((post) => ({
       post,
       comments: [...(commentsByParent.get(post.id) || [])].sort((left, right) =>
@@ -1191,10 +1191,19 @@ async function generateAgentForumPosts({
     const parentPostId =
       generationDecision.targetPostId ||
       (isUpdate ? topicPlan.updateTargetPostId : null);
-    const resolvedContent = trimToWordLimit(
-      result?.content || fallbackForumPost(agent, marketSnapshot, previousSnapshot),
-      isUpdate ? 170 : 320
-    );
+    const finalCatalyst =
+      result?.catalyst ||
+      (headlineAnalysis && headlineAnalysis.market_signal_strength !== "noise" ? headlineAnalysis.headline_title : "") ||
+      topicPlan.primary.catalyst ||
+      fallbackCatalyst(agent, marketSnapshot);
+    const resolvedContent = ensureRequiredConvictionCondition({
+      agent,
+      content: trimToWordLimit(
+        result?.content || fallbackForumPost(agent, marketSnapshot, previousSnapshot),
+        isUpdate ? 170 : 320
+      ),
+      catalyst: finalCatalyst
+    });
     const resolvedStance = result?.stance || stanceFor(agent);
     const titleResolution = resolveForumPostTitle({
       agent,
@@ -1205,11 +1214,6 @@ async function generateAgentForumPosts({
       stance: resolvedStance,
       isUpdate
     });
-    const finalCatalyst =
-      result?.catalyst ||
-      (headlineAnalysis && headlineAnalysis.market_signal_strength !== "noise" ? headlineAnalysis.headline_title : "") ||
-      topicPlan.primary.catalyst ||
-      fallbackCatalyst(agent, marketSnapshot);
     const { decision: catalystCorrectedDecision, corrected: catalystCorrected } = correctPostingDecisionCatalyst({
       agent,
       postingDecision: generationDecision,
@@ -3883,6 +3887,44 @@ function correctPostingDecisionCatalyst({
 
 function uniqueReasonCodes(reasonCodes: PostingDecision["reasonCodes"]): PostingDecision["reasonCodes"] {
   return [...new Set(reasonCodes)] as PostingDecision["reasonCodes"];
+}
+
+function ensureRequiredConvictionCondition({
+  agent,
+  content,
+  catalyst
+}: {
+  agent: Agent;
+  content: string;
+  catalyst: string;
+}): string {
+  if (/\bThis view changes if\b/i.test(content)) {
+    return content;
+  }
+
+  const repaired = `${content.trim()} ${convictionRepairSentence(agent, catalyst)}`.trim();
+  console.log(`[conviction-repair] agent=${agent.sector} appended required condition`);
+  return repaired;
+}
+
+function convictionRepairSentence(agent: Agent, catalyst: string): string {
+  const catalystText = catalyst.toLowerCase();
+  if (agent.sector === "Commodities" || /\boil|wti|brent|crude|gas|opec|eia|inventory|strait\b/.test(catalystText)) {
+    return "This view changes if EIA crude inventories print two consecutive moves above 3mb against the current supply signal within the next two weekly reports.";
+  }
+  if (agent.sector === "Rates" || /\byield|treasury|fed|fomc|curve|duration|auction\b/.test(catalystText)) {
+    return "This view changes if the US 10Y yield moves more than 25bps against the stated direction within the next five sessions.";
+  }
+  if (agent.sector === "FX" || /\bdollar|dxy|usd|jpy|eur|carry|currency|fx\b/.test(catalystText)) {
+    return "This view changes if DXY reverses by more than 1% while the 10Y yield confirms the opposite direction within the next five sessions.";
+  }
+  if (agent.sector === "Equities" || /\bstock|equity|shares|earnings|nasdaq|s&p|spy|xlf|iwm\b/.test(catalystText)) {
+    return "This view changes if sector breadth or earnings guidance moves more than 2% against the stated thesis within the next two weeks.";
+  }
+  if (agent.sector === "Risk/Sentiment" || /\bvix|credit|spread|risk|sentiment|volatility|crowding\b/.test(catalystText)) {
+    return "This view changes if VIX and HY OAS both move more than 5% against the stated risk signal within the next three sessions.";
+  }
+  return "This view changes if the named catalyst is contradicted by a fresh market print moving more than 2% within the next two weeks.";
 }
 
 function resolveForumPostTitle({

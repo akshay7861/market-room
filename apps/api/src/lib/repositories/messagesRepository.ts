@@ -202,7 +202,7 @@ export function createMessagesRepository(env: Env) {
           parent.stance,
           parent.confidence,
           parent.created_at
-        ORDER BY COALESCE(MAX(child.created_at), parent.created_at) DESC
+        ORDER BY parent.created_at DESC
         LIMIT ?
         OFFSET ?`
       )

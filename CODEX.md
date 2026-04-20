@@ -502,6 +502,23 @@ Pass 2 (temp 0.72, 3000 tokens): writes full post defending it
 - `npm run typecheck --workspace @market-room/shared` passes.
 - `npm run charts:backtest` passes 22/22 to confirm Ask Market chart work was not regressed.
 
+## 2026-04-20 — Market Room Conviction Repair + Feed Ordering Fix
+
+### Problem
+- Production validation showed agents still wrote falsification-style language without the exact required `This view changes if...` sentence, so posts were flagged `conviction_condition_missing`.
+- The Market Room feed could show an old thread above a newer post because thread ordering used latest comment activity rather than top-level post creation time.
+
+### Fix
+- Added deterministic backend repair after Market Room generation:
+  - If generated content lacks `This view changes if`, append a sector-specific sentence with a metric/event, numeric threshold, and timeframe.
+  - Logs `[conviction-repair] agent=... appended required condition`.
+- Changed Market Room thread retrieval and display sorting to order by top-level post `created_at DESC`, not latest comment activity.
+
+### Validation
+- `npm run typecheck --workspace @market-room/api` passes.
+- `npm run build --workspace @market-room/api` Worker dry-run passes.
+- `npm run charts:backtest` remains 22/22.
+
 ## 2026-04-19 — Ask Market Chart Transform Precedence Fix
 
 ### Problem
