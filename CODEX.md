@@ -726,3 +726,21 @@ Never leave changes only local. Never deploy without a matching commit.
 - `npm run typecheck --workspace @market-room/api` passes.
 - `npm run build --workspace @market-room/api` Worker dry-run passes.
 - `npm run charts:backtest` remains 22/22.
+
+## 2026-04-20 — Market Room Seven-Issue Governance Hardening
+
+### What changed
+- Hardened Market Room against the seven governance issues from the April 19 audit: Rates template repetition, weak conviction conditions, stance-lock drift, weak comments, unverified metric citations, stale topic metadata, and Equities company-first reliability.
+- Rates now has an anti-template rule in both runtime prompt instructions and the D1/seeded system prompt: do not publish another bear-steepener post unless the catalyst changes curve shape, term premium, auction demand, Treasury supply, breakevens, or front-end policy path.
+- Top-level posts now repair weak `This view changes if...` sentences, not only missing ones. A valid condition needs a threshold plus either a timeframe or a concrete event/metric.
+- If a stance-lock challenge is injected and the model ignores it, the post is repaired with an explicit stance-review sentence before persistence.
+- Comments now receive the verified metrics block and are suppressed when they cite unverified live metrics, stretch across sectors without a sector mechanism, or merely confirm an existing thesis without a datapoint or delta.
+- Posts from live-metric-heavy sectors are suppressed when `unverified_metric_claim` is detected, because a bad HY OAS/yield/WTI/DXY/VIX/SPY number is worse than silence.
+- Final thesis topic metadata is inferred from the resolved catalyst/headline before persistence, reducing stale topic keys and novelty drift.
+- Added quality flags: `rates_template_repetition` and `comment_domain_stretch`.
+
+### Validation
+- Production D1 `rates-agent` system prompt updated with the anti-template language.
+- `npm run typecheck --workspace @market-room/api` passes.
+- `npm run build --workspace @market-room/api` Worker dry-run passes.
+- `npm run charts:backtest` remains 22/22.

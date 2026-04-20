@@ -1253,12 +1253,17 @@ async function generateAgentForumPosts({
       (headlineAnalysis && headlineAnalysis.market_signal_strength !== "noise" ? headlineAnalysis.headline_title : "") ||
       topicPlan.primary.catalyst ||
       fallbackCatalyst(agent, marketSnapshot);
-    const resolvedContent = ensureRequiredConvictionCondition({
+    let resolvedContent = ensureRequiredConvictionCondition({
       agent,
       content: trimToWordLimit(
         result?.content || fallbackForumPost(agent, marketSnapshot, previousSnapshot),
         isUpdate ? 170 : 320
       ),
+      catalyst: finalCatalyst
+    });
+    resolvedContent = ensureStanceLockReviewIfRequired({
+      content: resolvedContent,
+      stanceChallenge,
       catalyst: finalCatalyst
     });
     const resolvedStance = result?.stance || stanceFor(agent);
@@ -1276,6 +1281,9 @@ async function generateAgentForumPosts({
       postingDecision: generationDecision,
       finalCatalyst
     });
+    const resolvedTopicPrimaryKey = resolveFinalTopicPrimaryKey(agent, headlineAnalysis, finalCatalyst, topicPlan.topicPrimaryKey);
+    const resolvedTopicSecondaryKey =
+      resolvedTopicPrimaryKey === topicPlan.topicPrimaryKey ? topicPlan.topicSecondaryKey : topicPlan.topicPrimaryKey;
     const postQualityFlags = collectPostQualityFlags({
       agent,
       titleFlags: catalystCorrected ? [...titleResolution.flags, "resolved_catalyst_corrected"] : titleResolution.flags,
@@ -1304,6 +1312,20 @@ async function generateAgentForumPosts({
       continue;
     }
 
+    if (shouldSuppressUnsafeMetricPost(agent, postQualityFlags)) {
+      console.log(
+        `[post-quality:${agent.name}] suppressed reason=unverified_metric_claim title="${truncateText(titleResolution.title ?? finalCatalyst, 100)}"`
+      );
+      continue;
+    }
+
+    if (shouldSuppressRatesTemplatePost(agent, headlineAnalysis, resolvedContent, recentPosts)) {
+      console.log(
+        `[rates-quality] suppressed template repeat title="${truncateText(titleResolution.title ?? finalCatalyst, 100)}"`
+      );
+      continue;
+    }
+
     const message: AgentMessage = {
       id: preGeneratedMessageId!,
       roomId,
@@ -1319,8 +1341,8 @@ async function generateAgentForumPosts({
       thesisId,
       thesisUpdateId: thesisId ? crypto.randomUUID() : null,
       thesisStatus: topicPlan.thesisStatus,
-      thesisTopicPrimary: topicPlan.topicPrimaryKey,
-      thesisTopicSecondary: topicPlan.topicSecondaryKey,
+      thesisTopicPrimary: resolvedTopicPrimaryKey,
+      thesisTopicSecondary: resolvedTopicSecondaryKey,
       content: resolvedContent,
       stance: resolvedStance,
       confidence: result?.confidence ?? confidenceFor(agent),
@@ -1379,6 +1401,7 @@ async function generateAgentForumComments({
 }): Promise<PlannedForumEntry[]> {
   const orderedAgents = sortAgentsForForum(agents);
   const commentRoomCoverage = await createRepositories(env).roomCoverage.getByRoomId(roomId);
+  const verifiedMetrics = buildVerifiedMarketMetricsContext(marketSnapshot);
   const targetPosts = selectPostsForComments(
     dedupePostsForComments([...posts, ...priorRoomThreads.map((thread) => thread.post)]),
     discussionPlan.selectedAgents,
@@ -1454,8 +1477,19 @@ async function generateAgentForumComments({
       knowledgeSnippets,
       dynamicMemory: commentDynamicMemory,
       agentState: commentAgentState,
-      roomCoverage: commentRoomCoverage
+      roomCoverage: commentRoomCoverage,
+      verifiedMetrics
     });
+    const commentContent = trimToWordLimit(result?.content || fallbackForumComment(responder, post, marketSnapshot), 140);
+    if (shouldSuppressWeakGeneratedComment({
+      responder,
+      post,
+      content: commentContent,
+      commentPurpose,
+      verifiedMetrics
+    })) {
+      continue;
+    }
 
     const message: AgentMessage = {
       id: crypto.randomUUID(),
@@ -1474,7 +1508,7 @@ async function generateAgentForumComments({
       thesisStatus: post.thesisStatus,
       thesisTopicPrimary: post.thesisTopicPrimary,
       thesisTopicSecondary: post.thesisTopicSecondary,
-      content: trimToWordLimit(result?.content || fallbackForumComment(responder, post, marketSnapshot), 140),
+      content: commentContent,
       stance: result?.stance || stanceFor(responder),
       confidence: result?.confidence ?? confidenceFor(responder),
       likeCount: 0,
@@ -1523,6 +1557,58 @@ function selectPostsForComments(posts: AgentMessage[], preferredAgents: Agent[],
     seenThemes.add(themeKey);
     return true;
   }).slice(0, maxPosts);
+}
+
+function shouldSuppressWeakGeneratedComment({
+  responder,
+  post,
+  content,
+  commentPurpose,
+  verifiedMetrics
+}: {
+  responder: Agent;
+  post: AgentMessage;
+  content: string;
+  commentPurpose: CommentPurpose;
+  verifiedMetrics: VerifiedMarketMetricsContext;
+}): boolean {
+  if (hasUnverifiedMetricClaim(content, verifiedMetrics)) {
+    console.log(
+      `[comment-quality] suppressed reason=unverified_metric responder=${responder.sector} parent="${truncateText(post.title || post.catalyst || "", 80)}"`
+    );
+    return true;
+  }
+
+  if (responder.sector !== post.sector && !commentContainsSectorMechanism(responder, content)) {
+    console.log(
+      `[comment-quality] suppressed reason=domain_stretch responder=${responder.sector} parent=${post.sector} purpose=${commentPurpose}`
+    );
+    return true;
+  }
+
+  if (
+    commentPurpose === "confirm_existing_thesis" &&
+    !/\b(?:\d+(?:\.\d+)?\s?(?:%|bps|bp|x|bn|billion|m|million)|because|therefore|transmi|mechanism|confirms?|contradicts?|invalidates?)\b/i.test(content)
+  ) {
+    console.log(
+      `[comment-quality] suppressed reason=confirm_without_delta responder=${responder.sector} parent="${truncateText(post.title || post.catalyst || "", 80)}"`
+    );
+    return true;
+  }
+
+  return false;
+}
+
+function commentContainsSectorMechanism(agent: Agent, content: string): boolean {
+  const patterns: Record<string, RegExp> = {
+    Macro: /\b(?:growth|inflation|policy|liquidity|consumer|labor|pce|cpi|gdp|recession)\b/i,
+    Rates: /\b(?:yield|treasury|curve|duration|breakeven|auction|term premium|2y|10y|bps)\b/i,
+    FX: /\b(?:dollar|dxy|fx|currency|carry|usd|jpy|eur|em fx|funding)\b/i,
+    Equities: /\b(?:earnings|revenue|eps|margin|valuation|multiple|stock|shares|guidance|breadth)\b/i,
+    Commodities: /\b(?:wti|brent|crude|oil|gas|gold|copper|inventory|opec|supply|demand)\b/i,
+    "Risk/Sentiment": /\b(?:risk|vix|volatility|credit|spread|hy oas|positioning|crowding|fragility)\b/i
+  };
+  return (patterns[agent.sector] || /\b(?:mechanism|transmission|data)\b/i).test(content);
 }
 
 function dedupePostsForComments(posts: AgentMessage[]): AgentMessage[] {
@@ -1861,8 +1947,8 @@ function buildPostThesisWritePlan({
       latestMessageId: message.id,
       latestSnapshotId: snapshotId,
       latestEventId: eventId,
-      topicPrimary: topicPlan.topicPrimaryKey,
-      topicSecondary: topicPlan.topicSecondaryKey,
+      topicPrimary: message.thesisTopicPrimary || topicPlan.topicPrimaryKey,
+      topicSecondary: message.thesisTopicSecondary || topicPlan.topicSecondaryKey,
       lastUpdatedAt: message.createdAt,
       update
     };
@@ -1878,8 +1964,8 @@ function buildPostThesisWritePlan({
       sector: agent.sector,
       canonicalClaim: canonicalClaimForMessage(message),
       title: message.title || fallbackForumTitle(agent, marketSnapshot, topicPlan),
-      topicPrimary: topicPlan.topicPrimaryKey,
-      topicSecondary: topicPlan.topicSecondaryKey,
+      topicPrimary: message.thesisTopicPrimary || topicPlan.topicPrimaryKey,
+      topicSecondary: message.thesisTopicSecondary || topicPlan.topicSecondaryKey,
       status: topicPlan.thesisStatus,
       confidenceCurrent: message.confidence,
       rootMessageId: message.id,
@@ -2634,7 +2720,8 @@ async function requestStructuredForumComment({
   knowledgeSnippets,
   dynamicMemory,
   agentState,
-  roomCoverage
+  roomCoverage,
+  verifiedMetrics
 }: {
   env: Env;
   agent: Agent;
@@ -2648,6 +2735,7 @@ async function requestStructuredForumComment({
   dynamicMemory: DynamicMemoryContext;
   agentState: AgentBehavioralSummary | null;
   roomCoverage: RoomCoverageState | null;
+  verifiedMetrics: VerifiedMarketMetricsContext;
 }): Promise<{
   content?: string;
   stance?: string;
@@ -2684,7 +2772,8 @@ async function requestStructuredForumComment({
         knowledgeSnippets,
         dynamicMemory,
         agentState,
-        roomCoverage
+        roomCoverage,
+        verifiedMetrics
       ),
       maxOutputTokens: 1200,  // thinking + output budget combined for Gemma 4 / Gemini 2.5
       temperature: 0.60,
@@ -3080,7 +3169,8 @@ function buildForumCommentPrompt(
   knowledgeSnippets: LocalKnowledgeSnippet[],
   dynamicMemory: DynamicMemoryContext,
   agentState: AgentBehavioralSummary | null,
-  roomCoverage: RoomCoverageState | null
+  roomCoverage: RoomCoverageState | null,
+  verifiedMetrics: VerifiedMarketMetricsContext
 ): string {
   const mergedHeadlines = relevantHeadlinesForAgent(agent, [
     ...sectorHeadlines,
@@ -3108,6 +3198,7 @@ function buildForumCommentPrompt(
       (instrument) =>
         `- ${instrument.label}: ${instrument.value}${instrument.change ? ` (${instrument.change})` : ""}`
     ),
+    verifiedMetrics.block,
     "What changed vs the previous snapshot:",
     ...sectorDeltaSummary.slice(0, 4),
     mergedHeadlines.length > 0 ? "Relevant headlines:" : "No headline context available.",
@@ -3120,6 +3211,7 @@ function buildForumCommentPrompt(
     ...(agentState ? [buildStatePromptBlock(agentState)] : []),
     ...(roomCoverage ? [buildRoomCoveragePromptBlock(roomCoverage)] : []),
     "Write a reply that advances the thread with a distinct angle.",
+    "Verified-metric discipline applies to comments too: cite only live/current market values from the VERIFIED MARKET METRICS block, article text, or stored/historical blocks.",
     "Do not say you agree and need confirmation unless you add a specific transmission channel, missing datapoint, or challenge."
   ].join("\n");
 }
@@ -4231,6 +4323,27 @@ function correctPostingDecisionCatalyst({
   };
 }
 
+function resolveFinalTopicPrimaryKey(
+  agent: Agent,
+  headlineAnalysis: HeadlineAnalysis | null,
+  finalCatalyst: string,
+  plannedThemeKey: string
+): string {
+  const sourceText = [headlineAnalysis?.headline_title, finalCatalyst].filter(Boolean).join(" ");
+  const inferred = inferPrimaryThemeKey(sourceText, agent.sector);
+  if (!inferred || inferred === "cross_asset_setup") {
+    return plannedThemeKey;
+  }
+
+  if (inferred !== plannedThemeKey) {
+    console.log(
+      `[topic-integrity] corrected agent=${agent.sector} planned=${plannedThemeKey} final=${inferred} catalyst="${truncateText(finalCatalyst, 90)}"`
+    );
+  }
+
+  return inferred;
+}
+
 function uniqueReasonCodes(reasonCodes: PostingDecision["reasonCodes"]): PostingDecision["reasonCodes"] {
   return [...new Set(reasonCodes)] as PostingDecision["reasonCodes"];
 }
@@ -4244,13 +4357,33 @@ function ensureRequiredConvictionCondition({
   content: string;
   catalyst: string;
 }): string {
-  if (/\bThis view changes if\b/i.test(content)) {
+  if (/\bThis view changes if\b/i.test(content) && !isWeakConvictionCondition(content)) {
     return content;
   }
 
   const repaired = `${content.trim()} ${convictionRepairSentence(agent, catalyst)}`.trim();
-  console.log(`[conviction-repair] agent=${agent.sector} appended required condition`);
+  console.log(`[conviction-repair] agent=${agent.sector} appended ${/\bThis view changes if\b/i.test(content) ? "stronger" : "required"} condition`);
   return repaired;
+}
+
+function ensureStanceLockReviewIfRequired({
+  content,
+  stanceChallenge,
+  catalyst
+}: {
+  content: string;
+  stanceChallenge: StanceLockChallenge | null;
+  catalyst: string;
+}): string {
+  if (!stanceChallenge?.active) {
+    return content;
+  }
+  if (/\b(evidence against|still holds|does not change|doesn't change|counter[-\s]?evidence|contradict|re-evaluat|challenge)\b/i.test(content)) {
+    return content;
+  }
+
+  console.log(`[stance-lock-repair] appended review stance=${stanceChallenge.stance}`);
+  return `${content.trim()} This does not change my prior ${stanceChallenge.stance} stance because ${truncateText(catalyst, 90)} has not yet provided counter-evidence strong enough to reverse the stated transmission channel.`.trim();
 }
 
 function convictionRepairSentence(agent: Agent, catalyst: string): string {
@@ -4383,6 +4516,15 @@ function collectPostQualityFlags({
     }
   }
 
+  if (agent.sector === "Rates" && /\bbear steepener\b/i.test(content)) {
+    const hasAuctionOrCurveSpecifics =
+      /\b(?:bid-to-cover|no tail|tailed|tail|indirect bidder|direct bidder|dealer takedown|auction size|coupon supply|2s10s|10y-2y|10Y–2Y)\b/i.test(content) &&
+      /\b\d+(?:\.\d+)?\s?(?:%|bps|bp|x|bn|billion|m|million)?\b/i.test(content);
+    if (!hasAuctionOrCurveSpecifics) {
+      flags.add("rates_template_repetition");
+    }
+  }
+
   return [...flags];
 }
 
@@ -4408,6 +4550,50 @@ function shouldSuppressWeakEquityCompanyPost(
   // when Yahoo fundamentals are unavailable. Ordinary earnings/company posts
   // need company-level numbers or they become generic breadth commentary.
   return !isMajorDeal;
+}
+
+function shouldSuppressUnsafeMetricPost(agent: Agent, flags: PostQualityFlag[]): boolean {
+  if (!flags.includes("unverified_metric_claim")) {
+    return false;
+  }
+
+  // Keep the high-risk numeric disciplines strict: these agents routinely cite
+  // HY OAS, yields, WTI, DXY, VIX, and SPY levels. A bad number is worse than
+  // silence in Market Room.
+  return ["Macro", "Rates", "FX", "Risk/Sentiment", "Commodities"].includes(agent.sector);
+}
+
+function shouldSuppressRatesTemplatePost(
+  agent: Agent,
+  headlineAnalysis: HeadlineAnalysis | null,
+  content: string,
+  recentPosts: AgentMessage[]
+): boolean {
+  if (agent.sector !== "Rates" || !/\bbear steepener\b/i.test(content)) {
+    return false;
+  }
+
+  const recentBearSteepenerCount = recentPosts
+    .slice(0, 4)
+    .filter((post) => /\bbear steepener\b/i.test(`${post.title || ""} ${post.content}`))
+    .length;
+  if (recentBearSteepenerCount < 2) {
+    return false;
+  }
+
+  const catalyst = headlineAnalysis?.headline_title || "";
+  const auctionOrCurveSpecific = /\b(?:auction|refunding|bid-to-cover|tail|indirect bidder|direct bidder|dealer takedown|coupon supply|2y|10y|2s10s|curve)\b/i.test(
+    `${catalyst} ${content}`
+  );
+  const hasSpecificAuctionDetails =
+    /\b(?:bid-to-cover|no tail|tailed|tail|indirect bidder|direct bidder|dealer takedown|auction size|coupon supply)\b/i.test(content) &&
+    /\b\d+(?:\.\d+)?\s?(?:%|bps|bp|x|bn|billion|m|million)?\b/i.test(content);
+
+  if (auctionOrCurveSpecific && hasSpecificAuctionDetails) {
+    return false;
+  }
+
+  return true;
 }
 
 function isStockSpecificEquityCatalyst(
@@ -4453,15 +4639,18 @@ function countBreadthFrameworkMentions(content: string): number {
 }
 
 function isWeakConvictionCondition(content: string): boolean {
-  const match = content.match(/\bThis view changes if\b[^.?!]*(?:[.?!]|$)/i);
-  if (!match) return true;
-  const sentence = match[0];
+  const matches = content.match(/\bThis view changes if\b[^.?!]*(?:[.?!]|$)/gi);
+  if (!matches || matches.length === 0) return true;
+  return !matches.some((sentence) => isStrongConvictionSentence(sentence));
+}
+
+function isStrongConvictionSentence(sentence: string): boolean {
   const hasThreshold =
     /\b\d+(?:\.\d+)?\s?(?:%|bps|bp|mb|m bbl|million|bn|billion|x|\$)?\b/i.test(sentence) ||
     /\b(above|below|under|over|breaks?|holds?|compresses?|widens?|prints?|surprises?|cuts?|hikes?)\b/i.test(sentence);
   const hasTimeframe = /\b(sessions?|days?|weeks?|months?|quarters?|next|within|by|after|before|consecutive|weekly|monthly)\b/i.test(sentence);
   const hasEvent = /\b(FOMC|CPI|PCE|NFP|payrolls?|EIA|OPEC|earnings|guidance|auction|inventory|inventories|spread|yield|WTI|DXY|VIX|SPY)\b/i.test(sentence);
-  return !(hasThreshold && (hasTimeframe || hasEvent));
+  return hasThreshold && (hasTimeframe || hasEvent);
 }
 
 function sanitizeTitle(value: string): string {
@@ -4629,6 +4818,9 @@ function buildSectorSpecificInstructions(agent: Agent): string | null {
         "You MUST cite at least one of these figures explicitly: the 10Y/CPI correlation coefficient, the historical 10Y yield range, or the 10Y-2Y spread range.",
         "Example: 'Per stored data, 10Y yield vs CPI YoY correlation is +0.XX across XXX monthly observations — inflation persistence is structurally bullish for long yields and confirms duration pressure is not mean-reverting quickly.'",
         "Name a specific yield level or spread as your data anchor — e.g. '10Y at 4.26%, in the upper half of the post-1990 stored range of X%–Y%' — not a qualitative description of rates being 'elevated'.",
+        "ANTI-TEMPLATE RULE: do not default to 'bear steepener' unless the catalyst specifically changes the curve, term premium, Treasury supply, auction demand, breakevens, or front-end policy path.",
+        "If the catalyst is Treasury auction/refunding/supply, cite an auction-specific number: bid-to-cover, tail/no-tail size, indirect bidder share, dealer takedown, auction size, coupon supply, or 2s10s/10Y-2Y move.",
+        "If you cannot name the fresh curve/auction datapoint, do not publish another bear-steepener post; say the catalyst is not a rates catalyst or stay silent.",
         "A Rates post that does not cite a stored figure from the historical context block has failed the data grounding standard.",
       ].join("\n");
     default:

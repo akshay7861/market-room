@@ -615,7 +615,9 @@ export type PostQualityFlag =
   | "stance_lock_review_missing"
   | "resolved_catalyst_corrected"
   | "stock_specific_no_fundamentals"
-  | "equity_breadth_overused";
+  | "equity_breadth_overused"
+  | "rates_template_repetition"
+  | "comment_domain_stretch";
 
 export type PostingDecision = {
   actionType: "new_post" | "update_existing" | "comment_only" | "stay_silent";
