@@ -937,8 +937,19 @@ type ChartSeries = { key: string; label: string; color: string; unit?: string; y
 type ChartPoint = { date: string; [key: string]: number | string };
 type HeatmapCell = { row: string; column: string; value: number };
 type ChartMode = "yoy_same_axis" | "yoy_dual_axis" | "absolute_dual_axis" | "correlation_heatmap" | "rolling_correlation" | "lead_lag" | "drawdown";
-type ChartPair = "wti_cpi" | "m1_cpi" | "wti_dollar" | "wti_spy" | "cross_asset" | "single_asset";
-type ChartAsset = "wti" | "cpi" | "dollar" | "spy" | "m1" | "vix" | "hy_oas" | "us10y";
+type ChartPair =
+  | "wti_cpi"
+  | "m1_cpi"
+  | "wti_dollar"
+  | "wti_spy"
+  | "us10y_spy"
+  | "fedfunds_unemployment"
+  | "vix_spy"
+  | "hy_oas_spy"
+  | "vix_hy_oas"
+  | "cross_asset"
+  | "single_asset";
+type ChartAsset = "wti" | "cpi" | "dollar" | "spy" | "m1" | "vix" | "hy_oas" | "us10y" | "fedfunds" | "unemployment";
 type ChartTransform = "level" | "yoy_pct" | "mom_pct";
 type ChartAxis = "left" | "right";
 
@@ -1109,6 +1120,7 @@ export function describeChartDataForPrompt(data: ChartData | null): string {
 function buildChartIntentFromQuestion(question: string, modifierText = question): ChartIntent | null {
   const lower = question.toLowerCase();
   const modifier = modifierText.toLowerCase();
+  const latestModifier = modifier.split("\n")[0] || modifier;
   const mentionsCrisis = /\b(2008|crisis|gfc|war|middle east|gulf war|iraq|iran|conflict)\b/.test(lower);
   const pair = inferChartPair(lower);
   if (!pair) {
@@ -1117,35 +1129,21 @@ function buildChartIntentFromQuestion(question: string, modifierText = question)
   const windowStart = mentionsCrisis ? "2007-01" : tenYearsAgo();
   const windowEnd = mentionsCrisis ? "2009-12" : undefined;
   const windowLabel = mentionsCrisis ? "2007–2009 crisis window" : "last 10 years";
-  const wantsHeatmap = /\b(heat.?map|correlation map|matrix|cross.?asset map)\b/.test(modifier);
-  const wantsRollingCorrelation = /\b(rolling correlation|rolling corr|correlation over time|changing correlation|correlation trend)\b/.test(modifier);
-  const wantsLeadLag = /\b(lead.?lag|lead lag|which .* leads|leads? .* by|lags? .* by|best lag|peak lag)\b/.test(modifier);
-  const wantsDrawdown = /\b(drawdown|draw down|from peak|peak-to-trough|correction)\b/.test(modifier);
-  const wantsAbsolute = /\b(absolute|level|price|index level|cpi index)\b/.test(modifier);
-  const wantsDualAxis = /\b(two axis|dual axis|primary|secondary|separate axis|separate axes)\b/.test(modifier);
-  const mode: ChartMode =
-    wantsHeatmap || pair === "cross_asset"
-      ? "correlation_heatmap"
-      : wantsDrawdown
-        ? "drawdown"
-        : wantsLeadLag
-          ? "lead_lag"
-          : wantsRollingCorrelation
-            ? "rolling_correlation"
-            : wantsAbsolute
-              ? "absolute_dual_axis"
-              : wantsDualAxis
-                ? "yoy_dual_axis"
-                : "yoy_same_axis";
+  const mode = inferChartMode(latestModifier, modifier, pair);
   const lagMonths = extractRequestedLagMonths(modifier) || extractRequestedLagMonths(lower);
   const seriesIntents = buildSeriesIntents(pair, modifier, lower, mode, lagMonths);
+  const requestedHeatmapAssets = pair === "cross_asset"
+    ? inferRequestedHeatmapAssets(latestModifier).length >= 2
+      ? inferRequestedHeatmapAssets(latestModifier)
+      : inferRequestedHeatmapAssets(lower)
+    : undefined;
 
   return {
     pair,
     mode,
     inflationMode: transformToInflationMode(seriesIntents.find((series) => series.asset === "cpi")?.transform),
     seriesIntents,
-    heatmapAssets: pair === "cross_asset" ? inferRequestedHeatmapAssets(lower) : undefined,
+    heatmapAssets: requestedHeatmapAssets,
     rollingWindowMonths: extractRollingWindowMonths(modifier) || extractRollingWindowMonths(lower),
     confidence: seriesIntents.length >= 2 ? "high" : "low",
     warnings: [],
@@ -1164,12 +1162,15 @@ type StoredChartSeriesKey =
   | "cpi_mom"
   | "cpi_yoy"
   | "m1_yoy"
+  | "dollar_level"
   | "dollar_yoy"
   | "spy_price"
   | "spy_yoy"
   | "vix_level"
   | "hy_spread"
-  | "us10y";
+  | "us10y"
+  | "fedfunds"
+  | "unemployment";
 
 function seriesDefinition(key: StoredChartSeriesKey): { key: StoredChartSeriesKey; label: string; data: Map<string, number>; unit: string } {
   switch (key) {
@@ -1185,6 +1186,8 @@ function seriesDefinition(key: StoredChartSeriesKey): { key: StoredChartSeriesKe
       return { key, label: "CPI YoY%", data: yoyMap(toMonthlyMap(cpiHeadlineSeries().observations)), unit: "%" };
     case "m1_yoy":
       return { key, label: "M1 YoY%", data: yoyMap(toMonthlyMap(m1MonthlySeries().observations)), unit: "%" };
+    case "dollar_level":
+      return { key, label: "Broad Dollar index", data: toMonthlyMap(broadDollarSeries().observations), unit: "index" };
     case "dollar_yoy":
       return { key, label: "Broad Dollar YoY%", data: yoyMap(toMonthlyMap(broadDollarSeries().observations)), unit: "%" };
     case "spy_price":
@@ -1197,6 +1200,10 @@ function seriesDefinition(key: StoredChartSeriesKey): { key: StoredChartSeriesKe
       return { key, label: "HY OAS", data: toMonthlyMap(highYieldSpreadSeries().observations), unit: "bps" };
     case "us10y":
       return { key, label: "US 10Y yield", data: toMonthlyMap(us10ySeries().observations), unit: "%" };
+    case "fedfunds":
+      return { key, label: "Fed Funds rate", data: toMonthlyMap(fedFundsSeries().observations), unit: "%" };
+    case "unemployment":
+      return { key, label: "Unemployment rate", data: toMonthlyMap(unemploymentSeries().observations), unit: "%" };
   }
 }
 
@@ -1228,6 +1235,16 @@ function rightSeriesForIntent(intent: ChartIntent): ReturnType<typeof seriesDefi
       return seriesDefinition("dollar_yoy");
     case "wti_spy":
       return seriesDefinition(intent.mode === "absolute_dual_axis" ? "spy_price" : "spy_yoy");
+    case "us10y_spy":
+      return seriesDefinition(intent.mode === "absolute_dual_axis" ? "spy_price" : "spy_yoy");
+    case "fedfunds_unemployment":
+      return seriesDefinition("unemployment");
+    case "vix_spy":
+      return seriesDefinition(intent.mode === "absolute_dual_axis" ? "spy_price" : "spy_yoy");
+    case "hy_oas_spy":
+      return seriesDefinition(intent.mode === "absolute_dual_axis" ? "spy_price" : "spy_yoy");
+    case "vix_hy_oas":
+      return seriesDefinition("hy_spread");
     case "cross_asset":
     default:
       return seriesDefinition("cpi_yoy");
@@ -1278,6 +1295,31 @@ function defaultSeriesForPair(pair: Exclude<ChartPair, "cross_asset">): ChartSer
         { asset: "wti", transform: "yoy_pct", axis: "left", lagMonths: 0 },
         { asset: "spy", transform: "yoy_pct", axis: "right", lagMonths: 0 }
       ];
+    case "us10y_spy":
+      return [
+        { asset: "us10y", transform: "level", axis: "left", lagMonths: 0 },
+        { asset: "spy", transform: "yoy_pct", axis: "right", lagMonths: 0 }
+      ];
+    case "fedfunds_unemployment":
+      return [
+        { asset: "fedfunds", transform: "level", axis: "left", lagMonths: 0 },
+        { asset: "unemployment", transform: "level", axis: "right", lagMonths: 0 }
+      ];
+    case "vix_spy":
+      return [
+        { asset: "vix", transform: "level", axis: "left", lagMonths: 0 },
+        { asset: "spy", transform: "yoy_pct", axis: "right", lagMonths: 0 }
+      ];
+    case "hy_oas_spy":
+      return [
+        { asset: "hy_oas", transform: "level", axis: "left", lagMonths: 0 },
+        { asset: "spy", transform: "yoy_pct", axis: "right", lagMonths: 0 }
+      ];
+    case "vix_hy_oas":
+      return [
+        { asset: "vix", transform: "level", axis: "left", lagMonths: 0 },
+        { asset: "hy_oas", transform: "level", axis: "right", lagMonths: 0 }
+      ];
     case "wti_cpi":
     default:
       return [
@@ -1304,18 +1346,26 @@ function seriesDefinitionForIntent(intent: ChartSeriesIntent): ReturnType<typeof
     case "m1":
       return seriesDefinition("m1_yoy");
     case "dollar":
-      return seriesDefinition("dollar_yoy");
+      return seriesDefinition(intent.transform === "level" ? "dollar_level" : "dollar_yoy");
     case "vix":
       return seriesDefinition("vix_level");
     case "hy_oas":
       return seriesDefinition("hy_spread");
     case "us10y":
       return seriesDefinition("us10y");
+    case "fedfunds":
+      return seriesDefinition("fedfunds");
+    case "unemployment":
+      return seriesDefinition("unemployment");
   }
 }
 
 function shouldUseDualAxis(seriesIntents: ChartSeriesIntent[], mode: ChartMode): boolean {
   if (mode === "absolute_dual_axis" || mode === "yoy_dual_axis") {
+    return true;
+  }
+  const [leftIntent, rightIntent] = seriesIntents;
+  if (leftIntent && rightIntent && leftIntent.transform !== rightIntent.transform) {
     return true;
   }
   const [left, right] = seriesIntents.map(seriesDefinitionForIntent);
@@ -1386,7 +1436,7 @@ function supportsTransform(asset: ChartAsset, transform: ChartTransform): boolea
     return asset === "cpi";
   }
   if (transform === "level") {
-    return asset === "wti" || asset === "cpi" || asset === "spy" || asset === "vix" || asset === "hy_oas" || asset === "us10y";
+    return asset === "wti" || asset === "cpi" || asset === "dollar" || asset === "spy" || asset === "vix" || asset === "hy_oas" || asset === "us10y" || asset === "fedfunds" || asset === "unemployment";
   }
   return asset === "wti" || asset === "cpi" || asset === "m1" || asset === "dollar" || asset === "spy";
 }
@@ -1409,6 +1459,10 @@ function assetAliasPattern(asset: ChartAsset): RegExp {
       return /\b(hy oas|high yield|credit spreads?|spreads?)\b/;
     case "us10y":
       return /\b(10y|10-year|10 year|treasury yield|us10y|ust 10y)\b/;
+    case "fedfunds":
+      return /\b(fed funds?|fed.?funds?|policy rate|effective fed funds|effr)\b/;
+    case "unemployment":
+      return /\b(unemployment|jobless|labou?r market)\b/;
   }
 }
 
@@ -1461,6 +1515,53 @@ function transformToInflationMode(transform?: ChartTransform): "yoy" | "mom" | "
   return undefined;
 }
 
+function inferChartMode(latestModifier: string, fullModifier: string, pair: ChartPair): ChartMode {
+  const latest = latestModifier.toLowerCase();
+  const full = fullModifier.toLowerCase();
+  const has = (pattern: RegExp, text = full) => pattern.test(text);
+
+  // Let the latest follow-up override older context. Without this, a previous
+  // "lead-lag" request can beat "now show it as rolling correlation instead".
+  if (has(/\b(heat.?map|correlation map|matrix|cross.?asset map)\b/, latest) || pair === "cross_asset") {
+    return "correlation_heatmap";
+  }
+  if (has(/\b(drawdown|draw down|from peak|peak-to-trough|correction)\b/, latest)) {
+    return "drawdown";
+  }
+  if (has(/\b(rolling correlation|rolling corr|correlation over time|changing correlation|correlation trend)\b/, latest)) {
+    return "rolling_correlation";
+  }
+  if (has(/\b(lead.?lag|lead lag|which .* leads|leads? .* by|lags? .* by|best lag|peak lag)\b/, latest)) {
+    return "lead_lag";
+  }
+  if (has(/\b(absolute|absolute values?|level|price|index level|cpi index)\b/, latest)) {
+    return "absolute_dual_axis";
+  }
+  if (has(/\b(two axis|dual axis|primary|secondary|separate axis|separate axes)\b/, latest)) {
+    return "yoy_dual_axis";
+  }
+
+  if (has(/\b(heat.?map|correlation map|matrix|cross.?asset map)\b/)) {
+    return "correlation_heatmap";
+  }
+  if (has(/\b(drawdown|draw down|from peak|peak-to-trough|correction)\b/)) {
+    return "drawdown";
+  }
+  if (has(/\b(rolling correlation|rolling corr|correlation over time|changing correlation|correlation trend)\b/)) {
+    return "rolling_correlation";
+  }
+  if (has(/\b(lead.?lag|lead lag|which .* leads|leads? .* by|lags? .* by|best lag|peak lag)\b/)) {
+    return "lead_lag";
+  }
+  if (has(/\b(absolute|absolute values?|level|price|index level|cpi index)\b/)) {
+    return "absolute_dual_axis";
+  }
+  if (has(/\b(two axis|dual axis|primary|secondary|separate axis|separate axes)\b/)) {
+    return "yoy_dual_axis";
+  }
+  return "yoy_same_axis";
+}
+
 function inferChartPair(text: string): ChartPair | null {
   const lower = text.toLowerCase();
   if (/\b(heat.?map|correlation map|matrix|cross.?asset map)\b/.test(lower)) {
@@ -1474,11 +1575,21 @@ function inferChartPair(text: string): ChartPair | null {
   const mentionsMoneySupply = /\b(m1|money supply|liquidity)\b/.test(lower);
   const mentionsFX = /\b(dollar|dxy|usd|fx|currency|eurusd|usdjpy|yen|euro|sterling|gbp|jpy)\b/.test(lower);
   const mentionsEquities = /\b(spy|s&p|spx|equities|stocks|equity|stock market)\b/.test(lower);
+  const mentionsVix = /\b(vix|volatility)\b/.test(lower);
+  const mentionsHy = /\b(hy oas|high yield|credit spreads?|spreads?)\b/.test(lower);
+  const mentionsUs10y = /\b(10y|10-year|10 year|treasury yield|treasury yields|us10y|ust 10y)\b/.test(lower);
+  const mentionsFedFunds = /\b(fed funds?|fed.?funds?|policy rate|effective fed funds|effr)\b/.test(lower);
+  const mentionsUnemployment = /\b(unemployment|jobless|labou?r market)\b/.test(lower);
 
   if (mentionsOil && mentionsInflation) return "wti_cpi";
   if (mentionsMoneySupply && mentionsInflation) return "m1_cpi";
   if (mentionsOil && mentionsFX) return "wti_dollar";
   if (mentionsOil && mentionsEquities) return "wti_spy";
+  if (mentionsUs10y && mentionsEquities) return "us10y_spy";
+  if (mentionsFedFunds && mentionsUnemployment) return "fedfunds_unemployment";
+  if (mentionsVix && mentionsEquities) return "vix_spy";
+  if (mentionsHy && mentionsEquities) return "hy_oas_spy";
+  if (mentionsVix && mentionsHy) return "vix_hy_oas";
   return null;
 }
 
@@ -1498,6 +1609,9 @@ function inferSingleAssetIntent(text: string): ChartSeriesIntent | null {
   }
   if (/\b(10y|10-year|10 year|treasury yield|us10y|ust 10y)\b/.test(lower)) {
     return { asset: "us10y", transform: "level", axis: "left", lagMonths: 0 };
+  }
+  if (/\b(dollar|dxy|usd|broad dollar|trade.?weighted dollar)\b/.test(lower)) {
+    return { asset: "dollar", transform: "level", axis: "left", lagMonths: 0 };
   }
   if (/\b(cpi|inflation)\b/.test(lower)) {
     return { asset: "cpi", transform: "level", axis: "left", lagMonths: 0 };
@@ -1539,15 +1653,19 @@ function heatmapSeriesLabelForAsset(asset: ChartAsset): string | null {
       return "US 10Y yield";
     case "m1":
       return "M1 YoY%";
+    case "fedfunds":
+      return "Fed Funds rate";
+    case "unemployment":
+      return "Unemployment rate";
   }
 }
 
 function hasChartRequestLanguage(text: string): boolean {
-  return /\b(correlation|correlat|relationship|similarity|regression|chart|plot|draw|graph|visuali[sz]e|heat.?map)\b/i.test(text);
+  return /\b(correlation|correlat|relationship|similarity|regression|chart|plot|draw|graph|visuali[sz]e|heat.?map|drawdown|draw down|from peak|peak-to-trough|correction)\b/i.test(text);
 }
 
 function hasChartModificationLanguage(text: string): boolean {
-  return /\b(two axis|dual axis|primary|secondary|absolute|level|price|index level|mom|m\/m|month.?over.?month|monthly %|yoy|y\/y|y-o-y|year.?over.?year|year.?on.?year|annual %|annual percent|12.?month|lag(?:ged)?|show it again|do it again|same chart|make it|chart as|replace)\b/i.test(text);
+  return /\b(two axis|dual axis|primary|secondary|absolute|level|price|index level|mom|m\/m|month.?over.?month|monthly %|yoy|y\/y|y-o-y|year.?over.?year|year.?on.?year|annual %|annual percent|12.?month|rolling correlation|rolling corr|correlation over time|lead.?lag|lead lag|lag(?:ged)?|drawdown|from peak|show it again|do it again|same chart|make it|chart as|replace|instead|only)\b/i.test(text);
 }
 
 function isAffirmativeChartFollowUp(text: string): boolean {
@@ -1586,7 +1704,8 @@ function rightColorFor(key: StoredChartSeriesKey): string {
 }
 
 function commonAxisLabelFor(left: ReturnType<typeof seriesDefinition>, right: ReturnType<typeof seriesDefinition>): string {
-  if (left.unit === "%" && right.unit === "%") return "YoY change";
+  if (left.unit === "%" && right.unit === "%" && left.label.includes("YoY") && right.label.includes("YoY")) return "YoY change";
+  if (left.unit === "%" && right.unit === "%") return "Percent";
   return `${left.label} / ${right.label}`;
 }
 

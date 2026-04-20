@@ -443,6 +443,30 @@ Pass 2 (temp 0.72, 3000 tokens): writes full post defending it
 
 ## Architecture Reference
 
+## 2026-04-20 — Ask Market Chart Coverage Fix After Live Audit
+
+### Problem
+- Claude's live Ask Market chart backtest passed only 26/40 cases.
+- Failures were concentrated in missing non-WTI pair routing, explicit drawdown wording, and thread follow-ups that described a chart without emitting `%%CHART_DATA%%`.
+- Specific misses included 10Y/SPY, Fed Funds/unemployment, VIX/SPY, HY OAS/SPY, VIX/HY OAS, SPY/WTI/DXY drawdowns, lead-lag -> rolling follow-ups, and heatmap subset follow-ups.
+
+### Fix
+- `historicalDataContextService.ts` now supports these additional pair routes:
+  - `us10y_spy`
+  - `fedfunds_unemployment`
+  - `vix_spy`
+  - `hy_oas_spy`
+  - `vix_hy_oas`
+- Added level data support for Broad Dollar index, Fed Funds rate, and unemployment rate in chart series definitions.
+- Drawdown requests now recognize explicit assets such as SPY, WTI, and DXY/dollar index.
+- Latest user follow-up now overrides older chart context for chart mode, so "now show it as rolling correlation" is not overridden by a previous lead-lag request.
+- Heatmap follow-up subsets now use the latest user message first, so "only oil inflation dollar and SPY" returns a 4x4 matrix instead of the previous full 7x7 matrix.
+
+### Validation
+- `npm run charts:backtest` now covers 22 deterministic chart cases and passes 22/22.
+- `npm run typecheck --workspace @market-room/api` passes.
+- `npm run build --workspace @market-room/api` Worker dry-run passes.
+
 ## 2026-04-19 — Ask Market Chart Transform Precedence Fix
 
 ### Problem
