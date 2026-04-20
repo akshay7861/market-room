@@ -307,8 +307,8 @@ export async function runMarketDiscussion(
   const sectorHeadlinesByAgentId = new Map<string, SnapshotHeadline[]>();
 
   for (const agent of activeAgents) {
-    // Priority order: Marketaux first, Yahoo second, Finnhub third, Polygon fourth,
-    // and high-tier official news last.
+    // Priority order: Marketaux first, Yahoo second, Finnhub third,
+    // Polygon.io/Massive fourth, and high-tier official news last.
     // Fed RSS low/medium items are already suppressed/context-only in officialCatalystService.
     sectorHeadlinesByAgentId.set(
       agent.id,
@@ -420,7 +420,7 @@ export async function runMarketDiscussion(
     );
   }
 
-  // Persist Polygon fetch log after event.id is known
+  // Persist Polygon.io/Massive fetch log after event.id is known
   if (polygonBriefing.logItems.length > 0) {
     const itemsWithEventId = polygonBriefing.logItems.map((item) => ({
       ...item,

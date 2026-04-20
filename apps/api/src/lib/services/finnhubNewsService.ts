@@ -69,6 +69,17 @@ function jaccardSimilarity(a: string[], b: string[]): number {
   return union === 0 ? 0 : intersection / union;
 }
 
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function matchesKeyword(text: string, keyword: string): boolean {
+  if (keyword.length <= 3) {
+    return new RegExp(`(^|[^a-z0-9])${escapeRegExp(keyword)}(?=[^a-z0-9]|$)`, "i").test(text);
+  }
+  return text.includes(keyword);
+}
+
 function articleUuid(article: FinnhubArticle): string {
   return `fh_${article.id}`;
 }
@@ -131,7 +142,7 @@ function toSnapshotHeadline(article: FinnhubArticle): SnapshotHeadline {
 
 function scoreArticleForSector(article: FinnhubArticle, sector: string, keywords: string[]): number {
   const text = `${article.headline} ${articleDescription(article)} ${article.related || ""} ${article.category || ""}`.toLowerCase();
-  let score = keywords.filter((kw) => text.includes(kw)).length;
+  let score = keywords.filter((kw) => matchesKeyword(text, kw)).length;
   if (article.category === "forex" && sector === "FX") score += 2;
   if (article.category === "merger" && sector === "Equities") score += 2;
   return score;

@@ -1,9 +1,11 @@
 /**
  * Polygon News Service
  *
- * Adds Polygon as a parallel catalyst source for Market Room. It returns the
- * same briefing shape as Marketaux and Finnhub while keeping Polygon-specific
- * insights out of prompts for this phase.
+ * Adds Polygon.io (now trading as Massive — massive.com) as a parallel catalyst
+ * source for Market Room. The API key, response shape, and legacy
+ * https://api.polygon.io endpoint remain compatible during the transition.
+ * This service returns the same briefing shape as Marketaux and Finnhub while
+ * keeping Polygon/Massive-specific insights out of prompts for this phase.
  */
 import type { Agent, SnapshotHeadline } from "@market-room/shared";
 import type { Env } from "../../index";
@@ -60,8 +62,43 @@ const NOISE_TITLE_PATTERNS: RegExp[] = [
   /mixed\s+(?:signals?|picture|session)/i
 ];
 
+const POLYGON_NOISE_TITLE_PATTERNS: RegExp[] = [
+  /\b(?:best|top|undervalued)\s+\d+\s+stocks?\s+(?:to\s+)?(?:buy|own|watch)/i,
+  /\bstocks?\s+to\s+(?:buy|own|watch)\b/i,
+  /\bis\s+.+\s+stock\s+a\s+buy\b/i,
+  /\bcould\s+this\s+stock\s+\d+x\b/i,
+  /\bis\s+this\s+the\b.*\bstock\b.*\bbuy\b/i,
+  /\bbuy\s+(?:on|right|now|every|the)\b/i,
+  /\bwhich\s+is\s+the\s+better\s+buy\b/i,
+  /\bface-off\b.*\bbetter\s+buy\b/i,
+  /\bhere'?s\s+(?:why|what\s+happens\s+next)\b/i,
+  /\bwall\s+street\s+turbulence\b/i,
+  /\bloads?\s+up\s+on\b/i,
+  /\bpassive\s+income\b/i,
+  /\bturns?\s+into\s+\$\d+/i,
+  /\bpresale\b/i,
+  /\bprice\s+prediction\s+targets?\b/i,
+  /\bdata\s+breach:?\s+.*(?:investigation|lawsuit|class\s+action)/i,
+  /\b(?:launches?|announces?)\s+investigation\s+into\b/i,
+  /\b(?:wins?|presented\s+by)\s+major\s+league\s+fishing\b/i,
+  /\bway\s+to\s+profit\s+from\s+.+\s+ipo\b/i,
+  /\bbiggest\s+winners?\b/i,
+  /\bnobody'?s\s+paying\s+attention\b/i,
+  /\bworth\s+\$\d+\s*trillion\b/i,
+  /\bwill\s+you\s+wish\s+you'?d\s+bought\b/i,
+  /\bnext\s+parabolic\s+stock\b/i,
+  /\bhedge\s+fund\s+manager\s+who\s+called\b/i,
+  /\b(?:deadline|class\s+action|secure\s+counsel|investor\s+counsel|losses\s+in\s+excess)\b/i
+];
+
 const MECHANISM_WORDS = /\b(?:cut|hike|ban|beats?|misses?|surges?|plunges?|spikes?|draw|surplus|deficit|suspend|reject|impose|lift|sanction|merger|acquisition|bankruptcy|default|downgrade|upgrade)\b/i;
 const HAS_NUMBER = /\b\d+(?:[.,]\d+)?(?:\s*%|bps|k|bn|b\b|bbl|mmb|\/oz)?\b/;
+const MARKET_RELEVANCE_WORDS =
+  /\b(?:market|markets|stock|stocks|equity|equities|s&p|nasdaq|dow|russell|bond|bonds|treasury|yield|yields|fed|fomc|inflation|cpi|pce|payroll|jobs|gdp|recession|dollar|currency|forex|fx|euro|yen|oil|wti|brent|crude|gold|copper|commodity|commodities|earnings|revenue|profit|margin|guidance|merger|acquisition|ipo|buyback|dividend|credit|spread|vix|volatility|tariff|sanction)\b/i;
+const COMPANY_EVENT_WORDS =
+  /\b(?:reports?|reported|announces?|announced|updates?|updated|beats?|misses?|guidance|outlook|trading\s+update|earnings|revenue|profit|margin|sales|orders?|contract|deal|acquires?|acquisition|merger|buyback|dividend|downgrade|upgrade|rating|target|fire|incident|launches?|approval|trial|clinical|preclinical|pipeline)\b/i;
+// Polygon.io is now trading as Massive, but the legacy API domain remains active
+// and accepts Massive-issued API keys.
 const POLYGON_BASE = "https://api.polygon.io/v2/reference/news";
 
 function tokenize(text: string): string[] {
@@ -82,6 +119,17 @@ function jaccardSimilarity(a: string[], b: string[]): number {
   return union === 0 ? 0 : intersection / union;
 }
 
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function matchesKeyword(text: string, keyword: string): boolean {
+  if (keyword.length <= 3) {
+    return new RegExp(`(^|[^a-z0-9])${escapeRegExp(keyword)}(?=[^a-z0-9]|$)`, "i").test(text);
+  }
+  return text.includes(keyword);
+}
+
 function articleUuid(article: PolygonArticle): string {
   return `pg_${article.id}`;
 }
@@ -100,6 +148,16 @@ function articleKeywords(article: PolygonArticle): string {
 
 function sourceName(article: PolygonArticle): string {
   return article.publisher?.name || "Polygon";
+}
+
+function isNoisyPolygonArticle(article: PolygonArticle): boolean {
+  if (/motley\s+fool/i.test(sourceName(article))) return true;
+  return [...NOISE_TITLE_PATTERNS, ...POLYGON_NOISE_TITLE_PATTERNS].some((pattern) => pattern.test(article.title));
+}
+
+function hasMarketRelevance(article: PolygonArticle): boolean {
+  const text = `${article.title} ${articleDescription(article)} ${articleKeywords(article)}`;
+  return MARKET_RELEVANCE_WORDS.test(text) || COMPANY_EVENT_WORDS.test(text);
 }
 
 function scoreArticle(article: PolygonArticle): number {
@@ -136,7 +194,7 @@ function toSnapshotHeadline(article: PolygonArticle): SnapshotHeadline {
 
 function scoreArticleForSector(article: PolygonArticle, sector: string, keywords: string[]): number {
   const text = `${article.title} ${articleDescription(article)} ${articleKeywords(article)} ${(article.tickers || []).join(" ")}`.toLowerCase();
-  let score = keywords.filter((kw) => text.includes(kw)).length;
+  let score = keywords.filter((kw) => matchesKeyword(text, kw)).length;
 
   const tickers = new Set((article.tickers || []).map((ticker) => ticker.toUpperCase()));
   if (sector === "Equities" && tickers.size > 0) score += 3;
@@ -150,7 +208,8 @@ function scoreArticleForSector(article: PolygonArticle, sector: string, keywords
 async function fetchPolygonArticles(apiKey: string): Promise<PolygonArticle[]> {
   const query = new URLSearchParams({
     limit: "50",
-    sort: "published_utc.desc",
+    sort: "published_utc",
+    order: "desc",
     apiKey
   });
   const response = await fetch(`${POLYGON_BASE}?${query.toString()}`, {
@@ -244,7 +303,7 @@ export async function fetchPolygonBriefing(
       continue;
     }
 
-    if (NOISE_TITLE_PATTERNS.some((p) => p.test(article.title))) {
+    if (!hasMarketRelevance(article) || isNoisyPolygonArticle(article)) {
       candidates.push({ ...article, selectionScore: 0, selectionOutcome: "rejected_noise" });
       continue;
     }

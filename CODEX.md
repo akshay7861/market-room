@@ -519,6 +519,22 @@ Pass 2 (temp 0.72, 3000 tokens): writes full post defending it
 - `npm run build --workspace @market-room/api` Worker dry-run passes.
 - `npm run charts:backtest` remains 22/22.
 
+## 2026-04-20 — Finnhub + Polygon/Massive Provider Validation
+
+### Massive / Polygon note
+- Polygon.io rebranded to Massive.com in 2025. This is a name/API continuity change, not an acquisition.
+- The code keeps `polygonNewsService.ts`, `POLYGON_API_KEY`, provider id `polygon`, and the legacy `https://api.polygon.io` endpoint for compatibility.
+- Live API validation showed the accepted query shape is `sort=published_utc&order=desc`, not `sort=published_utc.desc`.
+
+### Source quality hardening
+- Finnhub general feed includes non-market CNBC/general stories, so `finnhubNewsService.ts` now requires explicit market relevance before selecting general-category items.
+- Polygon/Massive feed includes promotional stock-picking/listicle, securities-law deadline, and sponsorship PR noise, so `polygonNewsService.ts` rejects those before scoring.
+- Both new source adapters now use word-boundary matching for very short routing keywords such as `em`, `fx`, `oil`, `fed`, `dxy`, `usd`, `eur`, and `jpy`, preventing accidental substring matches inside unrelated words.
+
+### Smoke-test observations
+- Finnhub key works; latest service-level test selected 9 market-relevant headlines from 154 raw articles and routed all 6 agents.
+- Polygon/Massive key works; latest service-level test selected 6 cleaner company-event headlines from 50 raw articles and routed 4 agents.
+
 ## 2026-04-19 — Ask Market Chart Transform Precedence Fix
 
 ### Problem
@@ -598,16 +614,17 @@ Never leave changes only local. Never deploy without a matching commit.
 ## 2026-04-20 — Market Room Multi-Source News Integration
 
 ### What changed
-- Added Finnhub and Polygon as parallel Market Room catalyst sources.
+- Added Finnhub and Polygon.io (now trading as Massive — massive.com) as parallel Market Room catalyst sources.
 - `finnhubNewsService.ts` fetches `general`, `forex`, and `merger` categories with `Promise.allSettled`, applies 24h freshness filtering, provider-specific cross-run dedupe, Jaccard near-duplicate cleanup, and routes up to 12 selected headlines.
-- `polygonNewsService.ts` fetches `/v2/reference/news` once per run, maps `tickers[]` into headline entities, discards `insights` for now, applies 24h freshness filtering, provider-specific cross-run dedupe, Jaccard cleanup, and routes up to 12 selected headlines.
-- `marketRoomService.ts` now fetches five source layers in the same discussion event: official, Yahoo, Marketaux, Finnhub, and Polygon.
-- Merge priority is Marketaux -> Yahoo -> Finnhub -> Polygon -> Official.
+- `polygonNewsService.ts` fetches `/v2/reference/news` once per run from the legacy `https://api.polygon.io` endpoint, maps `tickers[]` into headline entities, discards `insights` for now, applies 24h freshness filtering, provider-specific cross-run dedupe, Jaccard cleanup, and routes up to 12 selected headlines.
+- `marketRoomService.ts` now fetches five source layers in the same discussion event: official, Yahoo, Marketaux, Finnhub, and Polygon/Massive.
+- Merge priority is Marketaux -> Yahoo -> Finnhub -> Polygon/Massive -> Official.
 - `[catalyst-source]` logs now include `finnhub=N polygon=N`.
 - `fetched_news_items` logging now persists Finnhub and Polygon rows after `event.id` is known.
 
 ### Secrets
 - `FINNHUB_API_KEY` and `POLYGON_API_KEY` are typed on `Env`.
+- `POLYGON_API_KEY` accepts the key issued by Massive.com because Polygon.io's API and key model remain compatible.
 - They must be set as Cloudflare secrets via Wrangler, not in `wrangler.jsonc`.
 
 ### Validation
