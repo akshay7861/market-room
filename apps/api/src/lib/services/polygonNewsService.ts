@@ -88,7 +88,11 @@ const POLYGON_NOISE_TITLE_PATTERNS: RegExp[] = [
   /\bwill\s+you\s+wish\s+you'?d\s+bought\b/i,
   /\bnext\s+parabolic\s+stock\b/i,
   /\bhedge\s+fund\s+manager\s+who\s+called\b/i,
-  /\b(?:deadline|class\s+action|secure\s+counsel|investor\s+counsel|losses\s+in\s+excess)\b/i
+  /\b(?:deadline|class\s+action|secure\s+counsel|investor\s+counsel|losses\s+in\s+excess)\b/i,
+  /\bsued\s+for\s+securities\s+law\s+violations?\b/i,
+  /\bcontact\s+.+\s+to\s+discuss\s+your\s+rights\b/i,
+  /\bshare\s+repurchase\s+programme:\s+transactions?\s+of\s+week\b/i,
+  /\baktietilbagekøb:\s+transaktioner\s+i\s+uge\b/i
 ];
 
 const MECHANISM_WORDS = /\b(?:cut|hike|ban|beats?|misses?|surges?|plunges?|spikes?|draw|surplus|deficit|suspend|reject|impose|lift|sanction|merger|acquisition|bankruptcy|default|downgrade|upgrade)\b/i;
@@ -97,6 +101,8 @@ const MARKET_RELEVANCE_WORDS =
   /\b(?:market|markets|stock|stocks|equity|equities|s&p|nasdaq|dow|russell|bond|bonds|treasury|yield|yields|fed|fomc|inflation|cpi|pce|payroll|jobs|gdp|recession|dollar|currency|forex|fx|euro|yen|oil|wti|brent|crude|gold|copper|commodity|commodities|earnings|revenue|profit|margin|guidance|merger|acquisition|ipo|buyback|dividend|credit|spread|vix|volatility|tariff|sanction)\b/i;
 const COMPANY_EVENT_WORDS =
   /\b(?:reports?|reported|announces?|announced|updates?|updated|beats?|misses?|guidance|outlook|trading\s+update|earnings|revenue|profit|margin|sales|orders?|contract|deal|acquires?|acquisition|merger|buyback|dividend|downgrade|upgrade|rating|target|fire|incident|launches?|approval|trial|clinical|preclinical|pipeline)\b/i;
+const CROSS_ASSET_CONTEXT_WORDS =
+  /\b(?:fed|fomc|treasury|yield|yields|curve|duration|bps|inflation|cpi|pce|payroll|jobs|gdp|recession|dollar|currency|forex|fx|euro|yen|sterling|dxy|oil|wti|brent|crude|gold|copper|commodity|commodities|credit\s+spread|hy\s+oas|vix|volatility|risk-off|risk-on|safe-haven|tariff|sanction)\b/i;
 // Polygon.io is now trading as Massive, but the legacy API domain remains active
 // and accepts Massive-issued API keys.
 const POLYGON_BASE = "https://api.polygon.io/v2/reference/news";
@@ -160,6 +166,10 @@ function hasMarketRelevance(article: PolygonArticle): boolean {
   return MARKET_RELEVANCE_WORDS.test(text) || COMPANY_EVENT_WORDS.test(text);
 }
 
+function isSingleCompanyPolygonItem(article: PolygonArticle): boolean {
+  return articleEntities(article).length > 0 && COMPANY_EVENT_WORDS.test(`${article.title} ${articleDescription(article)}`);
+}
+
 function scoreArticle(article: PolygonArticle): number {
   let score = 0;
   const description = articleDescription(article);
@@ -194,13 +204,27 @@ function toSnapshotHeadline(article: PolygonArticle): SnapshotHeadline {
 
 function scoreArticleForSector(article: PolygonArticle, sector: string, keywords: string[]): number {
   const text = `${article.title} ${articleDescription(article)} ${articleKeywords(article)} ${(article.tickers || []).join(" ")}`.toLowerCase();
+  const tickers = new Set((article.tickers || []).map((ticker) => ticker.toUpperCase()));
+  const sectorTickers = SECTOR_TICKERS[sector] || [];
+  const sectorTickerMatch = sectorTickers.some((ticker) => tickers.has(ticker));
+
+  // Polygon/Massive is heavy on company PR wires. Those are valuable for the
+  // Equities agent, but broad keyword overlap ("bank", "US$", "risk") should
+  // not make a single-company press release a Rates/FX/Risk catalyst unless
+  // the text explicitly contains cross-asset context or a sector ETF ticker.
+  if (
+    sector !== "Equities" &&
+    isSingleCompanyPolygonItem(article) &&
+    !sectorTickerMatch &&
+    !CROSS_ASSET_CONTEXT_WORDS.test(text)
+  ) {
+    return 0;
+  }
+
   let score = keywords.filter((kw) => matchesKeyword(text, kw)).length;
 
-  const tickers = new Set((article.tickers || []).map((ticker) => ticker.toUpperCase()));
   if (sector === "Equities" && tickers.size > 0) score += 3;
-
-  const sectorTickers = SECTOR_TICKERS[sector] || [];
-  if (sectorTickers.some((ticker) => tickers.has(ticker))) score += 3;
+  if (sectorTickerMatch) score += 3;
 
   return score;
 }

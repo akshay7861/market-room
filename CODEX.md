@@ -519,6 +519,29 @@ Pass 2 (temp 0.72, 3000 tokens): writes full post defending it
 - `npm run build --workspace @market-room/api` Worker dry-run passes.
 - `npm run charts:backtest` remains 22/22.
 
+## 2026-04-20 — Polygon/Massive Corporate PR Routing Hardening
+
+### Production retest finding
+- A protected production Market Room run after the expanded-source integration produced 4 messages: 2 posts and 2 comments.
+- The old non-market failures such as movie/lifestyle/local crash articles did not reappear.
+- Two remaining source-quality issues were confirmed:
+  - Polygon/Massive routine corporate PR items such as weekly share-repurchase transaction notices could still become top-level catalysts.
+  - Single-company PR/legal items could route to Rates, FX, or Risk/Sentiment from broad keyword overlap instead of staying Equities-only or being rejected.
+
+### Fix
+- Tightened `polygonNewsService.ts` noise patterns:
+  - routine weekly share-repurchase transaction notices are rejected;
+  - Danish-language duplicate buyback transaction notices are rejected;
+  - legal solicitation / securities-law violation PR headlines are rejected.
+- Added a single-company Polygon/Massive routing guard:
+  - company PR items with tickers can still route to Equities;
+  - they cannot route to Rates, FX, Commodities, or Risk/Sentiment unless the text includes explicit cross-asset context or a sector ETF ticker.
+
+### Validation
+- `npm run typecheck --workspace @market-room/api` passes.
+- `npm run build --workspace @market-room/api` Worker dry-run passes.
+- `npm run charts:backtest` remains 22/22.
+
 ## 2026-04-20 — Finnhub + Polygon/Massive Provider Validation
 
 ### Massive / Polygon note
