@@ -569,6 +569,7 @@ Pass 2 (temp 0.72, 3000 tokens): writes full post defending it
 - `marketRoomService.ts` now applies an Equities standalone ownership gate:
   - Equities may open a post for company news, sector/index/equity terms, or direct equity relevance.
   - If the headline is macro/policy with no equity ownership, Equities is downgraded to `comment_only` and logs `[equities-standalone] downgraded reason=weak_equity_ownership ...`.
+- A final trigger-election guard now silences `new_post` decisions when both `no_fresh_signal` and `domain_relevance_low` are present, preventing weak-domain thesis updates from becoming top-level posts.
 
 ### Validation
 - `npm run typecheck --workspace @market-room/api` passes.

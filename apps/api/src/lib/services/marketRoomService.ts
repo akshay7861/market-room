@@ -1154,9 +1154,11 @@ async function generateAgentForumPosts({
       headlineAnalysis
     });
 
+    const weakDomainAdjustedDecision = applyNoFreshWeakDomainDecisionGate(materialityAdjustedDecision);
+
     const repetitionAdjustedDecision = applyRepeatedCatalystDecisionGate({
       agent,
-      postingDecision: materialityAdjustedDecision,
+      postingDecision: weakDomainAdjustedDecision,
       headlineAnalysis,
       topicPlan,
       recentMessages: [...flattenThreadPosts(priorRoomThreads, 80), ...thisRunPosts],
@@ -3997,6 +3999,26 @@ function hasEquityStandaloneOwnership(
   }
 
   return false;
+}
+
+function applyNoFreshWeakDomainDecisionGate(postingDecision: PostingDecision): PostingDecision {
+  if (
+    postingDecision.actionType !== "new_post" ||
+    !postingDecision.reasonCodes.includes("no_fresh_signal" as PostingDecision["reasonCodes"][number]) ||
+    !postingDecision.reasonCodes.includes("domain_relevance_low" as PostingDecision["reasonCodes"][number])
+  ) {
+    return postingDecision;
+  }
+
+  console.log(
+    `[trigger-election] downgraded action=new_post->stay_silent reason=no_fresh_signal_domain_low catalyst="${truncateText(postingDecision.suggestedTopic?.catalyst || "none", 90)}"`
+  );
+
+  return {
+    ...postingDecision,
+    actionType: "stay_silent",
+    reasonCodes: uniqueReasonCodes([...postingDecision.reasonCodes, "weak_catalyst_materiality_gate" as const])
+  };
 }
 
 function buildStanceLockChallenge(agent: Agent, recentPosts: AgentMessage[]): StanceLockChallenge | null {
