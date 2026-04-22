@@ -1,12 +1,9 @@
-import universe from "../equities/equityUniverse.json";
-
-type EquityUniverseEntry = {
-  bbg: string;
-  ric: string;
-  symbol: string;
-  name: string;
-  region: string;
-};
+import {
+  equityUniverse,
+  resolveEquitySubject,
+  type EquitySubjectResolution,
+  type EquityUniverseEntry
+} from "./equitySubjectResolution";
 
 export type EquityQuote = EquityUniverseEntry & {
   price: string;
@@ -43,112 +40,49 @@ type EquityCatalystType =
   | "macro_to_equity"
   | "noise_or_listicle";
 
-type SubjectMatchConfidence = "explicit_symbol" | "exact_name" | "partial_name";
+export type EquityDataTier = "none" | "quote_only" | "light" | "rich";
 
-type SubjectCompanyMatch = {
-  entry: EquityUniverseEntry;
-  score: number;
-  confidence: SubjectMatchConfidence;
-  matchedText: string;
-};
+export type EquityFundamentalsField =
+  | "price"
+  | "change"
+  | "marketCap"
+  | "peTrailing"
+  | "peForward"
+  | "epsTrailing"
+  | "nextEarningsDate"
+  | "epsEstimate"
+  | "revenueEstimate"
+  | "fiftyTwoWeekRange";
 
-type SubjectCompanyMatchOptions = {
-  allowPartialNameMatch: boolean;
+export type EquitySubjectDataContext = {
+  resolution: EquitySubjectResolution;
+  dataTier: EquityDataTier;
+  promptBlock: string;
+  quote: EquityQuote | null;
+  fundamentals: EquityFundamentals | null;
+  fetchedFields: Partial<Record<EquityFundamentalsField, string>>;
 };
 
 const YF_CHART_BASE = "https://query1.finance.yahoo.com/v8/finance/chart";
 const YF_QUOTE_BASE = "https://query1.finance.yahoo.com/v7/finance/quote";
 const YF_SUMMARY_BASE = "https://query1.finance.yahoo.com/v10/finance/quoteSummary";
+const YF_TIMESERIES_BASE = "https://query1.finance.yahoo.com/ws/fundamentals-timeseries/v1/finance/timeseries";
 const QUOTE_CACHE_TTL_MS = 20 * 60 * 1000;
 const FUNDAMENTALS_CACHE_TTL_MS = 20 * 60 * 1000;
 const MAX_QUOTES_PER_QUESTION = 30;
-const rawUniverse = universe as EquityUniverseEntry[];
 
 const quoteCache = new Map<string, { expiresAt: number; quote: EquityQuote }>();
 const fundamentalsCache = new Map<string, { expiresAt: number; data: EquityFundamentals | null }>();
 
 const EARNINGS_KEYWORDS = /\b(earnings|eps|revenue|beat|miss|guidance|quarter|q[1-4]|results|profit|loss|outlook|forecast)\b/i;
-
 const SINGLE_COMPANY_CATALYST_KEYWORDS =
   /\b(earnings|eps|revenue|beat|miss|guidance|quarter|q[1-4]|results|profit|loss|outlook|forecast|upgrade|downgrade|rating|price target|target raise|target cut|dividend|buyback|repurchase|ceo|cfo|management|margin|margins|cost cut|cost cuts|layoff|layoffs|capex|restructuring|agm|egm|annual meeting|shareholder meeting|regulatory change|settlement|lawsuit|approval|contract|revenue target|growth cut|growth outlook)\b/i;
-
 const SECTOR_OR_INDUSTRY_KEYWORDS =
   /\b(sector|industry|stocks?|equities|majors|banks?|semiconductors?|chips?|oilsands?|oil sands|energy equities|airlines?|retailers?|builders?|homebuilders?|software|hardware|automakers?|insurers?|financials?|cyclicals?|defensives?|small caps?|large caps?)\b/i;
-
 const INDEX_OR_FACTOR_KEYWORDS =
   /\b(s&p|spx|sp 500|s&p 500|nasdaq|ndx|dow|russell|iwm|qqq|spy|index|indices|breadth|growth|value|momentum|quality|low vol|duration-sensitive|multiple compression|multiple expansion|leadership|rotation)\b/i;
-
 const MACRO_TO_EQUITY_KEYWORDS =
   /\b(cpi|pce|payrolls?|nfp|unemployment|jobs?|wages?|fed|fomc|rates?|yields?|treasury|liquidity|dollar|dxy|credit|spreads?|oil|wti|brent|inflation|recession|growth scare|soft landing|hard landing|pmi|ism|tariff)\b/i;
-
-const COMPANY_SUFFIX_WORDS = new Set([
-  "inc", "incorporated", "corp", "corporation", "co", "company", "plc", "adr", "ads", "asa",
-  "se", "sa", "nv", "ag", "ltd", "limited", "holdings", "holding", "group", "lp", "llc",
-  "class", "ordinary", "shares", "common", "stock", "the"
-]);
-
-const GENERIC_COMPANY_WORDS = new Set([
-  "energy", "technologies", "technology", "industrial", "industrials", "resources", "capital",
-  "financial", "financials", "global", "international", "american", "national", "first",
-  "trust", "fund", "etf", "select", "sector", "spdr", "ishares", "invesco", "nasdaq"
-]);
-
-const AMBIGUOUS_SUBJECT_ALIASES = new Set([
-  "dow",
-  "nasdaq",
-  "nyse",
-  "tsx",
-  "occ",
-  "td",
-  "bnp",
-  "jd",
-  "a"
-]);
-
-const MARKET_ROOM_SYMBOL_EXCLUSIONS = new Set([
-  "AGM",
-  "EGM",
-  "JD",
-  "TD",
-  "BNP",
-  "OCC",
-  "NYSE",
-  "NASDAQ",
-  "TSX",
-  "DOW"
-]);
-
-const KNOWN_COMPANY_ALIASES: Record<string, string[]> = {
-  "AMZN": ["amazon"],
-  "NFLX": ["netflix"],
-  "DAL": ["delta"],
-  "META": ["meta", "meta platforms", "facebook"],
-  "EQNR": ["equinor"],
-  "EQNR.OL": ["equinor"],
-  "AAOI": ["applied optoelectronics"],
-  "PARR": ["par pacific"],
-  "VSH": ["vishay", "vishay intertechnology"],
-  "FRU.TO": ["freehold royalties"],
-  "TSM": ["tsm", "tsmc", "taiwan semiconductor"],
-  "WMB": ["williams companies", "williams"],
-  "ET": ["energy transfer"],
-  "EPD": ["enterprise products"],
-  "MS": ["morgan stanley"]
-};
-
-const curatedEntries: EquityUniverseEntry[] = [
-  { symbol: "TAN", bbg: "TAN US", ric: "TAN", name: "Invesco Solar ETF", region: "US" },
-  { symbol: "ICLN", bbg: "ICLN US", ric: "ICLN", name: "iShares Global Clean Energy ETF", region: "US" },
-  { symbol: "QCLN", bbg: "QCLN US", ric: "QCLN", name: "First Trust Nasdaq Clean Edge Green Energy ETF", region: "US" },
-  { symbol: "XLE", bbg: "XLE US", ric: "XLE", name: "Energy Select Sector SPDR Fund", region: "US" },
-  { symbol: "XOP", bbg: "XOP US", ric: "XOP", name: "SPDR S&P Oil & Gas Exploration & Production ETF", region: "US" },
-  { symbol: "OIH", bbg: "OIH US", ric: "OIH", name: "VanEck Oil Services ETF", region: "US" },
-  { symbol: "SHEL", bbg: "SHEL US", ric: "SHEL", name: "Shell PLC ADR", region: "US" },
-  { symbol: "TTE", bbg: "TTE US", ric: "TTE", name: "TotalEnergies SE ADR", region: "US" },
-  { symbol: "BSVN", bbg: "BSVN US", ric: "BSVN.O", name: "Bank7 Corp", region: "US" }
-];
-
-const equityUniverse = dedupeUniverse([...curatedEntries, ...rawUniverse]);
 
 const preferredThemeSymbols: Record<string, string[]> = {
   green_energy: [
@@ -171,24 +105,6 @@ const themeKeywordMap: Record<string, RegExp> = {
   banks: /\b(banks?|financials?|lenders?|net interest income|nii|deposit|credit card|brokerage)\b/i,
   semiconductors: /\b(semiconductor|chips?|foundry|memory|equipment|wafer|gpu|asic)\b/i
 };
-
-// ─── Company name cross-validation ────────────────────────────────────────────
-
-/**
- * Validates that Yahoo Finance's returned shortName has meaningful word overlap
- * with the universe entry's name. Prevents "TCS" (Tata Consultancy) from
- * resolving to a US-listed company of the same ticker symbol.
- */
-function validateCompanyName(universeName: string, yahooShortName: string | undefined): boolean {
-  if (!yahooShortName) return true; // can't invalidate without a name — pass through
-  const normalize = (s: string): string[] =>
-    s.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter((w) => w.length > 2);
-  const uTokens = new Set(normalize(universeName));
-  const yTokens = normalize(yahooShortName);
-  return yTokens.some((t) => uTokens.has(t));
-}
-
-// ─── Ask Market Q&A flow ──────────────────────────────────────────────────────
 
 export async function buildEquityQuoteContext(question: string): Promise<EquityQuoteContext | null> {
   const candidates = selectUniverseCandidates(question, MAX_QUOTES_PER_QUESTION);
@@ -239,59 +155,99 @@ export function buildEquityQuotePromptBlock(context: EquityQuoteContext | null):
     .join("\n");
 }
 
-// ─── Autonomous posting: fundamentals for Equities Agent ──────────────────────
+export async function buildAskEquityCompanyContext(question: string): Promise<EquitySubjectDataContext> {
+  const resolution = resolveEquitySubject(question);
+  if (resolution.status !== "resolved" || !resolution.entry) {
+    return {
+      resolution,
+      dataTier: "none",
+      promptBlock: "",
+      quote: null,
+      fundamentals: null,
+      fetchedFields: {}
+    };
+  }
 
-/**
- * Entry point for autonomous Equities Agent posts.
- * Identifies the primary company in the top headline, fetches fundamentals,
- * and returns a formatted prompt block. Returns "" if no confident match or
- * if Yahoo Finance is unavailable — the post always goes out regardless.
- */
+  const quote = await fetchEquityQuote(resolution.entry);
+  const fundamentals = await fetchEquityFundamentals(resolution.entry.symbol, resolution.entry.name, true);
+  const dataTier = classifyEquityDataTier(quote, fundamentals);
+
+  return {
+    resolution,
+    dataTier,
+    promptBlock: formatAskFundamentalsBlock(resolution, quote, fundamentals, dataTier),
+    quote,
+    fundamentals,
+    fetchedFields: collectFetchedFields(quote, fundamentals)
+  };
+}
+
+export function buildAskStatementsUnavailableFallback(context: EquitySubjectDataContext): string {
+  if (context.resolution.status === "ambiguous_subject") {
+    return "I can’t safely identify the company from that name alone. Please give me the ticker, exchange, or region and I’ll keep it constrained to the right company.";
+  }
+
+  if (context.resolution.status !== "resolved" || !context.resolution.entry) {
+    return "I don’t have a safe company match for that request, so I can’t provide current statement-level detail without risking the wrong issuer. Please give me the ticker, exchange, or region.";
+  }
+
+  const snapshot = buildConstrainedSnapshot(context);
+  return [
+    `I do not currently have detailed live income statement, balance sheet, or cash flow statement rows for ${context.resolution.entry.name} (${context.resolution.entry.symbol}) from this system.`,
+    snapshot ? `What I can give you reliably right now is a constrained market snapshot: ${snapshot}.` : "What I can give you reliably right now is only a limited quote snapshot, not statement rows.",
+    "What is unavailable here: current statement-line items like revenue, operating income, net income, cash, debt, and cash flow statement detail from a live filing source."
+  ].join(" ");
+}
+
 export async function buildEquityFundamentalsForPost(
   headlineTitle: string,
   sectorHeadlines: Array<{ title: string; description?: string | null }>
-): Promise<string> {
-  const primaryHeadline = sectorHeadlines.find((h) => h.title === headlineTitle) ?? sectorHeadlines[0];
+): Promise<EquitySubjectDataContext> {
+  const primaryHeadline = sectorHeadlines.find((headline) => headline.title === headlineTitle) ?? sectorHeadlines[0];
   const primaryText = [headlineTitle, primaryHeadline?.description || ""].filter(Boolean).join(" ");
   const combinedText = [
     primaryText,
     ...sectorHeadlines
-      .filter((h) => h.title !== headlineTitle)
+      .filter((headline) => headline.title !== headlineTitle)
       .slice(0, 2)
-      .map((h) => [h.title, h.description || ""].filter(Boolean).join(" "))
+      .map((headline) => [headline.title, headline.description || ""].filter(Boolean).join(" "))
   ].join(" ");
 
-  const subjectMatch = identifySubjectCompany(primaryText, combinedText);
-  const catalystType = classifyMarketRoomEquityCatalyst(primaryText, combinedText, subjectMatch);
+  const primaryResolution = resolveEquitySubject(primaryText);
+  const fallbackResolution =
+    primaryResolution.status === "resolved" || !SINGLE_COMPANY_CATALYST_KEYWORDS.test(primaryText)
+      ? primaryResolution
+      : resolveEquitySubject(combinedText);
+  const resolution = fallbackResolution;
+  const catalystType = classifyMarketRoomEquityCatalyst(primaryText, combinedText, resolution);
   const theme = detectTheme(primaryText);
 
-  if (theme && (!subjectMatch || !preferredThemeSymbols[theme]?.includes(subjectMatch.entry.symbol))) {
+  if (theme && (resolution.status !== "resolved" || !resolution.entry || !preferredThemeSymbols[theme]?.includes(resolution.entry.symbol))) {
     const rejectedSymbol = preferredThemeSymbols[theme]?.[0];
     if (rejectedSymbol) {
-      console.log(
-        `[equity-catalyst] rejected_theme_only symbol=${rejectedSymbol} theme=${theme} reason=subject_not_named`
-      );
+      console.log(`[equity-catalyst] rejected_theme_only symbol=${rejectedSymbol} theme=${theme} reason=subject_not_named`);
     }
   }
 
   if (catalystType === "noise_or_listicle") {
     console.log(`[equity-catalyst] type=noise_or_listicle no_single_stock=true headline="${headlineTitle.slice(0, 100)}"`);
-    return "";
+    return emptyDataContext(resolution);
   }
 
   if (catalystType !== "single_company") {
     console.log(`[equity-catalyst] type=${catalystType} no_single_stock=true headline="${headlineTitle.slice(0, 100)}"`);
-    return buildEquityCatalystContextBlock(catalystType, headlineTitle);
+    return {
+      ...emptyDataContext(resolution),
+      promptBlock: buildEquityCatalystContextBlock(catalystType, headlineTitle)
+    };
   }
 
-  if (!subjectMatch) {
-    console.log(
-      `[equity-fundamentals] skipped reason=unsafe_subject_match headline="${headlineTitle.slice(0, 100)}"`
-    );
-    return "";
+  if (resolution.status !== "resolved" || !resolution.entry) {
+    console.log(`[equity-fundamentals] skipped reason=unsafe_subject_match headline="${headlineTitle.slice(0, 100)}"`);
+    return emptyDataContext(resolution);
   }
 
-  const { entry, score, confidence, matchedText } = subjectMatch;
+  const { entry, score, confidence, matchedText } = resolution;
   const isEarningsHeadline = EARNINGS_KEYWORDS.test(primaryText);
   console.log(
     `[equity-catalyst] type=single_company subject=${entry.name} symbol=${entry.symbol} confidence=${confidence} matched="${matchedText}" score=${score}`
@@ -300,225 +256,122 @@ export async function buildEquityFundamentalsForPost(
   const fundamentals = await fetchEquityFundamentals(entry.symbol, entry.name, isEarningsHeadline);
   if (!fundamentals) {
     console.log(`[equity-fundamentals] no data returned for ${entry.symbol}`);
-    return "";
+    return emptyDataContext(resolution);
   }
 
-  const block = formatFundamentalsBlock(fundamentals);
-  if (!block) {
+  const quote: EquityQuote = {
+    ...entry,
+    price: fundamentals.price,
+    change: fundamentals.change,
+    status: "live",
+    source: "Yahoo Finance quote"
+  };
+  const dataTier = classifyEquityDataTier(quote, fundamentals);
+  const fetchedFields = collectFetchedFields(quote, fundamentals);
+  const promptBlock = formatFundamentalsBlock(fundamentals);
+
+  if (!promptBlock) {
     console.log(`[equity-fundamentals] skipped reason=insufficient_fields symbol=${entry.symbol}`);
-    return "";
+    return {
+      resolution,
+      dataTier,
+      promptBlock: "",
+      quote,
+      fundamentals,
+      fetchedFields
+    };
   }
 
-  console.log(
-    `[equity-fundamentals] injected symbol=${entry.symbol} fields=${fundamentalFieldList(fundamentals).join(",")}`
-  );
-  return block;
+  console.log(`[equity-fundamentals] injected symbol=${entry.symbol} fields=${fundamentalFieldList(fundamentals).join(",")}`);
+  return {
+    resolution,
+    dataTier,
+    promptBlock,
+    quote,
+    fundamentals,
+    fetchedFields
+  };
+}
+
+export function hasVisibleFetchedFundamentals(
+  content: string,
+  context: EquitySubjectDataContext
+): { visible: boolean; matchedFields: EquityFundamentalsField[] } {
+  const matchedFields = Object.entries(context.fetchedFields)
+    .filter(([field, value]) => Boolean(value) && fieldMatchesVisibleValue(field as EquityFundamentalsField, value!, content))
+    .map(([field]) => field as EquityFundamentalsField);
+
+  return {
+    visible: matchedFields.length > 0,
+    matchedFields
+  };
+}
+
+export function buildEquityFundamentalsRepairSentence(context: EquitySubjectDataContext): string | null {
+  if (context.dataTier !== "light" && context.dataTier !== "rich") {
+    return null;
+  }
+
+  const fields = context.fetchedFields;
+  if (fields.marketCap) {
+    return `At roughly ${fields.marketCap} of market cap, the market is already discounting a fairly clean execution path.`;
+  }
+  if (fields.peForward) {
+    return `The stock still trades around ${fields.peForward} forward earnings, which matters more than broad index tape if guidance is wobbling.`;
+  }
+  if (fields.peTrailing) {
+    return `At roughly ${fields.peTrailing} trailing earnings, valuation already sets a high bar for any near-term disappointment.`;
+  }
+  if (fields.epsTrailing) {
+    return `Trailing EPS is ${fields.epsTrailing}, so the debate is whether the next catalyst can actually improve that earnings base rather than just sentiment.`;
+  }
+  if (fields.fiftyTwoWeekRange) {
+    return `The stock is still trading inside a ${fields.fiftyTwoWeekRange} 52-week range, so positioning is not as washed out as the headline alone suggests.`;
+  }
+  if (fields.price) {
+    return `With shares around ${fields.price}, the market is reacting to company-specific execution more than a generic IWM/SPY framing.`;
+  }
+  return null;
+}
+
+function emptyDataContext(resolution: EquitySubjectResolution): EquitySubjectDataContext {
+  return {
+    resolution,
+    dataTier: "none",
+    promptBlock: "",
+    quote: null,
+    fundamentals: null,
+    fetchedFields: {}
+  };
 }
 
 function classifyMarketRoomEquityCatalyst(
   primaryText: string,
   combinedText: string,
-  subjectMatch: SubjectCompanyMatch | null
+  resolution: EquitySubjectResolution
 ): EquityCatalystType {
   if (isMarketRoomListicle(primaryText)) {
     return "noise_or_listicle";
   }
-
-  if (subjectMatch) {
+  if (resolution.status === "resolved" && resolution.classification === "single_company") {
     return "single_company";
   }
-
   if (SECTOR_OR_INDUSTRY_KEYWORDS.test(primaryText)) {
     return "sector_or_industry";
   }
-
   if (INDEX_OR_FACTOR_KEYWORDS.test(primaryText)) {
     return "index_or_factor";
   }
-
   if (MACRO_TO_EQUITY_KEYWORDS.test(primaryText) || MACRO_TO_EQUITY_KEYWORDS.test(combinedText)) {
     return "macro_to_equity";
   }
-
   return "sector_or_industry";
 }
 
-function identifySubjectCompany(primaryText: string, combinedText: string): SubjectCompanyMatch | null {
-  const hasSingleCompanyLanguage = SINGLE_COMPANY_CATALYST_KEYWORDS.test(primaryText);
-  const primaryMatch = identifySubjectCompanyInText(primaryText, {
-    allowPartialNameMatch: hasSingleCompanyLanguage
-  });
-  if (primaryMatch) return primaryMatch;
-
-  // Fallback to the combined top-headline slate only when the primary headline
-  // has single-company language but lacks the full name/ticker in the title.
-  if (!hasSingleCompanyLanguage) {
-    return null;
-  }
-  return identifySubjectCompanyInText(combinedText, {
-    allowPartialNameMatch: true
-  });
-}
-
-function identifySubjectCompanyInText(
-  text: string,
-  options: SubjectCompanyMatchOptions
-): SubjectCompanyMatch | null {
-  const normalizedText = normalizeForCompanyMatch(text);
-  const explicitSymbols = extractMarketRoomSubjectSymbols(text);
-  const candidates: SubjectCompanyMatch[] = [];
-
-  for (const entry of equityUniverse) {
-    const symbol = entry.symbol.toUpperCase();
-    const bbgSymbol = entry.bbg.split(" ")[0]?.toUpperCase() || "";
-    const aliases = companyAliases(entry);
-
-    if (explicitSymbols.has(symbol) || (bbgSymbol && explicitSymbols.has(bbgSymbol))) {
-      candidates.push({
-        entry,
-        score: 220,
-        confidence: "explicit_symbol",
-        matchedText: explicitSymbols.has(symbol) ? symbol : bbgSymbol
-      });
-      continue;
-    }
-
-    const exactAlias = aliases.find((alias) =>
-      alias.kind === "exact" &&
-      !isAmbiguousSubjectAlias(alias.value, normalizedText) &&
-      normalizedText.includes(` ${alias.value} `)
-    );
-    if (exactAlias) {
-      candidates.push({
-        entry,
-        score: 180 + exactAlias.value.split(" ").length * 12,
-        confidence: "exact_name",
-        matchedText: exactAlias.value
-      });
-      continue;
-    }
-
-    if (!options.allowPartialNameMatch) {
-      continue;
-    }
-
-    const partialAlias = aliases.find((alias) =>
-      alias.kind === "partial" &&
-      !isAmbiguousSubjectAlias(alias.value, normalizedText) &&
-      normalizedText.includes(` ${alias.value} `)
-    );
-    if (partialAlias) {
-      candidates.push({
-        entry,
-        score: 120 + partialAlias.value.split(" ").length * 8,
-        confidence: "partial_name",
-        matchedText: partialAlias.value
-      });
-    }
-  }
-
-  if (candidates.length === 0) return null;
-  candidates.sort(compareSubjectMatches);
-  const best = candidates[0];
-  if (!best || best.score < 100) return null;
-  return best;
-}
-
-function isAmbiguousSubjectAlias(alias: string, normalizedText: string): boolean {
-  if (!AMBIGUOUS_SUBJECT_ALIASES.has(alias)) {
-    return false;
-  }
-
-  // Require explicit company wording for ambiguous single-token names. This
-  // blocks Dow Jones -> DOW Inc, NASDAQ:BSVN -> Nasdaq Inc, TD Cowen -> TD Bank.
-  return !normalizedText.includes(` ${alias} inc `) && !normalizedText.includes(` ${alias} corp `);
-}
-
-function compareSubjectMatches(left: SubjectCompanyMatch, right: SubjectCompanyMatch): number {
-  if (right.score !== left.score) return right.score - left.score;
-  const confidenceRank: Record<SubjectMatchConfidence, number> = {
-    explicit_symbol: 3,
-    exact_name: 2,
-    partial_name: 1
-  };
-  const confidenceDelta = confidenceRank[right.confidence] - confidenceRank[left.confidence];
-  if (confidenceDelta !== 0) return confidenceDelta;
-
-  const leftIsUs = left.entry.region.toUpperCase() === "US" ? 1 : 0;
-  const rightIsUs = right.entry.region.toUpperCase() === "US" ? 1 : 0;
-  if (rightIsUs !== leftIsUs) return rightIsUs - leftIsUs;
-
-  const leftHasDot = left.entry.symbol.includes(".") ? 1 : 0;
-  const rightHasDot = right.entry.symbol.includes(".") ? 1 : 0;
-  if (leftHasDot !== rightHasDot) return leftHasDot - rightHasDot;
-
-  return left.entry.symbol.length - right.entry.symbol.length;
-}
-
-function companyAliases(entry: EquityUniverseEntry): Array<{ value: string; kind: "exact" | "partial" }> {
-  const aliases = new Map<string, "exact" | "partial">();
-  const add = (value: string, kind: "exact" | "partial") => {
-    const normalized = normalizeCompanyAlias(value);
-    if (!normalized || normalized.length < 3) return;
-    const existing = aliases.get(normalized);
-    if (existing === "exact") return;
-    aliases.set(normalized, kind);
-  };
-
-  add(entry.name, "exact");
-  add(entry.name.replace(/\([^)]*\)/g, " "), "exact");
-  for (const alias of KNOWN_COMPANY_ALIASES[entry.symbol.toUpperCase()] || []) {
-    add(alias, "exact");
-  }
-
-  const tokens = normalizeCompanyAlias(entry.name)
-    .split(" ")
-    .filter((token) => token && !COMPANY_SUFFIX_WORDS.has(token));
-  const meaningfulTokens = tokens.filter((token) => !GENERIC_COMPANY_WORDS.has(token));
-
-  if (meaningfulTokens.length >= 2) {
-    add(meaningfulTokens.slice(0, 2).join(" "), "partial");
-  }
-  if (meaningfulTokens.length === 1 && meaningfulTokens[0].length >= 5) {
-    add(meaningfulTokens[0], "partial");
-  }
-
-  return [...aliases.entries()].map(([value, kind]) => ({ value, kind }));
-}
-
-function normalizeCompanyAlias(value: string): string {
-  const tokens = value
-    .toLowerCase()
-    .replace(/&/g, " and ")
-    .replace(/\([^)]*\)/g, " ")
-    .replace(/[^a-z0-9\s.]/g, " ")
-    .replace(/\bcom\b/g, " ")
-    .split(/\s+/)
-    .map((token) => token.trim().replace(/\.$/, ""))
-    .filter((token) => token && !COMPANY_SUFFIX_WORDS.has(token));
-  return tokens.join(" ").trim();
-}
-
-function normalizeForCompanyMatch(value: string): string {
-  return ` ${value
-    .toLowerCase()
-    .replace(/&/g, " and ")
-    .replace(/[^a-z0-9\s.]/g, " ")
-    .replace(/\bcom\b/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()} `;
-}
-
-function isMarketRoomListicle(text: string): boolean {
-  return (
-    /\b\d+\s+(?:best|top|most|worst|cheapest|undervalued|overvalued|high[- ]?dividend|growth|value|small[- ]?cap)\b.*\bstock/i.test(text) ||
-    /\bstocks?\s+to\s+(buy|sell|watch|avoid|own)\b/i.test(text) ||
-    /\b(best|top)\s+stocks?\s+(under|for|in|to)\b/i.test(text) ||
-    /\b\d+\s+\w+\s+(etfs?|funds?|reits?)\s+to\s+(buy|own|watch)\b/i.test(text)
-  );
-}
-
-function buildEquityCatalystContextBlock(type: Exclude<EquityCatalystType, "single_company" | "noise_or_listicle">, headlineTitle: string): string {
+function buildEquityCatalystContextBlock(
+  type: Exclude<EquityCatalystType, "single_company" | "noise_or_listicle">,
+  headlineTitle: string
+): string {
   const instructions: Record<typeof type, string[]> = {
     sector_or_industry: [
       "This is a sector/industry catalyst, not a single-company catalyst.",
@@ -556,7 +409,199 @@ function fundamentalFieldList(f: EquityFundamentals): string[] {
   ].filter((field): field is string => Boolean(field));
 }
 
-// ─── Universe candidate selection ─────────────────────────────────────────────
+function classifyEquityDataTier(quote: EquityQuote | null, fundamentals: EquityFundamentals | null): EquityDataTier {
+  if (!quote && !fundamentals) return "none";
+  if (!fundamentals) return quote ? "quote_only" : "none";
+
+  const lightCount = [
+    fundamentals.marketCap,
+    fundamentals.peTrailing,
+    fundamentals.peForward,
+    fundamentals.epsTrailing,
+    fundamentals.fiftyTwoWeekRange
+  ].filter(Boolean).length;
+  const richCount = [
+    fundamentals.nextEarningsDate,
+    fundamentals.epsEstimate,
+    fundamentals.revenueEstimate
+  ].filter(Boolean).length;
+
+  if (richCount > 0) return "rich";
+  if (lightCount > 0) return "light";
+  return quote ? "quote_only" : "none";
+}
+
+function collectFetchedFields(
+  quote: EquityQuote | null,
+  fundamentals: EquityFundamentals | null
+): Partial<Record<EquityFundamentalsField, string>> {
+  return {
+    price: fundamentals?.price || quote?.price || undefined,
+    change: fundamentals?.change || quote?.change || undefined,
+    marketCap: fundamentals?.marketCap || undefined,
+    peTrailing: fundamentals?.peTrailing || undefined,
+    peForward: fundamentals?.peForward || undefined,
+    epsTrailing: fundamentals?.epsTrailing || undefined,
+    nextEarningsDate: fundamentals?.nextEarningsDate || undefined,
+    epsEstimate: fundamentals?.epsEstimate || undefined,
+    revenueEstimate: fundamentals?.revenueEstimate || undefined,
+    fiftyTwoWeekRange: fundamentals?.fiftyTwoWeekRange || undefined
+  };
+}
+
+function buildConstrainedSnapshot(context: EquitySubjectDataContext): string {
+  return [
+    context.fetchedFields.price ? `price ${context.fetchedFields.price}` : null,
+    context.fetchedFields.change ? `change ${context.fetchedFields.change}` : null,
+    context.fetchedFields.marketCap ? `market cap ${context.fetchedFields.marketCap}` : null,
+    context.fetchedFields.peTrailing ? `trailing P/E ${context.fetchedFields.peTrailing}` : null,
+    context.fetchedFields.peForward ? `forward P/E ${context.fetchedFields.peForward}` : null,
+    context.fetchedFields.epsTrailing ? `trailing EPS ${context.fetchedFields.epsTrailing}` : null,
+    context.fetchedFields.fiftyTwoWeekRange ? `52-week range ${context.fetchedFields.fiftyTwoWeekRange}` : null,
+    context.fetchedFields.epsEstimate ? `EPS estimate ${context.fetchedFields.epsEstimate}` : null,
+    context.fetchedFields.revenueEstimate ? `latest quarterly revenue ${context.fetchedFields.revenueEstimate}` : null
+  ]
+    .filter(Boolean)
+    .join(" | ");
+}
+
+function formatAskFundamentalsBlock(
+  resolution: EquitySubjectResolution,
+  quote: EquityQuote | null,
+  fundamentals: EquityFundamentals | null,
+  dataTier: EquityDataTier
+): string {
+  if (resolution.status !== "resolved" || !resolution.entry) {
+    return "";
+  }
+
+  const context: EquitySubjectDataContext = {
+    resolution,
+    dataTier,
+    promptBlock: "",
+    quote,
+    fundamentals,
+    fetchedFields: collectFetchedFields(quote, fundamentals)
+  };
+  const snapshot = buildConstrainedSnapshot(context);
+  if (!snapshot) {
+    return "";
+  }
+
+  return [
+    `## Company Snapshot — ${resolution.entry.symbol} (${resolution.entry.name})`,
+    snapshot,
+    dataTier === "quote_only"
+      ? "Only quote-level data is available here. Do not describe this as full fundamentals."
+      : "Use these fetched company fields directly if the user asked for fundamentals."
+  ].join("\n");
+}
+
+function formatFundamentalsBlock(f: EquityFundamentals): string {
+  const lines: string[] = [
+    `## Company Fundamentals — ${f.symbol} (${f.name})`,
+    [
+      `Live: ${f.price} (${f.change} today)`,
+      f.marketCap ? `Market cap: ${f.marketCap}` : null,
+      f.fiftyTwoWeekRange ? `52-week range: ${f.fiftyTwoWeekRange}` : null
+    ].filter(Boolean).join(" | ")
+  ];
+
+  const valuationParts = [
+    f.peTrailing ? `P/E ${f.peTrailing} TTM` : null,
+    f.peForward ? `Forward P/E ${f.peForward}` : null,
+    f.epsTrailing ? `EPS ${f.epsTrailing} TTM` : null
+  ].filter(Boolean);
+  if (valuationParts.length > 0) {
+    lines.push(`Valuation: ${valuationParts.join(" | ")}`);
+  }
+
+  const earningsParts = [
+    f.epsEstimate ? `Current quarter EPS estimate: ${f.epsEstimate}` : null,
+    f.revenueEstimate ? `Latest quarterly revenue: ${f.revenueEstimate}` : null
+  ].filter(Boolean);
+  if (earningsParts.length > 0) {
+    lines.push(`Earnings estimates: ${earningsParts.join(" | ")}`);
+  }
+
+  const meaningfulFields = [f.marketCap, f.peTrailing, f.peForward, f.epsTrailing, f.epsEstimate, f.revenueEstimate].filter(Boolean).length;
+  if (meaningfulFields < 2) {
+    return "";
+  }
+
+  lines.push(
+    "",
+    "INSTRUCTION — when this fundamentals block is present you MUST:",
+    "1. Name the specific P/E or EPS figure — not just 'expensive' or 'cheap'",
+    "2. If EPS beat/missed, state the magnitude and whether revenue also beat or missed",
+    "3. Compare the valuation multiple to a sector average, historical average, or named peer",
+    "4. If an EPS estimate is shown, frame your view against that consensus",
+    "5. If you use this block in final copy, at least one fetched value must appear explicitly in the post.",
+    "Yahoo Finance data can be delayed. If a field is missing above, omit it from the post."
+  );
+
+  return lines.join("\n");
+}
+
+function fieldMatchesVisibleValue(field: EquityFundamentalsField, value: string, content: string): boolean {
+  const normalized = content.toLowerCase().replace(/[–—]/g, "-");
+  switch (field) {
+    case "marketCap":
+      return matchesMarketCapValue(value, normalized);
+    case "peForward":
+      return matchesPeValue(value, normalized);
+    case "peTrailing":
+      return matchesPeValue(value, normalized);
+    case "epsTrailing":
+    case "epsEstimate":
+      return matchesDollarValueWithContext(value, normalized, /\b(eps|earnings per share)\b/);
+    case "revenueEstimate":
+      return matchesMarketCapValue(value, normalized);
+    case "fiftyTwoWeekRange":
+      return matchesRangeValue(value, normalized);
+    case "price":
+      return matchesDollarValue(value, normalized);
+    default:
+      return false;
+  }
+}
+
+function matchesMarketCapValue(value: string, content: string): boolean {
+  const match = value.match(/\$?(\d+(?:\.\d+)?)([TBM])/i);
+  if (!match) return false;
+  const amount = Number(match[1]);
+  const suffix = match[2].toUpperCase();
+  const rounded = Number.isInteger(amount) ? `${amount}` : amount.toFixed(1).replace(/\.0$/, "");
+  const suffixPattern =
+    suffix === "T" ? "(?:t|tn|trillion)" :
+    suffix === "B" ? "(?:b|bn|billion)" :
+    "(?:m|mn|million)";
+  return new RegExp(`\\$?${escapeRegex(rounded)}\\s*${suffixPattern}\\b`, "i").test(content);
+}
+
+function matchesPeValue(value: string, content: string): boolean {
+  const match = value.match(/(\d+(?:\.\d+)?)x/i);
+  if (!match) return false;
+  const amount = match[1];
+  return new RegExp(`\\b${escapeRegex(amount)}\\s*(?:x|times?)\\b(?:[^.!?]{0,40}(?:forward|trailing|earnings|p/e|pe|ttm))?`, "i").test(content);
+}
+
+function matchesDollarValueWithContext(value: string, content: string, contextPattern: RegExp): boolean {
+  return matchesDollarValue(value, content) && contextPattern.test(content);
+}
+
+function matchesDollarValue(value: string, content: string): boolean {
+  const match = value.match(/\$?(\d+(?:\.\d+)?)/);
+  if (!match) return false;
+  return new RegExp(`\\$?${escapeRegex(match[1])}\\b`, "i").test(content);
+}
+
+function matchesRangeValue(value: string, content: string): boolean {
+  const match = value.match(/\$?(\d+(?:\.\d+)?)\s*[–-]\s*\$?(\d+(?:\.\d+)?)/);
+  if (!match) return false;
+  return new RegExp(`\\$?${escapeRegex(match[1])}\\b`, "i").test(content) &&
+    new RegExp(`\\$?${escapeRegex(match[2])}\\b`, "i").test(content);
+}
 
 function selectUniverseCandidates(question: string, limit: number): EquityUniverseEntry[] {
   const text = question.toLowerCase();
@@ -580,15 +625,9 @@ function selectUniverseCandidates(question: string, limit: number): EquityUniver
         if (entryText.includes(token)) score += token.length >= 5 ? 4 : 2;
       }
 
-      if (theme === "green_energy" && /solar|renewable|energy|lithium|battery|electric|power|grid|wind/i.test(entry.name)) {
-        score += 16;
-      }
-      if (theme === "energy_equities" && /oil|gas|energy|pipeline|resources|petroleum|midstream|drilling/i.test(entry.name)) {
-        score += 16;
-      }
-      if (theme === "ai_infrastructure" && /semiconductor|technology|micro|nvidia|advanced micro|broadcom|cloud|electric|power/i.test(entry.name)) {
-        score += 16;
-      }
+      if (theme === "green_energy" && /solar|renewable|energy|lithium|battery|electric|power|grid|wind/i.test(entry.name)) score += 16;
+      if (theme === "energy_equities" && /oil|gas|energy|pipeline|resources|petroleum|midstream|drilling/i.test(entry.name)) score += 16;
+      if (theme === "ai_infrastructure" && /semiconductor|technology|micro|nvidia|advanced micro|broadcom|cloud|electric|power/i.test(entry.name)) score += 16;
 
       return { entry, score };
     })
@@ -598,51 +637,10 @@ function selectUniverseCandidates(question: string, limit: number): EquityUniver
   return dedupeUniverse(scored.map((item) => item.entry)).slice(0, limit);
 }
 
-/**
- * Returns the single best-matching universe entry with its score,
- * or null if no confident match (score < 50).
- * Used by buildEquityFundamentalsForPost to identify the primary company.
- */
-function selectTopCandidate(text: string): { entry: EquityUniverseEntry; score: number } | null {
-  const lower = text.toLowerCase();
-  const explicitSymbols = extractExplicitSymbols(text);
-  const theme = detectTheme(text);
-  const preferredSymbols = theme ? preferredThemeSymbols[theme] || [] : [];
-  const queryTokens = tokenize(lower);
-
-  let best: { entry: EquityUniverseEntry; score: number } | null = null;
-
-  for (const entry of equityUniverse) {
-    const entryText = `${entry.symbol} ${entry.bbg} ${entry.ric} ${entry.name} ${entry.region}`.toLowerCase();
-    let score = 0;
-
-    if (explicitSymbols.has(entry.symbol.toUpperCase())) score += 120;
-    if (explicitSymbols.has(entry.bbg.split(" ")[0]?.toUpperCase() || "")) score += 90;
-
-    const preferredIndex = preferredSymbols.indexOf(entry.symbol);
-    if (preferredIndex >= 0) score += 90 - preferredIndex;
-
-    for (const token of queryTokens) {
-      if (entryText.includes(token)) score += token.length >= 5 ? 4 : 2;
-    }
-
-    if (score > (best?.score ?? 0)) {
-      best = { entry, score };
-    }
-  }
-
-  // Require minimum score of 50 to avoid weak/accidental matches
-  if (!best || best.score < 50) return null;
-  return best;
-}
-
-// ─── Quote fetch (price only, for Ask Market) ─────────────────────────────────
-
 async function fetchEquityQuote(entry: EquityUniverseEntry): Promise<EquityQuote> {
   const cacheKey = entry.symbol.toUpperCase();
   const now = Date.now();
   const cached = quoteCache.get(cacheKey);
-
   if (cached && cached.expiresAt > now) {
     return cached.quote;
   }
@@ -673,16 +671,11 @@ async function fetchEquityQuote(entry: EquityUniverseEntry): Promise<EquityQuote
       };
     };
     const meta = payload.chart?.result?.[0]?.meta;
-
     if (!meta?.regularMarketPrice) {
       return unavailableQuote(entry);
     }
-
-    // Company name cross-validation — prevents wrong-company ticker resolution
     if (!validateCompanyName(entry.name, meta.shortName)) {
-      console.log(
-        `[equity-quotes] name mismatch: universe="${entry.name}" yahoo="${meta.shortName}" symbol=${entry.symbol} — marking unavailable`
-      );
+      console.log(`[equity-quotes] name mismatch: universe="${entry.name}" yahoo="${meta.shortName}" symbol=${entry.symbol} — marking unavailable`);
       return unavailableQuote(entry);
     }
 
@@ -700,8 +693,6 @@ async function fetchEquityQuote(entry: EquityUniverseEntry): Promise<EquityQuote
   }
 }
 
-// ─── Fundamentals fetch (for autonomous Equities Agent posts) ─────────────────
-
 async function fetchEquityFundamentals(
   symbol: string,
   universeName: string,
@@ -713,85 +704,55 @@ async function fetchEquityFundamentals(
   if (cached && cached.expiresAt > now) return cached.data;
 
   try {
-    // Tier 1: v7/quote — fast, gives price + basic fundamentals + name for validation
-    const quoteRes = await fetch(
-      `${YF_QUOTE_BASE}?symbols=${encodeURIComponent(symbol)}&fields=shortName,regularMarketPrice,regularMarketChangePercent,marketCap,trailingPE,forwardPE,epsTrailingTwelveMonths,fiftyTwoWeekHigh,fiftyTwoWeekLow`,
-      {
-        headers: {
-          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
-          Accept: "application/json"
-        }
-      }
-    );
-
-    if (!quoteRes.ok) {
+    const chartMeta = await fetchChartMeta(symbol);
+    if (!chartMeta?.regularMarketPrice) {
       fundamentalsCache.set(cacheKey, { expiresAt: now + FUNDAMENTALS_CACHE_TTL_MS, data: null });
       return null;
     }
 
-    const quotePayload = (await quoteRes.json()) as {
-      quoteResponse?: {
-        result?: Array<{
-          shortName?: string;
-          regularMarketPrice?: number;
-          regularMarketChangePercent?: number;
-          marketCap?: number;
-          trailingPE?: number;
-          forwardPE?: number;
-          epsTrailingTwelveMonths?: number;
-          fiftyTwoWeekHigh?: number;
-          fiftyTwoWeekLow?: number;
-        }>;
-      };
-    };
-
-    const q = quotePayload.quoteResponse?.result?.[0];
-    if (!q?.regularMarketPrice) {
+    if (!validateCompanyName(universeName, chartMeta.shortName || chartMeta.longName)) {
+      console.log(`[equity-fundamentals] name mismatch: universe="${universeName}" yahoo="${chartMeta.shortName || chartMeta.longName}" symbol=${symbol}`);
       fundamentalsCache.set(cacheKey, { expiresAt: now + FUNDAMENTALS_CACHE_TTL_MS, data: null });
       return null;
     }
 
-    // Name validation — discard if wrong company
-    if (!validateCompanyName(universeName, q.shortName)) {
-      console.log(
-        `[equity-fundamentals] name mismatch: universe="${universeName}" yahoo="${q.shortName}" symbol=${symbol}`
-      );
-      fundamentalsCache.set(cacheKey, { expiresAt: now + FUNDAMENTALS_CACHE_TTL_MS, data: null });
-      return null;
-    }
+    const timeseries = await fetchFundamentalsTimeseries(symbol, [
+      "quarterlyMarketCap",
+      "trailingPeRatio",
+      "quarterlyDilutedEPS",
+      "annualDilutedEPS",
+      "quarterlyTotalRevenue"
+    ]);
 
     const fundamentals: EquityFundamentals = {
       symbol,
-      name: q.shortName || universeName,
-      price: formatEquityPrice(q.regularMarketPrice, undefined),
-      change: q.regularMarketChangePercent != null
-        ? `${q.regularMarketChangePercent >= 0 ? "+" : ""}${q.regularMarketChangePercent.toFixed(2)}%`
-        : "flat/unknown",
-      marketCap: formatMarketCap(q.marketCap),
-      peTrailing: q.trailingPE != null && q.trailingPE > 0 ? `${q.trailingPE.toFixed(1)}x` : null,
-      peForward: q.forwardPE != null && q.forwardPE > 0 ? `${q.forwardPE.toFixed(1)}x` : null,
-      epsTrailing: q.epsTrailingTwelveMonths != null ? `$${q.epsTrailingTwelveMonths.toFixed(2)}` : null,
+      name: chartMeta.shortName || chartMeta.longName || universeName,
+      price: formatEquityPrice(chartMeta.regularMarketPrice, chartMeta.currency),
+      change: formatEquityChange(chartMeta),
+      marketCap: latestTimeseriesFmt(timeseries.quarterlyMarketCap) || null,
+      peTrailing: latestTimeseriesFmt(timeseries.trailingPeRatio, true) || null,
+      peForward: null,
+      epsTrailing:
+        latestTimeseriesCurrency(timeseries.annualDilutedEPS) ||
+        latestTimeseriesCurrency(timeseries.quarterlyDilutedEPS) ||
+        null,
       fiftyTwoWeekRange:
-        q.fiftyTwoWeekLow != null && q.fiftyTwoWeekHigh != null
-          ? `$${q.fiftyTwoWeekLow.toFixed(0)}–$${q.fiftyTwoWeekHigh.toFixed(0)}`
+        chartMeta.fiftyTwoWeekLow != null && chartMeta.fiftyTwoWeekHigh != null
+          ? `$${chartMeta.fiftyTwoWeekLow.toFixed(0)}–$${chartMeta.fiftyTwoWeekHigh.toFixed(0)}`
           : null,
       nextEarningsDate: null,
       epsEstimate: null,
-      revenueEstimate: null
+      revenueEstimate: latestTimeseriesFmt(timeseries.quarterlyTotalRevenue) || null
     };
 
-    // Tier 2: earningsTrend — only on earnings headlines, best-effort
     if (fetchEarningsTrend) {
       try {
-        const trendRes = await fetch(
-          `${YF_SUMMARY_BASE}/${encodeURIComponent(symbol)}?modules=earningsTrend`,
-          {
-            headers: {
-              "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
-              Accept: "application/json"
-            }
+        const trendRes = await fetch(`${YF_SUMMARY_BASE}/${encodeURIComponent(symbol)}?modules=earningsTrend`, {
+          headers: {
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+            Accept: "application/json"
           }
-        );
+        });
         if (trendRes.ok) {
           const trendPayload = (await trendRes.json()) as {
             quoteSummary?: {
@@ -807,16 +768,16 @@ async function fetchEquityFundamentals(
             };
           };
           const trend = trendPayload.quoteSummary?.result?.[0]?.earningsTrend?.trend;
-          const currentQ = trend?.find((t) => t.period === "0q") ?? trend?.[0];
+          const currentQ = trend?.find((item) => item.period === "0q") ?? trend?.[0];
           if (currentQ) {
             const eps = currentQ.earningsEstimate?.avg;
-            const rev = currentQ.revenueEstimate?.avg;
+            const revenue = currentQ.revenueEstimate?.avg;
             if (eps != null && eps !== 0) fundamentals.epsEstimate = `$${eps.toFixed(2)}`;
-            if (rev != null && rev > 0) fundamentals.revenueEstimate = formatMarketCap(rev);
+            if (revenue != null && revenue > 0) fundamentals.revenueEstimate = formatMarketCap(revenue);
           }
         }
       } catch {
-        // Tier 2 failure is silent — tier 1 data still injected
+        // Best effort only.
       }
     }
 
@@ -828,56 +789,93 @@ async function fetchEquityFundamentals(
   }
 }
 
-// ─── Prompt block formatter ───────────────────────────────────────────────────
-
-function formatFundamentalsBlock(f: EquityFundamentals): string {
-  const lines: string[] = [
-    `## Company Fundamentals — ${f.symbol} (${f.name})`,
-    [
-      `Live: ${f.price} (${f.change} today)`,
-      f.marketCap ? `Market cap: ${f.marketCap}` : null,
-      f.fiftyTwoWeekRange ? `52-week range: ${f.fiftyTwoWeekRange}` : null
-    ].filter(Boolean).join(" | "),
-  ];
-
-  const valuationParts = [
-    f.peTrailing ? `P/E ${f.peTrailing} TTM` : null,
-    f.peForward ? `Forward P/E ${f.peForward}` : null,
-    f.epsTrailing ? `EPS ${f.epsTrailing} TTM` : null
-  ].filter(Boolean);
-  if (valuationParts.length > 0) {
-    lines.push(`Valuation: ${valuationParts.join(" | ")}`);
+async function fetchChartMeta(symbol: string): Promise<{
+  regularMarketPrice?: number;
+  chartPreviousClose?: number;
+  regularMarketChangePercent?: number;
+  currency?: string;
+  shortName?: string;
+  longName?: string;
+  fiftyTwoWeekHigh?: number;
+  fiftyTwoWeekLow?: number;
+} | null> {
+  try {
+    const response = await fetch(`${YF_CHART_BASE}/${encodeURIComponent(symbol)}?range=1d&interval=1d&includePrePost=false`, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+        Accept: "application/json"
+      }
+    });
+    if (!response.ok) return null;
+    const payload = (await response.json()) as {
+      chart?: {
+        result?: Array<{
+          meta?: {
+            regularMarketPrice?: number;
+            chartPreviousClose?: number;
+            regularMarketChangePercent?: number;
+            currency?: string;
+            shortName?: string;
+            longName?: string;
+            fiftyTwoWeekHigh?: number;
+            fiftyTwoWeekLow?: number;
+          };
+        }>;
+      };
+    };
+    return payload.chart?.result?.[0]?.meta || null;
+  } catch {
+    return null;
   }
-
-  const earningsParts = [
-    f.epsEstimate ? `Current quarter EPS estimate: ${f.epsEstimate}` : null,
-    f.revenueEstimate ? `Revenue estimate: ${f.revenueEstimate}` : null
-  ].filter(Boolean);
-  if (earningsParts.length > 0) {
-    lines.push(`Earnings estimates: ${earningsParts.join(" | ")}`);
-  }
-
-  // Count meaningful fields (anything beyond price/change)
-  const meaningfulFields = [f.marketCap, f.peTrailing, f.peForward, f.epsTrailing, f.epsEstimate, f.revenueEstimate].filter(Boolean).length;
-  if (meaningfulFields < 2) {
-    // Not enough data to be useful — skip the block
-    return "";
-  }
-
-  lines.push(
-    "",
-    "INSTRUCTION — when this fundamentals block is present you MUST:",
-    "1. Name the specific P/E or EPS figure — not just 'expensive' or 'cheap'",
-    "2. If EPS beat/missed, state the magnitude and whether revenue also beat or missed",
-    "3. Compare the valuation multiple to a sector average, historical average, or named peer",
-    "4. If an EPS estimate is shown, frame your view against that consensus",
-    "⚠ Yahoo Finance data — 15-min delayed. If a field is missing above, omit it from your post. Do not estimate missing figures."
-  );
-
-  return lines.join("\n");
 }
 
-// ─── Shared utilities ─────────────────────────────────────────────────────────
+async function fetchFundamentalsTimeseries(symbol: string, types: string[]): Promise<Record<string, Array<{ reportedValue?: { raw?: number; fmt?: string } }>>> {
+  const period1 = 1609459200;
+  const period2 = Math.floor(Date.now() / 1000);
+  const url = `${YF_TIMESERIES_BASE}/${encodeURIComponent(symbol)}?type=${types.join(",")}&period1=${period1}&period2=${period2}`;
+  try {
+    const response = await fetch(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+        Accept: "application/json"
+      }
+    });
+    if (!response.ok) return {};
+    const payload = (await response.json()) as {
+      timeseries?: {
+        result?: Array<Record<string, unknown>>;
+      };
+    };
+    const out: Record<string, Array<{ reportedValue?: { raw?: number; fmt?: string } }>> = {};
+    for (const item of payload.timeseries?.result || []) {
+      for (const type of types) {
+        if (Array.isArray(item[type])) {
+          out[type] = item[type] as Array<{ reportedValue?: { raw?: number; fmt?: string } }>;
+        }
+      }
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+function latestTimeseriesFmt(
+  entries: Array<{ reportedValue?: { raw?: number; fmt?: string } }> | undefined,
+  appendX: boolean = false
+): string | null {
+  const latest = entries?.find((entry) => entry.reportedValue?.fmt);
+  if (!latest?.reportedValue?.fmt) return null;
+  return appendX ? `${latest.reportedValue.fmt}x` : latest.reportedValue.fmt;
+}
+
+function latestTimeseriesCurrency(
+  entries: Array<{ reportedValue?: { raw?: number; fmt?: string } }> | undefined
+): string | null {
+  const latest = entries?.find((entry) => entry.reportedValue?.raw != null);
+  if (latest?.reportedValue?.raw == null) return null;
+  return `$${Number(latest.reportedValue.raw).toFixed(2)}`;
+}
 
 function unavailableQuote(entry: EquityUniverseEntry): EquityQuote {
   return {
@@ -887,6 +885,18 @@ function unavailableQuote(entry: EquityUniverseEntry): EquityQuote {
     status: "unavailable",
     source: "Yahoo Finance chart"
   };
+}
+
+function validateCompanyName(universeName: string, yahooShortName: string | undefined): boolean {
+  if (!yahooShortName) return true;
+  const normalize = (value: string): string[] =>
+    value
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, " ")
+      .split(/\s+/)
+      .filter((token) => token.length > 2);
+  const universeTokens = new Set(normalize(universeName));
+  return normalize(yahooShortName).some((token) => universeTokens.has(token));
 }
 
 function formatEquityPrice(price: number, currency?: string): string {
@@ -900,11 +910,9 @@ function formatEquityChange(meta: { regularMarketPrice?: number; chartPreviousCl
     (meta.chartPreviousClose && meta.regularMarketPrice && meta.chartPreviousClose !== 0
       ? ((meta.regularMarketPrice - meta.chartPreviousClose) / meta.chartPreviousClose) * 100
       : null);
-
   if (changePct == null || !Number.isFinite(changePct)) {
     return "flat/unknown";
   }
-
   return `${changePct >= 0 ? "+" : ""}${changePct.toFixed(2)}%`;
 }
 
@@ -926,7 +934,6 @@ function detectTheme(question: string): string | null {
 }
 
 function extractExplicitSymbols(question: string): Set<string> {
-  // Expanded exclusion list — common acronyms and market terms that are also tickers
   const excluded = new Set([
     "WHAT", "WHICH", "WHY", "HOW", "THE", "AND", "FOR", "NOT", "BUT", "ARE",
     "ETF", "ETFS", "WTI", "DXY", "CPI", "PCE", "FED", "US", "UK", "AI",
@@ -936,52 +943,6 @@ function extractExplicitSymbols(question: string): Set<string> {
   ]);
   const matches = question.match(/\b[A-Z]{1,5}(?:\.[A-Z]{1,3})?\b/g) || [];
   return new Set(matches.filter((match) => !excluded.has(match)).map((match) => match.toUpperCase()));
-}
-
-function extractMarketRoomSubjectSymbols(text: string): Set<string> {
-  const explicitSymbols = extractExplicitSymbols(text);
-  const allowed = new Set<string>();
-
-  for (const symbol of explicitSymbols) {
-    if (MARKET_ROOM_SYMBOL_EXCLUSIONS.has(symbol)) {
-      continue;
-    }
-
-    if (symbol.length === 1 && !hasStrongTickerContext(text, symbol)) {
-      continue;
-    }
-
-    if (isLikelyBrokerOrPersonContext(text, symbol)) {
-      continue;
-    }
-
-    allowed.add(symbol);
-  }
-
-  return allowed;
-}
-
-function hasStrongTickerContext(text: string, symbol: string): boolean {
-  const escaped = escapeRegex(symbol);
-  return (
-    new RegExp(`\\(${escaped}\\)`).test(text) ||
-    new RegExp(`\\b(?:NYSE|NASDAQ|Nasdaq|NasdaqGS|NasdaqCM|AMEX|LSE|TSX|ASX|HKEX|TSE)\\s*:\\s*${escaped}\\b`).test(text) ||
-    new RegExp(`\\$${escaped}\\b`).test(text)
-  );
-}
-
-function isLikelyBrokerOrPersonContext(text: string, symbol: string): boolean {
-  const escaped = escapeRegex(symbol);
-  const brokerOrSourcePattern = new RegExp(
-    `\\b${escaped}\\b\\s+(?:cowen|securities|capital|markets|analyst|analysts|research|upgrade|downgrade|raises?|cuts?|initiates?|reaffirms?)`,
-    "i"
-  );
-
-  return brokerOrSourcePattern.test(text);
-}
-
-function escapeRegex(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function tokenize(value: string): string[] {
@@ -994,13 +955,24 @@ function tokenize(value: string): string[] {
 function dedupeUniverse(entries: EquityUniverseEntry[]): EquityUniverseEntry[] {
   const seen = new Set<string>();
   const deduped: EquityUniverseEntry[] = [];
-
   for (const entry of entries) {
     const key = entry.symbol.toUpperCase();
     if (seen.has(key)) continue;
     seen.add(key);
     deduped.push(entry);
   }
-
   return deduped;
+}
+
+function isMarketRoomListicle(text: string): boolean {
+  return (
+    /\b\d+\s+(?:best|top|most|worst|cheapest|undervalued|overvalued|high[- ]?dividend|growth|value|small[- ]?cap)\b.*\bstock/i.test(text) ||
+    /\bstocks?\s+to\s+(buy|sell|watch|avoid|own)\b/i.test(text) ||
+    /\b(best|top)\s+stocks?\s+(under|for|in|to)\b/i.test(text) ||
+    /\b\d+\s+\w+\s+(etfs?|funds?|reits?)\s+to\s+(buy|own|watch)\b/i.test(text)
+  );
+}
+
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

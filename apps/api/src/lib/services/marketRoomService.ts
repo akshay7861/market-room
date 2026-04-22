@@ -33,7 +33,7 @@ import { makePostingDecision, evaluateCommentTarget } from "./postingDecisionSer
 import { listRelevantMarketCasesForAgent } from "./marketCaseService";
 import { findRelevantKnowledgeSnippets, type LocalKnowledgeSnippet } from "./knowledgeSnippetService";
 import { recordDiscussionLearning } from "./learningService";
-import { fetchOfficialCatalystLayer, isDataLakeOnlyHeadline } from "./officialCatalystService";
+import { fetchOfficialCatalystLayer, isDataLakeOnlyHeadline, fetchRecentTreasuryAuctionData, formatAuctionDataBlock } from "./officialCatalystService";
 import { buildHistoricalDataPromptBlock, buildAnalogContextBlock, type SnapshotSignal } from "./historicalDataContextService";
 import { fetchYahooFinanceBriefing } from "./yahooFinanceNewsService";
 import { fetchMarketauxBriefing } from "./marketauxNewsService";
@@ -41,7 +41,12 @@ import { fetchFinnhubBriefing } from "./finnhubNewsService";
 import { fetchPolygonBriefing } from "./polygonNewsService";
 import { analyzeTopHeadlinesForAgent, type HeadlineAnalysis } from "./headlineAnalysisService";
 import { buildCrossAgentMacroView, buildDynamicMemoryContext, buildDynamicMemoryPromptBlock, refreshDynamicHouseViews } from "./dynamicMemoryService";
-import { buildEquityFundamentalsForPost } from "./equityQuoteService";
+import {
+  buildEquityFundamentalsForPost,
+  buildEquityFundamentalsRepairSentence,
+  hasVisibleFetchedFundamentals,
+  type EquitySubjectDataContext
+} from "./equityQuoteService";
 import { evaluateDomainRelevance, type DomainRelevanceResult } from "./domainRelevanceService";
 import {
   buildVerifiedMarketMetricsContext,
@@ -1158,7 +1163,8 @@ async function generateAgentForumPosts({
       agent,
       postingDecision: materialityAdjustedDecision,
       headlineAnalysis,
-      topHeadline: topHeadlineForDiagnostics
+      topHeadline: topHeadlineForDiagnostics,
+      noveltyScore: noveltyAssessment.compositeScore
     });
 
     const financingOwnershipAdjustedDecision = applyCompanyFinancingOwnershipGate({
@@ -1225,6 +1231,41 @@ async function generateAgentForumPosts({
       continue;
     }
 
+    const topHeadlineTitle = sectorHeadlines[0]?.title ?? generalHeadlines[0]?.title ?? "";
+    const equityFundamentalsContext =
+      agent.sector === "Equities"
+        ? await Promise.race([
+            buildEquityFundamentalsForPost(topHeadlineTitle, sectorHeadlines),
+            new Promise<EquitySubjectDataContext>((resolve) =>
+              setTimeout(
+                () =>
+                  resolve({
+                    resolution: {
+                      status: "unresolved",
+                      classification: "unresolved",
+                      confidence: "low",
+                      entry: null,
+                      matchedText: null,
+                      score: 0,
+                      candidateSymbols: []
+                    },
+                    dataTier: "none",
+                    promptBlock: "",
+                    quote: null,
+                    fundamentals: null,
+                    fetchedFields: {}
+                  }),
+                5000
+              )
+            )
+          ])
+        : null;
+    if (agent.sector === "Equities") {
+      console.log(
+        `[equities-standalone] fundamentals_result injected=${Boolean(equityFundamentalsContext?.promptBlock)} tier=${equityFundamentalsContext?.dataTier || "none"} classification=${equityFundamentalsContext?.resolution.classification || "none"}`
+      );
+    }
+
     const result = await requestStructuredForumPost({
       env,
       agent,
@@ -1244,7 +1285,8 @@ async function generateAgentForumPosts({
       thisRunPosts: [...thisRunPosts],
       headlineAnalysis,
       verifiedMetrics,
-      stanceChallenge
+      stanceChallenge,
+      equityFundamentalsContext
     });
 
     const createdAt = offsetTimestamp(index * 3);
@@ -1272,7 +1314,8 @@ async function generateAgentForumPosts({
     resolvedContent = ensureStanceLockReviewIfRequired({
       content: resolvedContent,
       stanceChallenge,
-      catalyst: finalCatalyst
+      catalyst: finalCatalyst,
+      stance: result?.stance || stanceFor(agent)
     });
     const resolvedStance = result?.stance || stanceFor(agent);
     const titleResolution = resolveForumPostTitle({
@@ -1292,7 +1335,7 @@ async function generateAgentForumPosts({
     const resolvedTopicPrimaryKey = resolveFinalTopicPrimaryKey(agent, headlineAnalysis, finalCatalyst, topicPlan.topicPrimaryKey);
     const resolvedTopicSecondaryKey =
       resolvedTopicPrimaryKey === topicPlan.topicPrimaryKey ? topicPlan.topicSecondaryKey : topicPlan.topicPrimaryKey;
-    const postQualityFlags = collectPostQualityFlags({
+    let postQualityFlags = collectPostQualityFlags({
       agent,
       titleFlags: catalystCorrected ? [...titleResolution.flags, "resolved_catalyst_corrected"] : titleResolution.flags,
       content: resolvedContent,
@@ -1302,10 +1345,24 @@ async function generateAgentForumPosts({
       stanceChallengeActive: Boolean(stanceChallenge?.active),
       headlineAnalysis
     });
-    const postingDecisionWithQualityFlags: PostingDecision = {
-      ...catalystCorrectedDecision,
-      qualityFlags: postQualityFlags
-    };
+    postQualityFlags = uniqueQualityFlags([
+      ...postQualityFlags,
+      ...evaluateFxCorrelationGrounding({
+        agent,
+        content: resolvedContent,
+        headlineAnalysis,
+        recentPosts
+      })
+    ]);
+
+    const equityVisibility = evaluateEquityFundamentalsVisibility({
+      agent,
+      content: resolvedContent,
+      context: equityFundamentalsContext,
+      messageType: isUpdate ? "comment" : "post"
+    });
+    resolvedContent = equityVisibility.content;
+    postQualityFlags = uniqueQualityFlags([...postQualityFlags, ...equityVisibility.flags]);
 
     if (postQualityFlags.length > 0) {
       console.log(
@@ -1320,6 +1377,13 @@ async function generateAgentForumPosts({
       continue;
     }
 
+    if (equityVisibility.shouldSuppress) {
+      console.log(
+        `[equity-fundamentals] suppressed_after_repair=true title="${truncateText(titleResolution.title ?? finalCatalyst, 100)}"`
+      );
+      continue;
+    }
+
     if (shouldSuppressUnsafeMetricPost(agent, postQualityFlags)) {
       console.log(
         `[post-quality:${agent.name}] suppressed reason=unverified_metric_claim title="${truncateText(titleResolution.title ?? finalCatalyst, 100)}"`
@@ -1327,9 +1391,21 @@ async function generateAgentForumPosts({
       continue;
     }
 
+    const postingDecisionWithQualityFlags: PostingDecision = {
+      ...catalystCorrectedDecision,
+      qualityFlags: postQualityFlags
+    };
+
     if (shouldSuppressRatesTemplatePost(agent, headlineAnalysis, resolvedContent, recentPosts)) {
       console.log(
         `[rates-quality] suppressed template repeat title="${truncateText(titleResolution.title ?? finalCatalyst, 100)}"`
+      );
+      continue;
+    }
+
+    if (shouldSuppressEquityBreadthRepeatPost(agent, postQualityFlags, recentPosts)) {
+      console.log(
+        `[equities-quality] suppressed breadth_repeat title="${truncateText(titleResolution.title ?? finalCatalyst, 100)}"`
       );
       continue;
     }
@@ -1602,6 +1678,35 @@ function shouldSuppressWeakGeneratedComment({
       `[comment-quality] suppressed reason=confirm_without_delta responder=${responder.sector} parent="${truncateText(post.title || post.catalyst || "", 80)}"`
     );
     return true;
+  }
+
+  // 4. Rates template comment — pure bear-steepener framing with no new numeric anchor
+  if (responder.sector === "Rates" && /\bbear.?steepener\b/i.test(content)) {
+    const hasNewNumber = /\b\d+(?:\.\d+)?\s*(?:bps|bp|%|basis points)\b/i.test(content);
+    if (!hasNewNumber) {
+      console.log(
+        `[comment-quality] suppressed reason=rates_template_comment responder=Rates parent="${truncateText(post.title || post.catalyst || "", 80)}"`
+      );
+      return true;
+    }
+  }
+
+  // 5. Equity breadth as primary mechanism when the parent thread is stock-specific
+  if (responder.sector === "Equities") {
+    const breadthCount = countBreadthFrameworkMentions(content);
+    if (breadthCount >= 2) {
+      const parentText = `${post.title || ""} ${post.catalyst || ""} ${post.content?.substring(0, 120) || ""}`;
+      // Stock-specific parent: contains a ticker-like token but is NOT an index/breadth thread itself
+      const parentIsStockSpecific =
+        /\b[A-Z]{1,5}\b/.test(parentText) &&
+        !/\bSPY\b|\bIWM\b|\bQQQ\b|\bXLF\b|\bbreadth\b|\bsmall.?cap\b/i.test(parentText.substring(0, 80));
+      if (parentIsStockSpecific) {
+        console.log(
+          `[comment-quality] suppressed reason=equity_breadth_comment_mismatch responder=Equities parent="${truncateText(post.title || post.catalyst || "", 80)}"`
+        );
+        return true;
+      }
+    }
   }
 
   return false;
@@ -2516,7 +2621,8 @@ async function requestStructuredForumPost({
   thisRunPosts,
   headlineAnalysis,
   verifiedMetrics,
-  stanceChallenge
+  stanceChallenge,
+  equityFundamentalsContext
 }: {
   env: Env;
   agent: Agent;
@@ -2541,6 +2647,7 @@ async function requestStructuredForumPost({
   verifiedMetrics: VerifiedMarketMetricsContext;
   /** Optional prompt nudge when an agent is stuck in one stance. */
   stanceChallenge: StanceLockChallenge | null;
+  equityFundamentalsContext: EquitySubjectDataContext | null;
 }): Promise<{
   title?: string;
   content?: string;
@@ -2563,26 +2670,19 @@ async function requestStructuredForumPost({
       buildCrossAgentMacroView(env, agent)
     ]);
 
-    // Equities Agent: fetch company fundamentals from top headline (5-second hard timeout)
-    if (agent.sector === "Equities") {
-      console.log(
-        `[equities-standalone] eligible=${sectorHeadlines.length} top="${truncateText(topHeadlineTitle || "none", 80)}" headline="${truncateText(headlineAnalysis?.headline_title || "none", 80)}"`
+    // Rates Agent: fetch live treasury auction results when the headline is auction-related (4-second hard timeout)
+    const isAuctionHeadline = agent.sector === "Rates" &&
+      /\b(?:auction|treasury.*note|treasury.*bond|bid.to.cover|refunding|coupon supply|note sale|bond sale)\b/i.test(
+        `${topHeadlineTitle} ${headlineAnalysis?.headline_title || ""}`
       );
-    }
-    const equityFundamentals =
-      agent.sector === "Equities"
-        ? await Promise.race([
-            buildEquityFundamentalsForPost(
-              topHeadlineTitle,
-              sectorHeadlines
-            ),
-            new Promise<string>((resolve) => setTimeout(() => resolve(""), 5000))
-          ])
-        : "";
-    if (agent.sector === "Equities") {
-      console.log(
-        `[equities-standalone] fundamentals_result injected=${Boolean(equityFundamentals)} length=${equityFundamentals.length}`
-      );
+    const auctionBlock = isAuctionHeadline
+      ? await Promise.race([
+          fetchRecentTreasuryAuctionData().then(formatAuctionDataBlock),
+          new Promise<string>((resolve) => setTimeout(() => resolve(""), 4000))
+        ])
+      : "";
+    if (isAuctionHeadline) {
+      console.log(`[rates-auction] injected=${Boolean(auctionBlock && !auctionBlock.startsWith("AUCTION DATA UNAVAILABLE"))} length=${auctionBlock.length}`);
     }
 
     // Build the prompt once — used by both passes
@@ -2606,9 +2706,10 @@ async function requestStructuredForumPost({
       historicalContext,
       analogBlock,
       crossAgentView,
-      equityFundamentals,
+      equityFundamentalsContext?.promptBlock || "",
       verifiedMetrics,
-      stanceChallenge
+      stanceChallenge,
+      auctionBlock
     );
 
     // ── Pass 1: View crystallisation ────────────────────────────────────────
@@ -2952,7 +3053,8 @@ function buildForumPostPrompt(
   crossAgentView: string = "",
   equityFundamentals: string = "",
   verifiedMetrics: VerifiedMarketMetricsContext = EMPTY_VERIFIED_MARKET_METRICS_CONTEXT,
-  stanceChallenge: StanceLockChallenge | null = null
+  stanceChallenge: StanceLockChallenge | null = null,
+  auctionBlock: string = ""
 ): string {
   const availableInstruments = relevantInstrumentsForAgent(agent, marketSnapshot);
   const mergedHeadlines = relevantHeadlinesForAgent(agent, [
@@ -3082,6 +3184,7 @@ function buildForumPostPrompt(
     ...(historicalContext ? [historicalContext] : []),
     ...(analogBlock ? [analogBlock] : []),
     ...(equityFundamentals ? [equityFundamentals] : []),
+    ...(auctionBlock ? [auctionBlock] : []),
     knowledgeSnippets.length > 0 ? "Approved long-term memory snippets:" : "No approved long-term memory snippets were retrieved for this post.",
     ...knowledgeSnippets.map(
       (snippet, index) => `${index + 1}. ${snippet.title} [${snippet.category}] ${snippet.excerpt}`
@@ -3115,7 +3218,7 @@ function buildForumPostPrompt(
     "Root your post in sector-specific mechanics, not the broad market backdrop that every agent shares.",
     // ── Hard accuracy & attribution rules ──────────────────────────────────────
     "FACT ATTRIBUTION RULE: when multiple company events (layoffs, earnings, guidance cuts, M&A) appear in the same headline batch, every statistic must be preceded by the exact company name it belongs to. Never merge figures from different companies into a single clause. Example — correct: 'Meta announced 8,000 cuts; Amazon announced 16,000 cuts.' Example — wrong: 'the company cut 16,000 jobs.' If you cannot confirm which number belongs to which company, omit the specific figure rather than attributing it incorrectly.",
-    "STORED DATA CITATION RULE: when citing a correlation coefficient, beta, ratio, or quantitative figure from the historical data blocks above, reproduce the figure exactly as it appears in those blocks. Do not round, adjust, or recall it from any other context. Example: if the block says 'Broad Dollar YoY% vs WTI YoY% correlation approximately -0.55', write -0.55 — not -0.83 or any other value. Discrepancies between what is in the data block and what you recall from training must always resolve in favour of the data block.",
+    "STORED DATA CITATION RULE: when citing a correlation coefficient, beta, ratio, or quantitative figure from the historical data blocks above, reproduce the figure exactly as it appears in those blocks. Do not round, adjust, or recall it from any other context. Example: if the block shows a Broad Dollar YoY% vs WTI YoY% correlation, use that exact value from the block rather than any remembered house number. Discrepancies between what is in the data block and what you recall from training must always resolve in favour of the data block.",
     "CATALYST QUALITY RULE: if the top headline appears to be a stock-screener list (e.g. 'N Most Undervalued Stocks to Buy Now', 'Best Dividend Stocks for 2025') treat it as noise. Do not use it as your primary catalyst. Instead, identify the specific company or macro development embedded in it — if no concrete company or data point can be extracted, skip the headline entirely and build your post from the next substantive catalyst in the list."
   ].filter(Boolean).join("\n");
 }
@@ -4063,6 +4166,14 @@ function applyCatalystMaterialityGate({
 
   const hasOpenThesis = Boolean(topicPlan.matchedThesis);
   const noveltyScore = noveltyAssessment.compositeScore;
+
+  // High novelty means the topic has genuinely fresh market signal — bypass all materiality checks.
+  // A score ≥ 70 implies the catalyst is novel enough to warrant posting regardless of how the
+  // LLM rated the individual headline's signal strength.
+  if (noveltyScore >= 70) {
+    return postingDecision;
+  }
+
   const headlineIsMaterial = Boolean(
     headlineAnalysis &&
       headlineAnalysis.is_new_information &&
@@ -4159,14 +4270,25 @@ function applyLowSignalThesisOnlyDecisionGate({
   agent,
   postingDecision,
   headlineAnalysis,
-  topHeadline
+  topHeadline,
+  noveltyScore
 }: {
   agent: Agent;
   postingDecision: PostingDecision;
   headlineAnalysis: HeadlineAnalysis | null;
   topHeadline?: SnapshotHeadline;
+  noveltyScore: number;
 }): PostingDecision {
   if (postingDecision.actionType === "stay_silent" || headlineAnalysis?.market_signal_strength !== "low") {
+    return postingDecision;
+  }
+
+  // High novelty overrides a low signal rating — the topic carries enough fresh information
+  // across the snapshot to warrant posting even if the individual headline is rated weak.
+  if (noveltyScore >= 70) {
+    console.log(
+      `[trigger-election] high novelty=${noveltyScore} overrides low signal, keeping action=${postingDecision.actionType} agent=${agent.sector}`
+    );
     return postingDecision;
   }
 
@@ -4356,6 +4478,10 @@ function uniqueReasonCodes(reasonCodes: PostingDecision["reasonCodes"]): Posting
   return [...new Set(reasonCodes)] as PostingDecision["reasonCodes"];
 }
 
+function uniqueQualityFlags(flags: PostQualityFlag[]): PostQualityFlag[] {
+  return [...new Set(flags)] as PostQualityFlag[];
+}
+
 function ensureRequiredConvictionCondition({
   agent,
   content,
@@ -4377,11 +4503,13 @@ function ensureRequiredConvictionCondition({
 function ensureStanceLockReviewIfRequired({
   content,
   stanceChallenge,
-  catalyst
+  catalyst,
+  stance
 }: {
   content: string;
   stanceChallenge: StanceLockChallenge | null;
   catalyst: string;
+  stance: string;
 }): string {
   if (!stanceChallenge?.active) {
     return content;
@@ -4390,8 +4518,18 @@ function ensureStanceLockReviewIfRequired({
     return content;
   }
 
-  console.log(`[stance-lock-repair] appended review stance=${stanceChallenge.stance}`);
-  return `${content.trim()} This does not change my prior ${stanceChallenge.stance} stance because ${truncateText(catalyst, 90)} has not yet provided counter-evidence strong enough to reverse the stated transmission channel.`.trim();
+  // Try to extract an explicit falsification condition already present in the content
+  // (e.g. "unless crude breaks $70", "provided that NFP surprises above +200k")
+  const conditionMatch = content.match(
+    /\b(?:unless|except if|only if|provided that|contingent on)\s+([^.!?]{15,80}[.!?]?)/i
+  );
+  const conditionClause = conditionMatch
+    ? `reconsidering specifically if ${conditionMatch[1].trim().replace(/[.!?]$/, "")}`
+    : `reconsidering if a materially different ${truncateText(catalyst, 55)} outcome emerges`;
+
+  const repairSentence = `The ${stance.replace(/-/g, " ")} read still holds here, but it needs ${conditionClause}.`;
+  console.log(`[stance-lock-repair] rewritten stance=${stanceChallenge.stance} streak=${stanceChallenge.streak} condition=${conditionMatch ? "extracted" : "fallback"}`);
+  return `${content.trim()} ${repairSentence}`.trim();
 }
 
 function convictionRepairSentence(agent: Agent, catalyst: string): string {
@@ -4536,6 +4674,137 @@ function collectPostQualityFlags({
   return [...flags];
 }
 
+function evaluateEquityFundamentalsVisibility({
+  agent,
+  content,
+  context,
+  messageType
+}: {
+  agent: Agent;
+  content: string;
+  context: EquitySubjectDataContext | null;
+  messageType: "post" | "comment";
+}): { content: string; flags: PostQualityFlag[]; shouldSuppress: boolean } {
+  if (
+    agent.sector !== "Equities" ||
+    !context ||
+    context.resolution.classification !== "single_company" ||
+    (context.dataTier !== "light" && context.dataTier !== "rich")
+  ) {
+    return { content, flags: [], shouldSuppress: false };
+  }
+
+  const initialVisibility = hasVisibleFetchedFundamentals(content, context);
+  console.log(
+    `[equity-fundamentals] fetched symbol=${context.resolution.entry?.symbol || "none"} tier=${context.dataTier} fields=${Object.keys(context.fetchedFields).join(",")}`
+  );
+  console.log(
+    `[equity-fundamentals] visible_in_output=${initialVisibility.visible} exact_match=${initialVisibility.matchedFields.length > 0} message_type=${messageType}`
+  );
+
+  if (initialVisibility.visible) {
+    return {
+      content,
+      flags: ["fetched_fundamentals_visible"],
+      shouldSuppress: false
+    };
+  }
+
+  if (messageType === "comment") {
+    return {
+      content,
+      flags: ["fetched_fundamentals_available_but_unused", "article_only_company_numbers"],
+      shouldSuppress: false
+    };
+  }
+
+  const repairSentence = buildEquityFundamentalsRepairSentence(context);
+  if (!repairSentence) {
+    console.log("[equity-fundamentals] repair_applied=false");
+    return {
+      content,
+      flags: ["fetched_fundamentals_available_but_unused", "article_only_company_numbers"],
+      shouldSuppress: true
+    };
+  }
+
+  const repairedContent = `${content.trim()} ${repairSentence}`.trim();
+  console.log("[equity-fundamentals] repair_applied=true");
+  const repairedVisibility = hasVisibleFetchedFundamentals(repairedContent, context);
+  if (repairedVisibility.visible) {
+    return {
+      content: repairedContent,
+      flags: ["fetched_fundamentals_visible"],
+      shouldSuppress: false
+    };
+  }
+
+  console.log("[equity-fundamentals] suppressed_after_repair=true");
+  return {
+    content,
+    flags: ["fetched_fundamentals_available_but_unused", "article_only_company_numbers"],
+    shouldSuppress: true
+  };
+}
+
+function evaluateFxCorrelationGrounding({
+  agent,
+  content,
+  headlineAnalysis,
+  recentPosts
+}: {
+  agent: Agent;
+  content: string;
+  headlineAnalysis: HeadlineAnalysis | null;
+  recentPosts: AgentMessage[];
+}): PostQualityFlag[] {
+  if (agent.sector !== "FX") {
+    return [];
+  }
+
+  const catalystText = [headlineAnalysis?.headline_title, headlineAnalysis?.primary_mechanism].filter(Boolean).join(" ");
+  const relevant = /\b(oil|wti|brent|commodity fx|aud|cad|nok|broad dollar)\b/i.test(catalystText);
+  const citedValueMatch =
+    content.match(/\bcorrelation(?: of)?\s*([+-]?\d+(?:\.\d+)?)\b/i) ||
+    content.match(/\bBroad Dollar[^.\n]{0,50}WTI[^.\n]{0,40}([+-]?\d+(?:\.\d+)?)\b/i);
+  const cited = Boolean(citedValueMatch);
+  const citedValue = citedValueMatch?.[1] || "";
+  const staticAnchor = /\b-0\.55\b/.test(content);
+
+  console.log(
+    `[fx-correlation] relevant=${relevant} computed_block_present=true cited=${cited} value=${citedValue || "none"}`
+  );
+
+  const flags: PostQualityFlag[] = [];
+  if (relevant && cited) {
+    flags.push("fx_correlation_from_computed_block");
+  }
+  if (relevant && !cited) {
+    flags.push("fx_correlation_missing_when_required");
+  }
+  if (staticAnchor) {
+    flags.push("fx_correlation_static_anchor_suspected");
+  }
+
+  if (citedValue) {
+    const priorValues = recentPosts
+      .filter((post) => post.messageType === "post")
+      .slice(0, 2)
+      .map((post) => {
+        const match =
+          post.content.match(/\bcorrelation(?: of)?\s*([+-]?\d+(?:\.\d+)?)\b/i) ||
+          post.content.match(/\bBroad Dollar[^.\n]{0,50}WTI[^.\n]{0,40}([+-]?\d+(?:\.\d+)?)\b/i);
+        return match?.[1] || null;
+      });
+    const streak = [citedValue, ...priorValues].filter((value) => value === citedValue).length;
+    if (streak >= 3) {
+      console.log(`[fx-correlation-warning] repeated_value=${citedValue} streak=${streak} source=computed_block_present`);
+    }
+  }
+
+  return flags;
+}
+
 function shouldSuppressWeakEquityCompanyPost(
   agent: Agent,
   headlineAnalysis: HeadlineAnalysis | null,
@@ -4674,6 +4943,27 @@ function shouldSuppressRatesTemplatePost(
   }
 
   return true;
+}
+
+function shouldSuppressEquityBreadthRepeatPost(
+  agent: Agent,
+  postQualityFlags: PostQualityFlag[],
+  recentPosts: AgentMessage[]
+): boolean {
+  if (agent.sector !== "Equities") return false;
+  if (!postQualityFlags.includes("equity_breadth_overused")) return false;
+
+  // Suppress only if the last 3 equities posts were also breadth-framework-heavy,
+  // meaning breadth is the default lens rather than a specific analytical choice.
+  const recentEquityPosts = recentPosts
+    .filter((p) => p.agentId === agent.id && p.messageType === "post")
+    .slice(0, 3);
+
+  const recentBreadthCount = recentEquityPosts.filter(
+    (p) => countBreadthFrameworkMentions(p.content) >= 2
+  ).length;
+
+  return recentBreadthCount >= 2;
 }
 
 function isStockSpecificEquityCatalyst(
@@ -4879,11 +5169,11 @@ function buildSectorSpecificInstructions(agent: Agent): string | null {
       ].join("\n");
     case "FX":
       return [
-        "FX DATA CITATION RULE: The prompt contains a computed Broad Dollar YoY% vs WTI YoY% correlation from stored data.",
-        "You MUST reference this figure — state its sign, magnitude, and what it means for the cross you are analysing.",
+        "FX DATA CITATION RULE: If the historical-data block contains a computed Broad Dollar YoY% vs WTI YoY% correlation and your catalyst genuinely involves oil-dollar transmission or commodity FX, cite that exact computed figure.",
+        "If the catalyst is not about oil-dollar transmission, do NOT force the correlation into the post just because you are the FX agent.",
+        "If the block is absent, do NOT cite a correlation number from memory.",
         "Example: 'Stored data shows Broad Dollar YoY% vs WTI YoY% correlation of -0.42 — dollar strength here structurally pressures commodity FX (AUD, CAD, NOK).'",
-        "Name at least one specific cross (e.g. EUR/USD, USD/JPY, AUD/USD) and state whether current price action aligns with or contradicts the stored dollar/oil relationship.",
-        "A post that describes dollar direction without citing the stored correlation figure has not met the data grounding standard.",
+        "Name at least one specific cross (e.g. EUR/USD, USD/JPY, AUD/USD) and state whether current price action aligns with or contradicts the stored dollar/oil relationship when that relationship is actually part of the thesis.",
         "",
         "CARRY MECHANICS PRECISION — be exact about directionality:",
         "  • High US real yields = USD attractive = EM-funded carry trades (short USD, long EM high-yielder) get UNWOUND. This is USD bullish, EM FX bearish.",

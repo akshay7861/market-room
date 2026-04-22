@@ -19,9 +19,13 @@ import { fetchYahooFinanceBriefing } from "./yahooFinanceNewsService";
 import { listRelevantMarketCasesForAgent } from "./marketCaseService";
 import { buildDynamicMemoryContext, buildDynamicMemoryPromptBlock } from "./dynamicMemoryService";
 import {
+  buildAskEquityCompanyContext,
+  buildAskStatementsUnavailableFallback,
+  buildEquityFundamentalsRepairSentence,
   buildEquityQuoteContext,
   buildEquityQuotePromptBlock,
-  type EquityQuoteContext
+  type EquityQuoteContext,
+  type EquitySubjectDataContext
 } from "./equityQuoteService";
 import {
   buildChartDataFromIntent,
@@ -37,6 +41,8 @@ type RoutingBreakdown = {
   score: number;
   contributions: string[];
 };
+
+type AskEquitiesMode = "financial_statements" | "company_fundamentals" | "quote_watchlist";
 
 export async function getMarketQuestionsView(env: Env): Promise<MarketQuestionsView> {
   const repositories = createRepositories(env);
@@ -641,6 +647,24 @@ function hasStockIdeaIntent(question: string): boolean {
     /\b(stocks?|tickers?|companies|names?|etfs?|buy|own|invest|watchlist|basket|sector|theme|green|clean energy|renewable|solar|wind|battery|lithium|nuclear|uranium|energy)\b/.test(text);
 }
 
+function classifyAskEquitiesMode(question: string): AskEquitiesMode {
+  if (hasAskFinancialStatementsIntent(question)) {
+    return "financial_statements";
+  }
+  if (hasAskCompanyFundamentalsIntent(question)) {
+    return "company_fundamentals";
+  }
+  return "quote_watchlist";
+}
+
+function hasAskFinancialStatementsIntent(question: string): boolean {
+  return /\b(financial statements?|income statement|balance sheet|cash flow|10-k|10-q|statement details|full company financials?)\b/i.test(question);
+}
+
+function hasAskCompanyFundamentalsIntent(question: string): boolean {
+  return /\b(fundamentals?|valuation|market cap|p\/e|pe ratio|eps|earnings quality|financial condition|leverage|profitability|margins?)\b/i.test(question);
+}
+
 function hasNegatedStockIdeaIntent(text: string): boolean {
   return (
     /\b(do not|don't|dont|not|no)\s+(give|answer|provide|make|turn this into)\b.{0,50}\b(stock picks?|watchlist|stock watchlist|basket|names?|tickers?|buy recommendation)\b/.test(text) ||
@@ -700,6 +724,73 @@ function hasStrongNonEquityIntent(question: string): boolean {
     /\b(treasury auction|tailed|bid-to-cover|indirect demand|dealer takedown|10s30s)\b/.test(text) ||
     /\b(sofr|ois|effective fed funds|fed funds|rrp|reverse repo|repo rates?|money-market plumbing|bill yields)\b/.test(text)
   );
+}
+
+function buildAskEquitiesDirectReply(
+  mode: AskEquitiesMode,
+  context: EquitySubjectDataContext | null,
+  question: string
+): string {
+  if (!context) {
+    return fallbackEquitySingleStockMovementReply(question);
+  }
+
+  if (mode === "financial_statements") {
+    return buildAskStatementsUnavailableFallback(context);
+  }
+
+  if (context.resolution.status === "ambiguous_subject") {
+    return "I can’t safely identify the company from that name alone. Please give me the ticker, exchange, or region and I’ll keep the fundamentals tied to the right issuer.";
+  }
+
+  if (context.resolution.status !== "resolved" || !context.resolution.entry) {
+    return "I don’t have a safe company match for that request yet. Please give me the ticker, exchange, or region so I can keep the fundamentals tied to the right stock.";
+  }
+
+  const name = `${context.resolution.entry.name} (${context.resolution.entry.symbol})`;
+  const fields = context.fetchedFields;
+  const lines: string[] = [];
+
+  if (context.dataTier === "quote_only") {
+    lines.push(`I only have quote-level data for ${name} right now, not a full fundamentals snapshot.`);
+    lines.push(
+      [
+        fields.price ? `Price: ${fields.price}` : null,
+        fields.change ? `Move: ${fields.change}` : null
+      ].filter(Boolean).join(" | ")
+    );
+    lines.push("If you want statement-level detail, I would need a live filings source rather than the current quote feed.");
+    return lines.filter(Boolean).join(" ");
+  }
+
+  lines.push(`Fundamentals snapshot for ${name}:`);
+  lines.push(
+    [
+      fields.price ? `shares at ${fields.price}` : null,
+      fields.change ? `${fields.change} today` : null,
+      fields.marketCap ? `market cap ${fields.marketCap}` : null,
+      fields.peTrailing ? `trailing P/E ${fields.peTrailing}` : null,
+      fields.peForward ? `forward P/E ${fields.peForward}` : null,
+      fields.epsTrailing ? `trailing EPS ${fields.epsTrailing}` : null,
+      fields.fiftyTwoWeekRange ? `52-week range ${fields.fiftyTwoWeekRange}` : null
+    ].filter(Boolean).join(", ")
+  );
+
+  if (context.dataTier === "rich") {
+    lines.push(
+      [
+        fields.epsEstimate ? `current EPS estimate ${fields.epsEstimate}` : null,
+        fields.revenueEstimate ? `latest quarterly revenue ${fields.revenueEstimate}` : null
+      ].filter(Boolean).join(", ")
+    );
+  }
+
+  const interpretation = buildEquityFundamentalsRepairSentence(context);
+  if (interpretation) {
+    lines.push(interpretation);
+  }
+  lines.push("This is a constrained fundamentals snapshot from fetched quote data, not a full live financial-statement read.");
+  return lines.filter(Boolean).join(" ");
 }
 
 function hasAskedSectorFrame(text: string, sector: string): boolean {
@@ -825,10 +916,26 @@ async function generateAgentQuestionReply(
     `[catalyst-source] ask_market agent=${agent.id} eligible=${headlines.length} official_news=${officialBriefing.headlinesByAgentId.get(agent.id)?.length || 0} yahoo=${yahooBriefing.headlinesByAgentId.get(agent.id)?.length || 0} data_lake_sources=excluded`
   );
   const relevantCases = await listRelevantMarketCasesForAgent(env, agent, marketSnapshot, "question_thread", 4);
+  const askEquitiesMode = agent.sector === "Equities" ? classifyAskEquitiesMode(latestQuestion) : null;
+  const askEquityCompanyContext =
+    agent.sector === "Equities" && askEquitiesMode !== "quote_watchlist"
+      ? await buildAskEquityCompanyContext(latestQuestion)
+      : null;
   const equityQuoteContext =
-    agent.sector === "Equities" && hasEquityQuoteIntent(latestQuestion)
+    agent.sector === "Equities" && askEquitiesMode === "quote_watchlist" && hasEquityQuoteIntent(latestQuestion)
       ? await buildEquityQuoteContext(latestQuestion)
       : null;
+  if (agent.sector === "Equities" && askEquitiesMode) {
+    console.log(`[ask-equities-mode] mode=${askEquitiesMode}`);
+  }
+  if (askEquityCompanyContext) {
+    console.log(
+      `[ask-equities-subject] status=${askEquityCompanyContext.resolution.status} symbol=${askEquityCompanyContext.resolution.entry?.symbol || "none"} confidence=${askEquityCompanyContext.resolution.confidence} ambiguous=${askEquityCompanyContext.resolution.status === "ambiguous_subject"}`
+    );
+    console.log(
+      `[ask-equities-data] quote=${Boolean(askEquityCompanyContext.quote && askEquityCompanyContext.quote.status === "live")} light_fundamentals=${askEquityCompanyContext.dataTier === "light" || askEquityCompanyContext.dataTier === "rich"} rich_fundamentals=${askEquityCompanyContext.dataTier === "rich"} statements=false`
+    );
+  }
   const knowledgeSnippets = await findRelevantKnowledgeSnippets(
     env,
     agent,
@@ -861,9 +968,11 @@ async function generateAgentQuestionReply(
   }
 
   const content =
-    isLlmConfigured(env)
-      ? await requestAgentQuestionReply(env, agent, messages, marketSnapshot, headlines, relevantCases, knowledgeSnippets, dynamicMemory, equityQuoteContext, describeChartDataForPrompt(chartData))
-      : fallbackQuestionReply(agent, marketSnapshot, latestQuestion);
+    agent.sector === "Equities" && askEquitiesMode && askEquitiesMode !== "quote_watchlist"
+      ? buildAskEquitiesDirectReply(askEquitiesMode, askEquityCompanyContext, latestQuestion)
+      : isLlmConfigured(env)
+        ? await requestAgentQuestionReply(env, agent, messages, marketSnapshot, headlines, relevantCases, knowledgeSnippets, dynamicMemory, equityQuoteContext, describeChartDataForPrompt(chartData))
+        : fallbackQuestionReply(agent, marketSnapshot, latestQuestion);
 
   const finalContent = chartData
     ? `${sanitizeChartGroundedReply(content, chartData)}\n%%CHART_DATA%%${JSON.stringify(chartData)}`

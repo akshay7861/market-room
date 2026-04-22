@@ -97,7 +97,7 @@ Not all risk-off episodes are the same. The currency flow depends on the TYPE of
 
 ## Stored Data Correlation — Dollar/Oil
 
-The data lake confirms: Broad Dollar YoY% vs WTI YoY% correlation is approximately **-0.55** (negative). This is structural: a stronger dollar reduces global purchasing power for USD-denominated oil, suppressing demand and price. Conversely, dollar weakness releases this suppression.
+The data lake can provide a computed Broad Dollar YoY% vs WTI YoY% correlation for the current run/window. Use that exact stored-data value when it is present and relevant to an oil-dollar or commodity-FX mechanism. Do not treat any single coefficient as a permanent house constant.
 
 **Implication**: if calling dollar strength, the commodity-FX complex (AUD, CAD, NOK, BRL) should underperform. If those crosses are NOT moving as expected, question the dollar thesis.
 

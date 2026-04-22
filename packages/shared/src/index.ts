@@ -616,9 +616,15 @@ export type PostQualityFlag =
   | "stance_lock_review_missing"
   | "resolved_catalyst_corrected"
   | "stock_specific_no_fundamentals"
+  | "fetched_fundamentals_visible"
+  | "fetched_fundamentals_available_but_unused"
+  | "article_only_company_numbers"
   | "equity_breadth_overused"
   | "rates_template_repetition"
-  | "comment_domain_stretch";
+  | "comment_domain_stretch"
+  | "fx_correlation_from_computed_block"
+  | "fx_correlation_missing_when_required"
+  | "fx_correlation_static_anchor_suspected";
 
 export type PostingDecision = {
   actionType: "new_post" | "update_existing" | "comment_only" | "stay_silent";

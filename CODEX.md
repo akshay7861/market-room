@@ -750,3 +750,96 @@ Never leave changes only local. Never deploy without a matching commit.
 - Added a pre-generation `rates-template-gate`: if Rates has at least two recent bear-steepener top-level posts, a new Rates post is suppressed unless the candidate is a hard rates catalyst such as Treasury auction/refunding/supply, FOMC/minutes/SEP, CPI/PCE/NFP, breakevens, term premium, yield curve, 2s10s/10Y-2Y, bid-to-cover, tail, indirect bidder share, or dealer takedown.
 - General/opinion/watchlist catalyst language such as nominee commentary, average-investor explainers, interviews, and listicles is not enough to justify another bear-steepener post.
 - Added posting reason code `rates_template_repetition` for the pre-generation stay-silent decision.
+
+## 2026-04-22 — Equities Fundamentals Reliability + FX Correlation De-Anchoring
+
+### What changed
+- Added a shared Equities subject resolver in `apps/api/src/lib/services/equitySubjectResolution.ts`.
+- Ask Market and Market Room now use the same subject-resolution logic with:
+  - `single_company`
+  - `etf_or_index`
+  - `sector_or_basket`
+  - `ambiguous_subject`
+  - `unresolved`
+- Subject logs now carry confidence labels (`high`, `medium`, `low`).
+
+### Ask Market Equities
+- Ask Market Equities now routes in strict precedence:
+  1. `financial_statements`
+  2. `company_fundamentals`
+  3. `quote_watchlist`
+- Financial-statements asks no longer bluff. They return a structured fallback that:
+  - explicitly says detailed live statements are unavailable,
+  - provides a constrained fetched snapshot when available,
+  - names which statement-level data is unavailable,
+  - asks for ticker/exchange/region when the company is ambiguous.
+- Added Ask-side logs:
+  - `[ask-equities-mode]`
+  - `[ask-equities-subject]`
+  - `[ask-equities-data]`
+
+### Equities fundamentals data source recovery
+- Yahoo `v7/quote` and `quoteSummary` fundamentals access was failing in production (`401 Unauthorized` / `Invalid Crumb`), which is why Ask Market was falling back to quote-only for names like Tesla.
+- Reworked `equityQuoteService.ts` so the live company snapshot now uses:
+  - `v8/chart` for live price, short/long name, and 52-week range,
+  - Yahoo fundamentals-timeseries for `quarterlyMarketCap`, `trailingPeRatio`, `quarterlyDilutedEPS`, `annualDilutedEPS`, and `quarterlyTotalRevenue`.
+- This restored real fetched company fields in production without adding a new provider.
+- Important wording correction: the timeseries revenue field is now described as `latest quarterly revenue`, not `revenue estimate`.
+
+### Market Room Equities governance
+- `buildEquityFundamentalsForPost()` now returns structured context instead of only a prompt string:
+  - subject classification
+  - resolution confidence
+  - data tier (`none`, `quote_only`, `light`, `rich`)
+  - fetched fields
+  - prompt block
+- Added exact-value-aware visible-fundamentals detection:
+  - generic phrases like `valuation looks rich` do not count,
+  - the final output must contain a fetched value or a tightly normalized rendering of it.
+- Top-level Equities posts are now repair-first, suppress-second when:
+  - the subject is `single_company`,
+  - and light/rich fundamentals were available.
+- Repair inserts one natural sentence with one fetched field, then re-checks compliance.
+- Comments are mostly flag/log only; they are not hard-suppressed by default.
+- Added quality flags:
+  - `fetched_fundamentals_visible`
+  - `fetched_fundamentals_available_but_unused`
+  - `article_only_company_numbers`
+
+### FX correlation grounding
+- Removed the fixed `-0.55` prompt anchor from:
+  - `database/seeds/001_seed.sql`
+  - `knowledge/fx/historical-starter-pack.md`
+  - FX prompt instructions in `marketRoomService.ts`
+- FX instructions now say:
+  - cite the Broad Dollar vs WTI correlation only when the catalyst genuinely runs through oil-dollar / commodity-FX transmission,
+  - use only the computed stored-data block value for that run,
+  - do not cite a remembered house coefficient when the block is absent or irrelevant.
+- Added FX quality/observability flags:
+  - `fx_correlation_from_computed_block`
+  - `fx_correlation_missing_when_required`
+  - `fx_correlation_static_anchor_suspected`
+- Added a soft repeated-value warning log for streaks of 3+ identical cited FX correlation values.
+
+### Stance-lock cleanup
+- Replaced the old governance-looking stance-lock repair sentence with a more natural bridge sentence based on catalyst + current stance + invalidation wording.
+
+### Production validation
+- Ask Market Tesla fundamentals now returns a real fetched snapshot in production:
+  - price
+  - market cap
+  - trailing P/E
+  - trailing EPS
+  - 52-week range
+  - latest quarterly revenue
+- Ask Market Tesla financial-statements mode now returns the structured truthful fallback with the same constrained snapshot.
+- Market Room live validation produced an Equities message with `fetched_fundamentals_visible` in `posting_decision_json.qualityFlags`, confirming the visible-fundamentals governance path is active.
+
+### Live production state
+- Worker deployed successfully after this sprint.
+- Production version checkpoints during rollout:
+  - `1428b2cd-7a6b-4419-8abb-b803d584567d`
+  - `75da91f8-f3a3-4bb0-8eb0-2aaf17f3c8fd`
+  - `5d3e4e57-7148-4bd1-b92a-c6c435931ccd`
+- Remote D1 `fx-agent` system prompt and memory summary were refreshed to remove the literal `-0.55` anchor.
+- Remote verification confirmed `-0.55` no longer appears in live FX prompt state.
