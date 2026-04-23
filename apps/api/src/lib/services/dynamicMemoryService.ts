@@ -4,6 +4,16 @@ import { createRepositories } from "../repositories";
 
 const ACTIVE_THESIS_STATUSES = new Set(["open", "developing", "waiting_for_data", "reopened"]);
 
+export type FrozenPeerThesisSnapshotRow = {
+  agentId: string;
+  agentName: string;
+  status: string;
+  confidence: number | null;
+  updatedAt: string;
+  claim: string;
+  source: "thesis" | "memory_summary";
+};
+
 type ThesisUpdateRow = {
   thesisId: string;
   summary: string;
@@ -168,46 +178,75 @@ function buildCalibrationEnforcementBlock(calibration: string): string {
   return lines.join("\n");
 }
 
-// ─── Cross-agent macro view ────────────────────────────────────────────────
-
-/**
- * Returns the Macro Agent's current open theses for injection into non-Macro
- * agent prompts. Creates coherent multi-agent reasoning by anchoring every
- * sector view to the shared macro baseline.
- */
-export async function buildCrossAgentMacroView(env: Env, agent: Agent): Promise<string> {
-  // Macro agent does not need to see its own theses as a "house view" — it IS the source
-  if (agent.id === "macro-agent") return "";
-
+export async function buildFrozenPeerThesisSnapshot(
+  env: Env,
+  agents: Agent[]
+): Promise<FrozenPeerThesisSnapshotRow[]> {
   const repositories = createRepositories(env);
-  const macroTheses = await repositories.theses.listActiveByOwner("macro-agent");
+  const snapshots = await Promise.all(
+    agents.map(async (peerAgent): Promise<FrozenPeerThesisSnapshotRow> => {
+      const peerTheses = await repositories.theses.listActiveByOwner(peerAgent.id);
+      const topThesis = peerTheses[0];
+      if (topThesis) {
+        return {
+          agentId: peerAgent.id,
+          agentName: peerAgent.name,
+          status: topThesis.status || "open",
+          confidence: topThesis.confidenceCurrent ?? null,
+          updatedAt: topThesis.lastUpdatedAt || topThesis.createdAt || new Date().toISOString(),
+          claim: topThesis.canonicalClaim || topThesis.title,
+          source: "thesis"
+        };
+      }
 
-  if (macroTheses.length === 0) {
-    // Fall back to the Macro Agent's memory summary if no open theses
-    const macroAgent = await repositories.agents.getById("macro-agent");
-    if (!macroAgent?.memorySummary) return "";
-    return [
-      "HOUSE MACRO VIEW (Macro Agent baseline — anchor your sector argument to this):",
-      `  ${macroAgent.memorySummary}`,
-      "If your sector view contradicts this macro baseline, state the mechanism that overrides it. If it aligns, add the sector-specific evidence the macro agent cannot see."
-    ].join("\n");
+      return {
+        agentId: peerAgent.id,
+        agentName: peerAgent.name,
+        status: "memory_summary",
+        confidence: null,
+        updatedAt: peerAgent.updatedAt,
+        claim: peerAgent.memorySummary || "No current peer thesis available.",
+        source: "memory_summary"
+      };
+    })
+  );
+
+  return snapshots;
+}
+
+export function buildPeerAgentThesesView(
+  agent: Agent,
+  peerSnapshot: FrozenPeerThesisSnapshotRow[],
+  nowIso: string
+): string {
+  const peerRows = peerSnapshot.filter((row) => row.agentId !== agent.id);
+  if (peerRows.length === 0) {
+    return "";
   }
 
-  const thesisSummaries = macroTheses
-    .slice(0, 3)
-    .map((thesis) => {
-      const confidence = thesis.confidenceCurrent != null ? `${Math.round(thesis.confidenceCurrent * 100)}% confidence` : "";
-      const claim = thesis.canonicalClaim || thesis.title;
-      const status = thesis.status;
-      return `  • [${status}${confidence ? `, ${confidence}` : ""}] ${claim}`;
-    })
-    .join("\n");
+  const lines = peerRows.map((row) => {
+    const confidence = row.confidence != null ? `${Math.round(row.confidence * 100)}%` : "n/a";
+    return `  • [${row.agentId}, ${row.status}, ${confidence}, ${freshnessLabel(row.updatedAt, nowIso)}] ${row.claim}`;
+  });
 
   return [
-    "HOUSE MACRO VIEW (Macro Agent's live theses — anchor your sector view to this baseline):",
-    thesisSummaries,
-    "RULE: your post must either (a) align with the house macro view and add sector-specific evidence the macro agent cannot see, or (b) explicitly push back with a counter-mechanism rooted in your sector's data. Silent divergence is not allowed."
+    "PEER DESK VIEWS (current top peer theses for this run):",
+    ...lines,
+    "Use a directly relevant peer thesis where it matters: agree and add sector evidence, disagree and state the counter-mechanism, or extend the chain forward. Never silently diverge from a directly relevant peer thesis."
   ].join("\n");
+}
+
+function freshnessLabel(updatedAt: string, nowIso: string): string {
+  const updatedMillis = Date.parse(updatedAt);
+  const nowMillis = Date.parse(nowIso);
+  if (!Number.isFinite(updatedMillis) || !Number.isFinite(nowMillis)) {
+    return "updated recently";
+  }
+  const hours = Math.max(0, Math.round((nowMillis - updatedMillis) / (1000 * 60 * 60)));
+  if (hours < 1) {
+    return "updated <1h ago";
+  }
+  return `updated ${hours}h ago`;
 }
 
 async function listRecentThesisUpdates(

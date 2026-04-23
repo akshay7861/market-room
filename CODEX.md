@@ -843,3 +843,62 @@ Never leave changes only local. Never deploy without a matching commit.
   - `5d3e4e57-7148-4bd1-b92a-c6c435931ccd`
 - Remote D1 `fx-agent` system prompt and memory summary were refreshed to remove the literal `-0.55` anchor.
 - Remote verification confirmed `-0.55` no longer appears in live FX prompt state.
+
+## Alternating Reactive/Synthesis Architecture (Apr 2026)
+
+### Scheduler cadence
+- Added persistent scheduler tick state (`scheduler_tick_state`) via migration `018_scheduler_tick_counter.sql`.
+- Scheduler now supports cadence-driven mode selection:
+  - `SYNTHESIS_ENABLED` (hard on/off)
+  - `SYNTHESIS_EVERY_N_TICKS` (default 2)
+  - `SYNTHESIS_AGENT_LIMIT` (optional cap)
+- Generalized rule:
+  - if `SYNTHESIS_ENABLED=true` and `tick % N === 0` -> synthesis run
+  - otherwise -> reactive run
+- This is exclusive per tick (one mode per scheduler tick).
+
+### Frozen run context
+- `runMarketDiscussion()` now builds one shared frozen context at run start and passes it through generation:
+  - `runContextId`
+  - snapshot timestamp
+  - peer snapshot version
+  - frozen peer thesis snapshot (all desks)
+  - synthesis clustered theme digest
+  - `synthesisTopicLabel`
+  - synthetic catalyst key (for synthesis ticks)
+- All agents in a run are prompted against this shared context to avoid intra-run drift.
+
+### Peer thesis broadcasting
+- Replaced macro-only prompt-time peer lookup with snapshot-based peer view formatting:
+  - `buildFrozenPeerThesisSnapshot(...)`
+  - `buildPeerAgentThesesView(...)`
+- Peer rows now include freshness metadata (`updatedAt` rendered as age label), status, and confidence.
+- Prompt instruction is relevance-based: engage directly relevant peer views; do not silently diverge.
+
+### Synthesis mode behavior
+- Added `triggerMode: "synthesis"` in market-room flow.
+- Synthesis runs use:
+  - synthetic catalyst key (`synthesis_tick_<N>`)
+  - clustered 24h theme digest (3-5 themes, 1-2 representative headlines each)
+  - transmission-chain block as mandatory
+- Synthesis v1 output mapping is thesis-oriented:
+  - `new_thesis` -> visible top-level post
+  - `thesis_update` -> visible top-level update post if publish-worthy
+  - low-signal/weak -> `silent`
+- Casual synthesis comments are intentionally skipped in v1.
+
+### Reactive mode updates
+- Reactive prompt path now also gets:
+  - frozen peer thesis block
+  - transmission-chain instruction (encouraged)
+- Existing novelty/materiality/suppression logic remains the base governance layer.
+
+### Observability
+- Added mode and context logging:
+  - `[scheduler-mode] ...`
+  - `[run-context] ...`
+  - `[synthesis-mode] ... action=... topic=... peer=... chain=... stored_stat=... context=...`
+- Synthesis runs retain filterability via:
+  - `triggerMode = synthesis`
+  - `triggerReason = synthesis_tick_<N>`
+  - synthetic catalyst + `synthesisTopicLabel` metadata.

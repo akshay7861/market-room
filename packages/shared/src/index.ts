@@ -624,7 +624,17 @@ export type PostQualityFlag =
   | "comment_domain_stretch"
   | "fx_correlation_from_computed_block"
   | "fx_correlation_missing_when_required"
-  | "fx_correlation_static_anchor_suspected";
+  | "fx_correlation_static_anchor_suspected"
+  | "synthesis_anchor_selected"
+  | "synthesis_anchor_mismatch"
+  | "synthesis_anchor_repaired"
+  | "synthesis_theme_generic_fallback"
+  | "synthesis_no_valid_news_anchor"
+  | "synthesis_delta_missing"
+  | "synthesis_duplicate_conviction_condition"
+  | "synthesis_directional_call_missing"
+  | "synthesis_data_anchor_missing"
+  | "synthesis_opening_not_sector_specific";
 
 export type PostingDecision = {
   actionType: "new_post" | "update_existing" | "comment_only" | "stay_silent";

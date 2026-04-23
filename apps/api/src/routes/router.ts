@@ -48,14 +48,40 @@ import { fetchLatestMarketSnapshot } from "../lib/market-data";
 import { loadRoom } from "../lib/room";
 import type { Env } from "../index";
 
+const ALLOWED_ORIGINS = new Set([
+  "https://www.marketroom.uk",
+  "https://marketroom.uk"
+]);
+
+const MAX_QUESTION_LENGTH = 2000;
+
 export async function handleRequest(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-  const url = new URL(request.url);
+  const origin = request.headers.get("Origin") ?? "";
+  const allowedOrigin = ALLOWED_ORIGINS.has(origin) ? origin : "https://www.marketroom.uk";
 
   if (request.method === "OPTIONS") {
     return new Response(null, {
-      headers: corsHeaders()
+      status: 204,
+      headers: buildCorsHeaders(allowedOrigin)
     });
   }
+
+  const response = await routeRequest(request, env, ctx);
+
+  // Attach CORS + security headers to every response in one place.
+  const headers = new Headers(response.headers);
+  for (const [k, v] of Object.entries(buildCorsHeaders(allowedOrigin))) {
+    headers.set(k, v);
+  }
+  headers.set("X-Content-Type-Options", "nosniff");
+  headers.set("X-Frame-Options", "DENY");
+  headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+
+  return new Response(response.body, { status: response.status, headers });
+}
+
+async function routeRequest(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+  const url = new URL(request.url);
 
   if (
     isProtectedAdminPath(url.pathname) &&
@@ -117,6 +143,9 @@ export async function handleRequest(request: Request, env: Env, ctx: ExecutionCo
 
     if (!question) {
       return json({ error: "A market question is required." }, { status: 400 });
+    }
+    if (question.length > MAX_QUESTION_LENGTH) {
+      return json({ error: `Question must be ${MAX_QUESTION_LENGTH} characters or fewer.` }, { status: 400 });
     }
 
     try {
@@ -248,7 +277,6 @@ export async function handleRequest(request: Request, env: Env, ctx: ExecutionCo
     return new Response(jsonl, {
       status: 200,
       headers: {
-        ...corsHeaders(),
         "Content-Type": "application/x-ndjson; charset=utf-8",
         "Content-Disposition": `attachment; filename="training-examples-${suffix}.jsonl"`
       }
@@ -310,6 +338,9 @@ export async function handleRequest(request: Request, env: Env, ctx: ExecutionCo
 
     if (!question) {
       return json({ error: "A follow-up question is required." }, { status: 400 });
+    }
+    if (question.length > MAX_QUESTION_LENGTH) {
+      return json({ error: `Question must be ${MAX_QUESTION_LENGTH} characters or fewer.` }, { status: 400 });
     }
 
     try {
@@ -595,11 +626,12 @@ export async function handleRequest(request: Request, env: Env, ctx: ExecutionCo
   return json({ error: "Not found" }, { status: 404 });
 }
 
-function corsHeaders(): HeadersInit {
+function buildCorsHeaders(allowedOrigin: string): Record<string, string> {
   return {
-    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Origin": allowedOrigin,
     "Access-Control-Allow-Headers": "Content-Type, X-Client-Id, X-Admin-Token",
-    "Access-Control-Allow-Methods": "GET,POST,PATCH,OPTIONS"
+    "Access-Control-Allow-Methods": "GET,POST,PATCH,OPTIONS",
+    "Vary": "Origin"
   };
 }
 

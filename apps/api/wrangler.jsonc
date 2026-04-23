@@ -10,6 +10,10 @@
     // Check every hour and let the app decide whether a discussion is warranted.
     "crons": ["0 * * * *"]
   },
+  "workers_dev": true,
+  "routes": [
+    { "pattern": "api.marketroom.uk/*", "zone_name": "marketroom.uk" }
+  ],
   "d1_databases": [
     {
       "binding": "DB",
@@ -38,7 +42,9 @@
     "SCHEDULED_MATERIALITY_DXY_MOVE_PCT": "0.5",
     "SCHEDULED_MATERIALITY_US10Y_BPS": "8",
     "SCHEDULED_HEADLINE_CHANGE_COUNT": "2",
-    "ADMIN_API_ENABLED": "false",
+    "SYNTHESIS_ENABLED": "true",
+    "SYNTHESIS_EVERY_N_TICKS": "2",
+    "ADMIN_API_ENABLED": "true",
     "KNOWLEDGE_VECTOR_RETRIEVAL": "true"
   }
 }

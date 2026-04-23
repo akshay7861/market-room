@@ -8,6 +8,26 @@ export async function runScheduledMarketCheck(
   env: Env,
   source: "cron" | "manual_test" = "cron"
 ): Promise<ScheduledRunResult> {
+  const tickNumber = await incrementAndGetTick(env);
+  const synthesisEnabled = parseBooleanEnv(env.SYNTHESIS_ENABLED);
+  const synthesisEveryNTicks = Math.max(1, Math.floor(parseNumberEnv(env.SYNTHESIS_EVERY_N_TICKS, 2)));
+  const isSynthesisTick = synthesisEnabled && tickNumber % synthesisEveryNTicks === 0;
+
+  console.log(
+    `[scheduler-mode] tick=${tickNumber} mode=${isSynthesisTick ? "synthesis" : "reactive"} enabled=${synthesisEnabled} every=${synthesisEveryNTicks}`
+  );
+
+  if (isSynthesisTick) {
+    return runSynthesisScheduledCheck(env, source, tickNumber);
+  }
+
+  return runReactiveScheduledCheck(env, source);
+}
+
+async function runReactiveScheduledCheck(
+  env: Env,
+  source: "cron" | "manual_test" = "cron"
+): Promise<ScheduledRunResult> {
   if (!isSchedulerEnabled(env)) {
     return {
       status: "disabled",
@@ -76,6 +96,48 @@ export async function runScheduledMarketCheck(
     reason: "Material market changes triggered a scheduled discussion.",
     snapshotId: discussion.snapshotId,
     materialityReasons: materiality.reasons,
+    discussion
+  };
+}
+
+async function runSynthesisScheduledCheck(
+  env: Env,
+  source: "cron" | "manual_test" = "cron",
+  tickNumber: number
+): Promise<ScheduledRunResult> {
+  if (!isSchedulerEnabled(env)) {
+    return {
+      status: "disabled",
+      reason: "Scheduled discussions are disabled.",
+      materialityReasons: []
+    };
+  }
+
+  const repositories = createRepositories(env);
+  const previousSnapshotRecord = await repositories.marketSnapshots.getLatest();
+  const previousSnapshot = parseSnapshotPayload(previousSnapshotRecord);
+  const prompt = getSchedulerPrompt(env);
+  const latestSnapshot = await fetchLatestMarketSnapshot(env, prompt, {
+    previousSnapshot
+  });
+
+  const discussion = await runMarketDiscussion(env, prompt, {
+    triggerMode: "synthesis",
+    snapshotPayload: latestSnapshot,
+    triggerReason: `synthesis_tick_${tickNumber}`,
+    materialityReasons: [
+      `Synthesis cadence tick from ${source}.`,
+      "Agents formed forward theses from shared market state and peer desk context."
+    ]
+  });
+
+  await markSynthesisTickAt(env, new Date().toISOString());
+
+  return {
+    status: "triggered",
+    reason: "Synthesis tick triggered a thesis-building run.",
+    snapshotId: discussion.snapshotId,
+    materialityReasons: ["synthesis_tick"],
     discussion
   };
 }
@@ -288,4 +350,37 @@ function parseBooleanEnv(value?: string): boolean {
 function parseNumberEnv(value: string | undefined, fallback: number): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+async function ensureSchedulerTickState(env: Env): Promise<void> {
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS scheduler_tick_state (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      total_ticks INTEGER NOT NULL DEFAULT 0,
+      last_tick_at TEXT,
+      last_synthesis_at TEXT
+    )`
+  ).run();
+  await env.DB.prepare(
+    "INSERT OR IGNORE INTO scheduler_tick_state (id, total_ticks) VALUES (1, 0)"
+  ).run();
+}
+
+async function incrementAndGetTick(env: Env): Promise<number> {
+  await ensureSchedulerTickState(env);
+  const now = new Date().toISOString();
+  await env.DB.prepare(
+    "UPDATE scheduler_tick_state SET total_ticks = total_ticks + 1, last_tick_at = ? WHERE id = 1"
+  ).bind(now).run();
+  const row = await env.DB.prepare(
+    "SELECT total_ticks FROM scheduler_tick_state WHERE id = 1"
+  ).first<{ total_ticks: number }>();
+  return row?.total_ticks ?? 0;
+}
+
+async function markSynthesisTickAt(env: Env, timestamp: string): Promise<void> {
+  await ensureSchedulerTickState(env);
+  await env.DB.prepare(
+    "UPDATE scheduler_tick_state SET last_synthesis_at = ? WHERE id = 1"
+  ).bind(timestamp).run();
 }

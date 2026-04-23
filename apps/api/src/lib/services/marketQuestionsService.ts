@@ -242,6 +242,24 @@ async function selectAgentForFollowUp(
 }
 
 async function selectAgentForQuestion(env: Env, agents: Agent[], question: string): Promise<Agent> {
+  const equitiesAgent = agents.find((agent) => agent.sector === "Equities") || null;
+  const askEquitiesMode = classifyAskEquitiesMode(question);
+  const equitySubject = askEquitiesMode !== "quote_watchlist" ? await buildAskEquityCompanyContext(question).catch(() => null) : null;
+  const asksForEquities =
+    askEquitiesMode !== "quote_watchlist" &&
+    Boolean(
+      equitySubject?.resolution.status === "resolved" ||
+        equitySubject?.resolution.status === "ambiguous_subject" ||
+        hasEquityQuoteIntent(question)
+    );
+
+  if (equitiesAgent && asksForEquities) {
+    console.log(
+      `[routing] ask-equities short-circuit mode=${askEquitiesMode} agent=${equitiesAgent.name} subject=${equitySubject?.resolution.entry?.symbol || "none"}`
+    );
+    return equitiesAgent;
+  }
+
   const rankedHeuristic = await heuristicAgentMatch(env, agents, question);
   const heuristic = rankedHeuristic[0] || {
     agent: agents[0],
@@ -951,6 +969,7 @@ async function generateAgentQuestionReply(
   const chartIntent = buildChartIntentFromThread(messages);
   const chartDataCandidate = chartIntent ? buildChartDataFromIntent(chartIntent) : null;
   const chartData = validateChartData(chartDataCandidate) ? chartDataCandidate : null;
+  const historicalPromptBlock = buildHistoricalDataPromptBlock(latestQuestion);
   if (chartIntent) {
     const chartSeriesLog = chartIntent.seriesIntents
       .map((series) => `${series.asset}:${series.transform}:${series.axis}${series.lagMonths ? `:lag${series.lagMonths}m` : ""}`)
@@ -974,9 +993,17 @@ async function generateAgentQuestionReply(
         ? await requestAgentQuestionReply(env, agent, messages, marketSnapshot, headlines, relevantCases, knowledgeSnippets, dynamicMemory, equityQuoteContext, describeChartDataForPrompt(chartData))
         : fallbackQuestionReply(agent, marketSnapshot, latestQuestion);
 
+  const groundedContent = enforceAskFxCorrelationGrounding({
+    agent,
+    question: latestQuestion,
+    content,
+    historicalPromptBlock,
+    chartData
+  });
+
   const finalContent = chartData
-    ? `${sanitizeChartGroundedReply(content, chartData)}\n%%CHART_DATA%%${JSON.stringify(chartData)}`
-    : content;
+    ? `${sanitizeChartGroundedReply(groundedContent, chartData)}\n%%CHART_DATA%%${JSON.stringify(chartData)}`
+    : groundedContent;
 
   return {
     id: crypto.randomUUID(),
@@ -1065,6 +1092,90 @@ function sanitizeChartGroundedReply(content: string, chartData: ChartData): stri
   }
 
   return sanitized.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+
+function enforceAskFxCorrelationGrounding({
+  agent,
+  question,
+  content,
+  historicalPromptBlock,
+  chartData
+}: {
+  agent: Agent;
+  question: string;
+  content: string;
+  historicalPromptBlock: string;
+  chartData: ChartData | null;
+}): string {
+  const relevant = isAskFxCorrelationRelevant(question, content);
+  const expected = extractExpectedAskFxCorrelation(historicalPromptBlock, chartData);
+  const citedMatch =
+    content.match(/\bcorrelation(?: over the last \d+ years?)?(?: is| of|:)?\s*(?:about|around|roughly)?\s*([+-]?\d+(?:\.\d+)?)\b/i) ||
+    content.match(/\bBroad Dollar[^.\n]{0,60}(?:WTI|oil|crude)[^.\n]{0,40}([+-]?\d+(?:\.\d+)?)\b/i);
+  const citedValue = citedMatch?.[1] || null;
+
+  console.log(
+    `[ask-fx-correlation] agent=${agent.sector} relevant=${relevant} computed_block_present=${Boolean(expected)} cited=${Boolean(citedValue)} value=${citedValue || "none"} expected=${expected || "none"}`
+  );
+
+  if (!relevant || !expected) {
+    return content;
+  }
+
+  if (!citedValue) {
+    return `${content.trim()}\n\nStored data shows Broad Dollar YoY% vs WTI YoY% correlation of ${expected}, so CAD should be read through oil-dollar transmission rather than a generic broad-dollar move.`.trim();
+  }
+
+  if (citedValue === expected) {
+    return content;
+  }
+
+  console.log(`[ask-fx-correlation] corrected cited=${citedValue} expected=${expected}`);
+  const withoutWrongCorrelationSentence = content
+    .split(/(?<=[.!?])\s+/)
+    .filter(
+      (sentence) =>
+        !(
+          /\bcorrelation\b/i.test(sentence) &&
+          /\b(dollar|broad dollar|usd)\b/i.test(sentence) &&
+          /\b(wti|oil|crude)\b/i.test(sentence)
+        )
+    )
+    .join(" ")
+    .trim();
+
+  const correctedLead = `Stored data shows Broad Dollar YoY% vs WTI YoY% correlation of ${expected} over the available monthly sample, so CAD should be read through oil-dollar transmission rather than a generic broad-dollar move.`;
+  return [correctedLead, withoutWrongCorrelationSentence].filter(Boolean).join("\n\n").trim();
+}
+
+function isAskFxCorrelationRelevant(question: string, content: string): boolean {
+  const text = `${question}\n${content}`.toLowerCase();
+  const asksForCorrelation = /\b(correlation|relationship|linkage|transmission)\b/.test(text);
+  const mentionsDollar = /\b(dollar|broad dollar|dxy|usd)\b/.test(text);
+  const mentionsOil = /\b(wti|oil|crude)\b/.test(text);
+  const mentionsCommodityFx = /\b(cad|aud|nok|commodity fx|commodity-linked)\b/.test(text);
+  return (mentionsDollar && mentionsOil && asksForCorrelation) || (mentionsDollar && mentionsOil && mentionsCommodityFx);
+}
+
+function extractExpectedAskFxCorrelation(historicalPromptBlock: string, chartData: ChartData | null): string | null {
+  if (
+    chartData &&
+    /WTI/i.test(chartData.title) &&
+    /Broad Dollar/i.test(chartData.title) &&
+    chartData.subtitle
+  ) {
+    const chartMatch = chartData.subtitle.match(/Correlation:\s*([+-]?\d+(?:\.\d+)?)/i);
+    if (chartMatch?.[1]) {
+      return chartMatch[1];
+    }
+  }
+  const historicalMatch = historicalPromptBlock.match(
+    /Broad Dollar YoY% vs WTI YoY% correlation:\s*([+-]?\d+(?:\.\d+)?)/i
+  );
+  if (historicalMatch?.[1]) {
+    return historicalMatch[1];
+  }
+  return null;
 }
 
 function buildQuestionThreadPrompt(

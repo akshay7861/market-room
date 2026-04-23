@@ -40,7 +40,14 @@ import { fetchMarketauxBriefing } from "./marketauxNewsService";
 import { fetchFinnhubBriefing } from "./finnhubNewsService";
 import { fetchPolygonBriefing } from "./polygonNewsService";
 import { analyzeTopHeadlinesForAgent, type HeadlineAnalysis } from "./headlineAnalysisService";
-import { buildCrossAgentMacroView, buildDynamicMemoryContext, buildDynamicMemoryPromptBlock, refreshDynamicHouseViews } from "./dynamicMemoryService";
+import {
+  buildDynamicMemoryContext,
+  buildDynamicMemoryPromptBlock,
+  buildFrozenPeerThesisSnapshot,
+  buildPeerAgentThesesView,
+  refreshDynamicHouseViews,
+  type FrozenPeerThesisSnapshotRow
+} from "./dynamicMemoryService";
 import {
   buildEquityFundamentalsForPost,
   buildEquityFundamentalsRepairSentence,
@@ -59,7 +66,7 @@ import {
 const defaultDiscussionPrompt =
   "Discuss the biggest market drivers right now, the main risk, and one thing investors should watch next.";
 
-type DiscussionTriggerMode = "manual" | "scheduled";
+type DiscussionTriggerMode = "manual" | "scheduled" | "synthesis";
 type DiscussionProfile =
   | "commodity_heavy"
   | "rates_heavy"
@@ -73,6 +80,52 @@ type RunMarketDiscussionOptions = {
   eventSummary?: string;
   triggerReason?: string;
   materialityReasons?: string[];
+};
+
+type FrozenRunContext = {
+  runContextId: string;
+  snapshotTimestamp: string;
+  peerSnapshotVersion: string;
+  peerSnapshot: FrozenPeerThesisSnapshotRow[];
+  synthesisThemeBoard: SynthesisThemeCluster[];
+  dominantSynthesisTheme: SynthesisThemeCluster | null;
+  synthesisThemeDigest: string[];
+  synthesisTopicLabel: string;
+  synthesisCatalystKey: string;
+  synthesisPrimaryHeadline: string;
+};
+
+type SynthesisThemeDefinition = {
+  key: string;
+  label: string;
+  matcher: RegExp;
+  mechanismTerms: string[];
+  sectorBias: Partial<Record<string, number>>;
+  generic?: boolean;
+};
+
+type SynthesisThemeCluster = {
+  key: string;
+  label: string;
+  headlines: SnapshotHeadline[];
+  mechanismTerms: string[];
+  sectorRelevance: Record<string, number>;
+  isGeneric: boolean;
+  freshnessScore: number;
+  hasCompanyHeadline: boolean;
+};
+
+type AgentSynthesisAnchorSelection = {
+  themeKey: string;
+  themeLabel: string;
+  anchorHeadline: SnapshotHeadline | null;
+  anchorConfidence: "high" | "medium" | "low";
+  mechanismTerms: string[];
+  isGenericFallback: boolean;
+  relevanceScore: number;
+  repetitionChallenge: string | null;
+  hasCompanyHeadline: boolean;
+  participationAdjustment: number;
 };
 
 type DiscussionPlan = {
@@ -162,6 +215,23 @@ type StanceLockChallenge = {
   stance: string;
   streak: number;
   block: string;
+};
+
+type MechanismFamily =
+  | "labor_inflation_persistence"
+  | "fed_easing_timing"
+  | "term_premium_repricing"
+  | "credit_stress"
+  | "commodity_pass_through"
+  | "earnings_fundamentals_deterioration"
+  | "revisions_breadth_sector_weakness"
+  | "cross_asset_setup";
+
+type MechanismSelection = {
+  family: MechanismFamily;
+  score: number;
+  evidence: string[];
+  anchor: string;
 };
 
 const EMPTY_VERIFIED_MARKET_METRICS_CONTEXT: VerifiedMarketMetricsContext = {
@@ -274,6 +344,8 @@ export async function runMarketDiscussion(
     options.snapshotPayload?.prompt ||
     defaultDiscussionPrompt;
   const triggerMode = options.triggerMode || "manual";
+  const synthesisAgentLimit = parseSynthesisAgentLimit(env.SYNTHESIS_AGENT_LIMIT, activeAgents.length);
+  const synthesisAgents = synthesisAgentLimit ? activeAgents.slice(0, synthesisAgentLimit) : activeAgents;
   await repositories.theses.markStaleBefore(
     room.id,
     new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
@@ -286,15 +358,19 @@ export async function runMarketDiscussion(
       now,
       previousSnapshot: previousSnapshotPayload
     }));
-  const discussionPlan = buildDiscussionPlan(activeAgents, marketSnapshotPayload);
+  const discussionPlan =
+    triggerMode === "synthesis"
+      ? buildSynthesisDiscussionPlan(synthesisAgents)
+      : buildDiscussionPlan(activeAgents, marketSnapshotPayload);
   const priorRoomThreadBundle = await repositories.messages.listThreadsByRoom(room.id, 24, 4); // 24 threads = ~6 full runs of history for novelty check
   const priorRoomThreads = buildDiscussionThreads(priorRoomThreadBundle.posts, priorRoomThreadBundle.comments);
-  const [officialBriefing, yahooBriefing, marketauxBriefing, finnhubBriefing, polygonBriefing] = await Promise.all([
+  const [officialBriefing, yahooBriefing, marketauxBriefing, finnhubBriefing, polygonBriefing, frozenPeerSnapshot] = await Promise.all([
     fetchOfficialCatalystLayer(env, activeAgents),
     fetchYahooFinanceBriefing(activeAgents),
     fetchMarketauxBriefing(env, activeAgents),
     fetchFinnhubBriefing(env, activeAgents),
-    fetchPolygonBriefing(env, activeAgents)
+    fetchPolygonBriefing(env, activeAgents),
+    buildFrozenPeerThesisSnapshot(env, activeAgents)
   ]);
 
   const recentCatalystMessages = flattenThreadPosts(priorRoomThreads, 80);
@@ -351,6 +427,22 @@ export async function runMarketDiscussion(
     marketSnapshotPayload,
     generalCatalystHeadlines
   );
+  const frozenRunContext = buildFrozenRunContext({
+    triggerMode,
+    triggerReason: options.triggerReason,
+    now,
+    snapshot: enrichedSnapshotPayload,
+    peerSnapshot: frozenPeerSnapshot,
+    headlines: generalCatalystHeadlines
+  });
+  console.log(
+    `[run-context] mode=${triggerMode} snapshot_ts=${frozenRunContext.snapshotTimestamp} peer_snapshot_version=${frozenRunContext.peerSnapshotVersion} context=${frozenRunContext.runContextId}`
+  );
+  if (triggerMode === "synthesis") {
+    console.log(
+      `[synthesis-mode] tick=${options.triggerReason || "synthesis"} topic=${frozenRunContext.synthesisTopicLabel} catalyst="${truncateText(frozenRunContext.synthesisPrimaryHeadline, 80)}" agents=${discussionPlan.selectedAgents.map((agent) => agent.id).join(",")}`
+    );
+  }
 
   const snapshot: MarketSnapshot = {
     id: crypto.randomUUID(),
@@ -386,13 +478,19 @@ export async function runMarketDiscussion(
         postingAgentIds: activeAgents.map((agent) => agent.id),
         triggerMode,
         triggerReason: options.triggerReason || triggerMode,
+        synthesisTopicLabel: frozenRunContext.synthesisTopicLabel,
+        synthesisPrimaryHeadline: frozenRunContext.synthesisPrimaryHeadline,
+        runContextId: frozenRunContext.runContextId,
         materialityReasons: options.materialityReasons || [],
         snapshotHeadline: enrichedSnapshotPayload.headline,
         snapshotProvider: enrichedSnapshotPayload.provider,
         usedFallback: enrichedSnapshotPayload.usedFallback,
         discussionProfile: discussionPlan.profile,
         routingReason: discussionPlan.routingReason,
-        orchestration: ["forum_posts", "agent_comments", ...discussionPlan.orchestration]
+        orchestration:
+          triggerMode === "synthesis"
+            ? ["synthesis_posts_only", ...discussionPlan.orchestration]
+            : ["forum_posts", "agent_comments", ...discussionPlan.orchestration]
       },
       null,
       2
@@ -447,12 +545,14 @@ export async function runMarketDiscussion(
             previousSnapshot: previousSnapshotPayload,
             roomId: room.id,
             eventId: event.id,
-          discussionPlan,
-          generalHeadlines: generalCatalystHeadlines,
-          sectorHeadlinesByAgentId,
-          priorRoomThreads,
-          recentTheses,
-          snapshotId: snapshot.id
+            discussionPlan,
+            generalHeadlines: generalCatalystHeadlines,
+            sectorHeadlinesByAgentId,
+            priorRoomThreads,
+            recentTheses,
+            snapshotId: snapshot.id,
+            triggerMode,
+            frozenRunContext
         })
         : generateMockForumPosts(activeAgents, marketSnapshotPayload, room.id, event.id, snapshot.id);
 
@@ -462,6 +562,9 @@ export async function runMarketDiscussion(
   const generatedSelfUpdates = generatedSelfUpdateEntries.map((entry) => entry.message);
 
   const generatedComments =
+    triggerMode === "synthesis"
+      ? []
+      :
     generatedPosts.length === 0 && priorRoomThreads.length === 0
       ? []
       : isLlmConfigured(env)
@@ -477,7 +580,8 @@ export async function runMarketDiscussion(
             generalHeadlines: generalCatalystHeadlines,
             sectorHeadlinesByAgentId,
             priorRoomThreads,
-            snapshotId: snapshot.id
+            snapshotId: snapshot.id,
+            frozenRunContext
           })
         : generateMockForumComments(activeAgents, generatedPosts, room.id, event.id);
 
@@ -551,6 +655,9 @@ export async function runMarketDiscussion(
 }
 
 function eventTitleFor(triggerMode: DiscussionTriggerMode): string {
+  if (triggerMode === "synthesis") {
+    return "Market Room synthesis forum update";
+  }
   return triggerMode === "scheduled"
     ? "Market Room scheduled forum update"
     : "Market Room forum update";
@@ -564,6 +671,9 @@ function eventSummaryFor(
   routingReason: string,
   materialityReasons?: string[]
 ): string {
+  if (triggerMode === "synthesis") {
+    return `A synthesis forum update asked ${selectedAgentCount} of ${activeAgentCount} active agents to form forward theses from shared market state and peer desk context.`;
+  }
   if (triggerMode === "scheduled") {
     const reasons = materialityReasons?.slice(0, 2).join("; ");
     const isHourlyRefresh = reasons?.toLowerCase().includes("hourly scheduled refresh");
@@ -575,6 +685,21 @@ function eventSummaryFor(
   }
 
   return `A ${profileLabel} forum update woke ${selectedAgentCount} of ${activeAgentCount} active agents because ${routingReason.toLowerCase()}.`;
+}
+
+function buildSynthesisDiscussionPlan(agents: Agent[]): DiscussionPlan {
+  const selectedAgents = sortAgentsForForum(agents);
+  const opener = selectedAgents[0] || createSyntheticFallbackAgent();
+  return {
+    profile: "cross_asset",
+    profileLabel: "synthesis",
+    routingReason: "cadence-driven synthesis tick",
+    selectedAgents,
+    opener,
+    roundTwoAgents: selectedAgents.slice(1, 3),
+    roundThreeAgent: selectedAgents[3] || null,
+    orchestration: ["mode:synthesis", "all_agents_parallel", "thesis_only_output"]
+  };
 }
 
 function buildDiscussionPlan(agents: Agent[], marketSnapshot: MarketSnapshotPayload): DiscussionPlan {
@@ -966,7 +1091,9 @@ async function generateAgentForumPosts({
   sectorHeadlinesByAgentId,
   priorRoomThreads,
   recentTheses,
-  snapshotId
+  snapshotId,
+  triggerMode,
+  frozenRunContext
 }: {
   env: Env;
   agents: Agent[];
@@ -980,6 +1107,8 @@ async function generateAgentForumPosts({
   priorRoomThreads: AgentDiscussionThread[];
   recentTheses: Thesis[];
   snapshotId: string;
+  triggerMode: DiscussionTriggerMode;
+  frozenRunContext: FrozenRunContext;
 }): Promise<PlannedForumEntry[]> {
   const repositories = createRepositories(env);
   const sortedAgents = sortAgentsForForum(agents);
@@ -988,6 +1117,24 @@ async function generateAgentForumPosts({
   const recentThesesByOwner = new Map<string, Thesis[]>();
   const entries: PlannedForumEntry[] = [];
   const roomCoverage = await repositories.roomCoverage.getByRoomId(roomId);
+  const recentDiscussionEvents = await repositories.events.listRecentDiscussionEvents(16);
+  const recentSynthesisEventIds = new Set(
+    recentDiscussionEvents
+      .filter((event) => {
+        try {
+          const payload = JSON.parse(event.payloadJson || "{}") as { triggerMode?: string };
+          return payload.triggerMode === "synthesis";
+        } catch {
+          return false;
+        }
+      })
+      .slice(0, 2)
+      .map((event) => event.id)
+  );
+  const recentSynthesisSectorCounts = buildSynthesisSectorParticipation(
+    priorRoomThreads,
+    recentSynthesisEventIds
+  );
   const verifiedMetrics = buildVerifiedMarketMetricsContext(marketSnapshot);
   // Tracks posts published earlier in this same run so subsequent agents can avoid echoing them.
   const thisRunPosts: AgentMessage[] = [];
@@ -996,7 +1143,9 @@ async function generateAgentForumPosts({
     recentThesesByOwner.set(thesis.ownerAgentId, [...(recentThesesByOwner.get(thesis.ownerAgentId) || []), thesis]);
   }
 
-  for (const [index, agent] of sortedAgents.entries()) {
+  const agentLoop = triggerMode === "synthesis" ? discussionPlan.selectedAgents : sortedAgents;
+
+  for (const [index, agent] of agentLoop.entries()) {
     const sectorHeadlines = sectorHeadlinesByAgentId.get(agent.id) || [];
     const [recentPosts, relevantCases, knowledgeSnippets, dynamicMemory, agentState] = await Promise.all([
       repositories.messages.listRecentByAgent(agent.id, 8),  // 8 not 4 — wider cross-run novelty window
@@ -1016,7 +1165,7 @@ async function generateAgentForumPosts({
       buildDynamicMemoryContext(env, agent),
       repositories.agentState.getByAgentId(agent.id)
     ]);
-    const topicPlan = buildAgentTopicPlan(
+    const topicPlanBase = buildAgentTopicPlan(
       agent,
       marketSnapshot,
       previousSnapshot,
@@ -1029,6 +1178,28 @@ async function generateAgentForumPosts({
       recentThesesByOwner.get(agent.id) || [],
       roomCoverage
     );
+    const synthesisSelection =
+      triggerMode === "synthesis"
+        ? selectSynthesisAnchorForAgent({
+            agent,
+            topicPlan: topicPlanBase,
+            context: frozenRunContext,
+            recentPosts,
+            recentSynthesisSectorCounts
+          })
+        : null;
+
+    if (triggerMode === "synthesis" && !synthesisSelection) {
+      console.log(
+        `[synthesis-mode] agent=${agent.id} action=silent topic=${frozenRunContext.synthesisTopicLabel} reason=no_valid_news_anchor context=${frozenRunContext.runContextId}`
+      );
+      continue;
+    }
+
+    const topicPlan =
+      triggerMode === "synthesis" && synthesisSelection
+        ? adaptTopicPlanForSynthesis(topicPlanBase, frozenRunContext, synthesisSelection)
+        : topicPlanBase;
 
     const noveltyAssessment = computeNoveltyAssessment({
       candidateThemeKey: topicPlan.primary.themeKey,
@@ -1056,6 +1227,22 @@ async function generateAgentForumPosts({
         })
       : null;
     const topHeadlineForDiagnostics = topSectorHeadlines.find((headline) => headline.title === headlineAnalysis?.headline_title) || topSectorHeadlines[0];
+    const mechanismSelection = rankMechanismFamilyForAgent({
+      agent,
+      topicPlan,
+      headlineAnalysis,
+      synthesisSelection,
+      marketSnapshot,
+      relevantCases,
+      knowledgeSnippets,
+      peerSnapshot: frozenRunContext.peerSnapshot
+    });
+    const promptKnowledgeSnippets = selectPromptKnowledgeSnippets({
+      agent,
+      snippets: knowledgeSnippets,
+      mechanism: mechanismSelection
+    });
+    const promptRelevantCases = selectPromptRelevantCases(relevantCases, mechanismSelection);
     const domainRelevance = evaluateDomainRelevance({
       agent,
       headlineTitle: topHeadlineForDiagnostics?.title || headlineAnalysis?.headline_title || topicPlan.primary.catalyst,
@@ -1067,6 +1254,9 @@ async function generateAgentForumPosts({
     });
     console.log(
       `[domain-gate] agent=${agent.sector} verdict=${domainRelevance.verdict} score=${domainRelevance.score} title="${truncateText(topHeadlineForDiagnostics?.title || topicPlan.primary.catalyst, 80)}" matched=${domainRelevance.matchedTerms.join("|") || "none"} action=${domainRelevance.mode}`
+    );
+    console.log(
+      `[mechanism-ranking] agent=${agent.sector} family=${mechanismSelection.family} score=${mechanismSelection.score} anchor="${truncateText(mechanismSelection.anchor, 90)}" evidence=${truncateText(mechanismSelection.evidence.join("; "), 140)}`
     );
 
     const rawPostingDecision = makePostingDecision({
@@ -1109,7 +1299,11 @@ async function generateAgentForumPosts({
         headlineAnalysis.headline_type
       );
 
+      const companyOwnedEquityCatalyst = isCompanyOwnedEquityCatalyst(headlineAnalysis, topHeadlineForDiagnostics);
       const catalystAlreadyClaimed = thisRunPosts.some((p) => {
+        if (companyOwnedEquityCatalyst && agent.sector === "Equities") {
+          return false;
+        }
         // Macro/policy: only block within same sector
         if (isMacroPolicy && p.sector !== agent.sector) return false;
         // Company/commodity/geo/other: ANY prior post on this article blocks a second top-level
@@ -1130,6 +1324,20 @@ async function generateAgentForumPosts({
     // Macro is the most prolific agent but volume ≠ quality. If the last Macro post
     // was made less than 90 minutes ago AND novelty is low, silence this run.
     const finalPostingDecision = (() => {
+      if (triggerMode === "synthesis") {
+        if (
+          synthesisSelection &&
+          synthesisSelection.isGenericFallback &&
+          !topicPlan.matchedThesis
+        ) {
+          return {
+            ...postingDecision,
+            actionType: "stay_silent" as const,
+            reasonCodes: uniqueReasonCodes([...postingDecision.reasonCodes, "stale_agent_thesis"])
+          };
+        }
+        return postingDecision;
+      }
       if (
         agent.sector === "Macro" &&
         postingDecision.actionType !== "stay_silent" &&
@@ -1173,7 +1381,21 @@ async function generateAgentForumPosts({
       headlineAnalysis
     });
 
-    const weakDomainAdjustedDecision = applyNoFreshWeakDomainDecisionGate(financingOwnershipAdjustedDecision);
+    const equityOwnedCompanyHeadlineAdjustedDecision = applyEquityOwnedCompanyHeadlineGate({
+      agent,
+      postingDecision: financingOwnershipAdjustedDecision,
+      headlineAnalysis,
+      topHeadline: topHeadlineForDiagnostics
+    });
+
+    const macroSingleNameAdjustedDecision = applyMacroSingleNameOwnershipGate({
+      agent,
+      postingDecision: equityOwnedCompanyHeadlineAdjustedDecision,
+      headlineAnalysis,
+      topHeadline: topHeadlineForDiagnostics
+    });
+
+    const weakDomainAdjustedDecision = applyNoFreshWeakDomainDecisionGate(macroSingleNameAdjustedDecision);
 
     const ratesTemplateAdjustedDecision = applyRatesTemplateDecisionGate({
       agent,
@@ -1187,9 +1409,11 @@ async function generateAgentForumPosts({
       agent,
       postingDecision: ratesTemplateAdjustedDecision,
       headlineAnalysis,
+      topHeadline: topHeadlineForDiagnostics,
       topicPlan,
       recentMessages: [...flattenThreadPosts(priorRoomThreads, 80), ...thisRunPosts],
-      recentAgentMessages: recentPosts
+      recentAgentMessages: recentPosts,
+      currentRunPosts: thisRunPosts
     });
     const stanceChallenge = buildStanceLockChallenge(agent, recentPosts);
     const generationDecision =
@@ -1228,6 +1452,11 @@ async function generateAgentForumPosts({
     });
 
     if (!willPost) {
+      if (triggerMode === "synthesis") {
+        console.log(
+          `[synthesis-mode] agent=${agent.id} action=silent topic=${frozenRunContext.synthesisTopicLabel} reason=${generationDecision.reasonCodes.join("|") || "decision_gate"} context=${frozenRunContext.runContextId}`
+        );
+      }
       continue;
     }
 
@@ -1260,6 +1489,7 @@ async function generateAgentForumPosts({
             )
           ])
         : null;
+    const historicalContext = buildMarketRoomHistoricalContext(agent, generalHeadlines, sectorHeadlines);
     if (agent.sector === "Equities") {
       console.log(
         `[equities-standalone] fundamentals_result injected=${Boolean(equityFundamentalsContext?.promptBlock)} tier=${equityFundamentalsContext?.dataTier || "none"} classification=${equityFundamentalsContext?.resolution.classification || "none"}`
@@ -1274,8 +1504,8 @@ async function generateAgentForumPosts({
       discussionPlan,
       topicPlan,
       recentPosts,
-      relevantCases,
-      knowledgeSnippets,
+      relevantCases: promptRelevantCases,
+      knowledgeSnippets: promptKnowledgeSnippets,
       generalHeadlines,
       sectorHeadlines,
       priorRoomThreads,
@@ -1286,7 +1516,11 @@ async function generateAgentForumPosts({
       headlineAnalysis,
       verifiedMetrics,
       stanceChallenge,
-      equityFundamentalsContext
+      equityFundamentalsContext,
+      triggerMode,
+      frozenRunContext,
+      synthesisSelection,
+      mechanismSelection
     });
 
     const createdAt = offsetTimestamp(index * 3);
@@ -1299,24 +1533,46 @@ async function generateAgentForumPosts({
       generationDecision.targetPostId ||
       (isUpdate ? topicPlan.updateTargetPostId : null);
     const finalCatalyst =
-      result?.catalyst ||
-      (headlineAnalysis && headlineAnalysis.market_signal_strength !== "noise" ? headlineAnalysis.headline_title : "") ||
-      topicPlan.primary.catalyst ||
-      fallbackCatalyst(agent, marketSnapshot);
+      triggerMode === "synthesis"
+        ? synthesisSelection?.anchorHeadline?.title || synthesisSelection?.themeLabel || frozenRunContext.synthesisPrimaryHeadline
+        : result?.catalyst ||
+          (headlineAnalysis && headlineAnalysis.market_signal_strength !== "noise" ? headlineAnalysis.headline_title : "") ||
+          topicPlan.primary.catalyst ||
+          fallbackCatalyst(agent, marketSnapshot);
     let resolvedContent = ensureRequiredConvictionCondition({
       agent,
       content: trimToWordLimit(
         result?.content || fallbackForumPost(agent, marketSnapshot, previousSnapshot),
         isUpdate ? 170 : 320
       ),
-      catalyst: finalCatalyst
+      catalyst: finalCatalyst,
+      mechanismFamily: mechanismSelection.family
     });
     resolvedContent = ensureStanceLockReviewIfRequired({
       content: resolvedContent,
       stanceChallenge,
       catalyst: finalCatalyst,
-      stance: result?.stance || stanceFor(agent)
+      stance: result?.stance || stanceFor(agent),
+      sector: agent.sector,
+      mechanismFamily: mechanismSelection.family
     });
+    const evidenceGate = applyEvidenceFirstMechanismGate({
+      agent,
+      content: resolvedContent,
+      mechanism: mechanismSelection,
+      catalyst: finalCatalyst,
+      recentPosts
+    });
+    resolvedContent = evidenceGate.content;
+    console.log(
+      `[evidence-first] agent=${agent.id} mechanism_family=${evidenceGate.metrics.mechanismFamily} house_view_visible=${evidenceGate.metrics.houseViewVisible ? "yes" : "no"} mechanism_fit=${evidenceGate.metrics.mechanismFit ? "yes" : "no"} macro_threshold_pair_used=${evidenceGate.metrics.macroThresholdPairUsed ? "yes" : "no"} macro_threshold_pair_relevant=${evidenceGate.metrics.macroThresholdPairRelevant ? "yes" : "no"} repeat_delta_visible=${evidenceGate.metrics.repeatDeltaVisible ? "yes" : "no"} repair_applied=${evidenceGate.metrics.repaired ? "yes" : "no"}`
+    );
+    if (evidenceGate.suppressed) {
+      console.log(
+        `[evidence-first] agent=${agent.id} action=silent reason=mechanism_relevance_gate context=${frozenRunContext.runContextId}`
+      );
+      continue;
+    }
     const resolvedStance = result?.stance || stanceFor(agent);
     const titleResolution = resolveForumPostTitle({
       agent,
@@ -1339,19 +1595,27 @@ async function generateAgentForumPosts({
       agent,
       titleFlags: catalystCorrected ? [...titleResolution.flags, "resolved_catalyst_corrected"] : titleResolution.flags,
       content: resolvedContent,
-      hasStoredContext: knowledgeSnippets.length > 0,
+      hasStoredContext: promptKnowledgeSnippets.length > 0,
       postingDecision: catalystCorrectedDecision,
       verifiedMetrics,
       stanceChallengeActive: Boolean(stanceChallenge?.active),
       headlineAnalysis
     });
+    const fxCorrelationEnforcement = enforceFxCorrelationQuality({
+      agent,
+      content: resolvedContent,
+      headlineAnalysis,
+      historicalContext
+    });
+    resolvedContent = fxCorrelationEnforcement.content;
     postQualityFlags = uniqueQualityFlags([
       ...postQualityFlags,
       ...evaluateFxCorrelationGrounding({
         agent,
         content: resolvedContent,
         headlineAnalysis,
-        recentPosts
+        recentPosts,
+        historicalContext
       })
     ]);
 
@@ -1364,15 +1628,73 @@ async function generateAgentForumPosts({
     resolvedContent = equityVisibility.content;
     postQualityFlags = uniqueQualityFlags([...postQualityFlags, ...equityVisibility.flags]);
 
+    if (triggerMode === "synthesis" && synthesisSelection) {
+      postQualityFlags = uniqueQualityFlags([...postQualityFlags, "synthesis_anchor_selected"]);
+      if (synthesisSelection.isGenericFallback) {
+        postQualityFlags = uniqueQualityFlags([...postQualityFlags, "synthesis_theme_generic_fallback"]);
+      }
+      if (!synthesisSelection.anchorHeadline) {
+        postQualityFlags = uniqueQualityFlags([...postQualityFlags, "synthesis_no_valid_news_anchor"]);
+      }
+      const mismatch = hasSynthesisAnchorMismatch({
+        content: resolvedContent,
+        selection: synthesisSelection
+      });
+      if (mismatch) {
+        postQualityFlags = uniqueQualityFlags([...postQualityFlags, "synthesis_anchor_mismatch"]);
+        resolvedContent = repairSynthesisAnchorContent(resolvedContent, synthesisSelection);
+        const repairedMismatch = hasSynthesisAnchorMismatch({
+          content: resolvedContent,
+          selection: synthesisSelection
+        });
+        if (!repairedMismatch) {
+          postQualityFlags = uniqueQualityFlags([...postQualityFlags, "synthesis_anchor_repaired"]);
+        } else {
+          console.log(
+            `[synthesis-mode] agent=${agent.id} action=silent topic=${synthesisSelection.themeKey} reason=anchor_mismatch_unrepaired context=${frozenRunContext.runContextId}`
+          );
+          continue;
+        }
+      }
+
+      const synthesisGate = applySynthesisPublicationQualityGate({
+        agent,
+        content: resolvedContent,
+        selection: synthesisSelection,
+        postingDecision: generationDecision,
+        equityFundamentalsContext
+      });
+      resolvedContent = synthesisGate.content;
+      postQualityFlags = uniqueQualityFlags([...postQualityFlags, ...synthesisGate.flags]);
+      const paragraphGate = applySynthesisParagraphReadabilityGate(resolvedContent);
+      resolvedContent = paragraphGate.content;
+      console.log(
+        `[synthesis-quality] agent=${agent.id} anchor_visible=${synthesisGate.metrics.anchorVisible ? "yes" : "no"} delta_visible=${synthesisGate.metrics.deltaVisible ? "yes" : "no"} directional_call=${synthesisGate.metrics.directionalCall ? "yes" : "no"} data_anchor=${synthesisGate.metrics.dataAnchor ? "yes" : "no"} conviction_count=${synthesisGate.metrics.convictionCount} repair_applied=${synthesisGate.repaired ? "yes" : "no"} publication_gate=${synthesisGate.metrics.publicationGate} paragraphs=${paragraphGate.paragraphs} paragraph_repair=${paragraphGate.repaired ? "yes" : "no"} paragraph_gate=${paragraphGate.gate}`
+      );
+      if (synthesisGate.suppressed) {
+        console.log(
+          `[synthesis-mode] agent=${agent.id} action=silent topic=${synthesisSelection.themeKey} reason=publication_quality_gate context=${frozenRunContext.runContextId}`
+        );
+        continue;
+      }
+    }
+
     if (postQualityFlags.length > 0) {
       console.log(
         `[post-quality:${agent.name}] flags=${postQualityFlags.join(",")} title="${titleResolution.title ?? "null"}"`
       );
     }
 
-    if (shouldSuppressWeakEquityCompanyPost(agent, headlineAnalysis, resolvedContent, finalCatalyst)) {
+    if (shouldSuppressWeakEquityCompanyPost(agent, headlineAnalysis, topHeadlineForDiagnostics, resolvedContent, finalCatalyst)) {
       console.log(
         `[equities-quality] suppressed stock-specific post reason=missing_company_numbers title="${truncateText(titleResolution.title ?? finalCatalyst, 100)}"`
+      );
+      continue;
+    }
+
+    if (fxCorrelationEnforcement.shouldSuppress) {
+      console.log(
+        `[fx-correlation] suppressed reason=${fxCorrelationEnforcement.reason || "quality"} title="${truncateText(titleResolution.title ?? finalCatalyst, 100)}"`
       );
       continue;
     }
@@ -1410,6 +1732,19 @@ async function generateAgentForumPosts({
       continue;
     }
 
+    const messageType = isUpdate ? "comment" : "post";
+    const synthesisAction = mapSynthesisAction({
+      triggerMode,
+      messageType,
+      postingDecision: generationDecision
+    });
+    if (triggerMode === "synthesis" && synthesisAction === "silent") {
+      console.log(
+        `[synthesis-mode] agent=${agent.id} action=silent topic=${frozenRunContext.synthesisTopicLabel} reason=low_signal`
+      );
+      continue;
+    }
+
     const message: AgentMessage = {
       id: preGeneratedMessageId!,
       roomId,
@@ -1418,8 +1753,8 @@ async function generateAgentForumPosts({
       agentName: agent.name,
       sector: agent.sector,
       role: "assistant",
-      messageType: isUpdate ? "comment" : "post",
-      parentMessageId: parentPostId,
+      messageType: triggerMode === "synthesis" ? "post" : messageType,
+      parentMessageId: triggerMode === "synthesis" ? null : parentPostId,
       title: titleResolution.title,
       catalyst: finalCatalyst,
       thesisId,
@@ -1437,6 +1772,13 @@ async function generateAgentForumPosts({
       postingDecision: postingDecisionWithQualityFlags,
       createdAt
     };
+
+    if (triggerMode === "synthesis") {
+      const synthesisPeer = extractEngagedPeerAgent(message.content, frozenRunContext.peerSnapshot);
+      console.log(
+        `[synthesis-mode] agent=${agent.id} action=${synthesisAction} topic=${frozenRunContext.synthesisTopicLabel} catalyst="${truncateText(finalCatalyst, 80)}" peer=${synthesisPeer || "none"} chain=${hasTransmissionChainShape(message.content) ? "yes" : "no"} stored_stat=${hasStoredDataCitation(message.content) ? "yes" : "no"} participation_adjust=${synthesisSelection?.participationAdjustment ?? 0} context=${frozenRunContext.runContextId}`
+      );
+    }
 
     entries.push({
       message,
@@ -1468,7 +1810,8 @@ async function generateAgentForumComments({
   generalHeadlines,
   sectorHeadlinesByAgentId,
   priorRoomThreads,
-  snapshotId
+  snapshotId,
+  frozenRunContext
 }: {
   env: Env;
   agents: Agent[];
@@ -1482,6 +1825,7 @@ async function generateAgentForumComments({
   sectorHeadlinesByAgentId: Map<string, SnapshotHeadline[]>;
   priorRoomThreads: AgentDiscussionThread[];
   snapshotId: string;
+  frozenRunContext: FrozenRunContext;
 }): Promise<PlannedForumEntry[]> {
   const orderedAgents = sortAgentsForForum(agents);
   const commentRoomCoverage = await createRepositories(env).roomCoverage.getByRoomId(roomId);
@@ -1562,7 +1906,8 @@ async function generateAgentForumComments({
       dynamicMemory: commentDynamicMemory,
       agentState: commentAgentState,
       roomCoverage: commentRoomCoverage,
-      verifiedMetrics
+      verifiedMetrics,
+      frozenRunContext
     });
     const commentContent = trimToWordLimit(result?.content || fallbackForumComment(responder, post, marketSnapshot), 140);
     if (shouldSuppressWeakGeneratedComment({
@@ -1754,6 +2099,905 @@ function buildRoomThemeCoverage(threads: AgentDiscussionThread[]): Map<string, n
   }
 
   return coverage;
+}
+
+function parseSynthesisAgentLimit(value: string | undefined, activeCount: number): number | null {
+  if (!value) {
+    return null;
+  }
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return null;
+  }
+  return Math.min(activeCount, Math.floor(parsed));
+}
+
+const SYNTHESIS_THEME_DEFINITIONS: SynthesisThemeDefinition[] = [
+  {
+    key: "oil_geopolitics_and_inflation_pass_through",
+    label: "Oil and geopolitical risk",
+    matcher: /\b(oil|wti|brent|opec|hormuz|iran|energy|inflation)\b/i,
+    mechanismTerms: ["wti", "brent", "inflation", "energy", "risk premium"],
+    sectorBias: { Commodities: 4, Macro: 2, FX: 2, Equities: 1, "Risk/Sentiment": 1, Rates: 1 }
+  },
+  {
+    key: "rates_repricing_and_duration_pressure",
+    label: "Rates repricing and duration pressure",
+    matcher: /\b(fed|rates?|yield|treasury|duration|curve|bond|auction|refunding)\b/i,
+    mechanismTerms: ["10y", "2y", "yield", "term premium", "duration", "refunding"],
+    sectorBias: { Rates: 4, Macro: 2, Equities: 1, FX: 1, "Risk/Sentiment": 1 }
+  },
+  {
+    key: "growth_softness_vs_multiple_risk",
+    label: "Growth softness versus multiple risk",
+    matcher: /\b(growth|earnings|guidance|jobs|recession|valuation|multiple|equity|stocks?)\b/i,
+    mechanismTerms: ["earnings", "guidance", "valuation", "multiple", "growth"],
+    sectorBias: { Equities: 4, Macro: 2, "Risk/Sentiment": 1, Rates: 1, FX: 1 }
+  },
+  {
+    key: "credit_and_risk_sensitivity",
+    label: "Credit and risk sensitivity",
+    matcher: /\b(credit|spread|hy|oas|risk|volatility|vix|downgrade|default)\b/i,
+    mechanismTerms: ["hy oas", "spread", "vix", "credit", "risk"],
+    sectorBias: { "Risk/Sentiment": 4, Macro: 2, Equities: 1, Rates: 1 }
+  },
+  {
+    key: "fx_policy_divergence",
+    label: "FX policy divergence",
+    matcher: /\b(dollar|dxy|fx|currency|yen|euro|carry|boe|ecb|boj)\b/i,
+    mechanismTerms: ["dxy", "dollar", "currency", "carry", "policy divergence"],
+    sectorBias: { FX: 4, Macro: 2, Rates: 1 }
+  },
+  {
+    key: "company_specific_developments",
+    label: "Company earnings and guidance",
+    matcher: /\b(earnings|eps|revenue|guidance|dividend|buyback|merger|acquisition|results)\b/i,
+    mechanismTerms: ["earnings", "eps", "revenue", "guidance", "margin"],
+    sectorBias: { Equities: 4, Macro: 1, "Risk/Sentiment": 1 }
+  },
+  {
+    key: "cross_asset_tape",
+    label: "Cross-asset tape",
+    matcher: /.+/i,
+    mechanismTerms: ["cross asset", "broad market"],
+    sectorBias: {},
+    generic: true
+  }
+];
+
+function buildFrozenRunContext({
+  triggerMode,
+  triggerReason,
+  now,
+  snapshot,
+  peerSnapshot,
+  headlines
+}: {
+  triggerMode: DiscussionTriggerMode;
+  triggerReason?: string;
+  now: string;
+  snapshot: MarketSnapshotPayload;
+  peerSnapshot: FrozenPeerThesisSnapshotRow[];
+  headlines: SnapshotHeadline[];
+}): FrozenRunContext {
+  const runContextId = crypto.randomUUID();
+  const synthesisThemeBoard = triggerMode === "synthesis"
+    ? buildSynthesisThemeBoard(headlines)
+    : [];
+  const synthesisThemeDigest = triggerMode === "synthesis" ? buildClusteredThemeDigest(synthesisThemeBoard) : [];
+  const dominantSynthesisTheme = synthesisThemeBoard[0] || null;
+  const newsAnchors = headlines.filter((headline) => !/synthesis_tick_|cross asset tape|market room/i.test(headline.title));
+  const synthesisTopicLabel = triggerMode === "synthesis"
+    ? deriveSynthesisTopicLabel(dominantSynthesisTheme, snapshot.headline)
+    : "reactive_mode";
+  const synthesisCatalystKey = triggerMode === "synthesis"
+    ? normalizeSynthesisCatalystKey(triggerReason)
+    : "reactive_catalyst";
+  const synthesisPrimaryHeadline =
+      triggerMode === "synthesis"
+      ? dominantSynthesisTheme?.headlines[0]?.title || newsAnchors[0]?.title || snapshot.headline
+      : snapshot.headline;
+  return {
+    runContextId,
+    snapshotTimestamp: now,
+    peerSnapshotVersion: `${now}:${peerSnapshot.length}`,
+    peerSnapshot,
+    synthesisThemeBoard,
+    dominantSynthesisTheme,
+    synthesisThemeDigest,
+    synthesisTopicLabel,
+    synthesisCatalystKey,
+    synthesisPrimaryHeadline
+  };
+}
+
+function adaptTopicPlanForSynthesis(
+  topicPlan: AgentTopicPlan,
+  context: FrozenRunContext,
+  selection: AgentSynthesisAnchorSelection
+): AgentTopicPlan {
+  const hasMatchedThesis = Boolean(topicPlan.matchedThesis);
+  const catalyst = selection.anchorHeadline?.title || selection.themeLabel;
+  return {
+    ...topicPlan,
+    action: hasMatchedThesis ? "thread_update" : "new_post",
+    primary: {
+      ...topicPlan.primary,
+      themeKey: selection.themeKey,
+      label: selection.themeLabel,
+      catalyst
+    },
+    hasMeaningfulFreshSignal: (context.synthesisThemeBoard.length > 0 && !selection.isGenericFallback) || topicPlan.hasMeaningfulFreshSignal
+  };
+}
+
+function normalizeSynthesisCatalystKey(triggerReason?: string): string {
+  if (!triggerReason) {
+    return "synthesis_tick_0";
+  }
+  const match = triggerReason.match(/synthesis_tick_(\d+)/i);
+  if (match) {
+    return `synthesis_tick_${match[1]}`;
+  }
+  return "synthesis_tick_0";
+}
+
+function buildSynthesisThemeBoard(headlines: SnapshotHeadline[]): SynthesisThemeCluster[] {
+  const clusters = new Map<string, SynthesisThemeCluster>();
+  for (const headline of headlines.slice(0, 28)) {
+    const text = `${headline.title} ${headline.description || ""}`;
+    const matched = SYNTHESIS_THEME_DEFINITIONS.find((theme) => theme.matcher.test(text)) || SYNTHESIS_THEME_DEFINITIONS[SYNTHESIS_THEME_DEFINITIONS.length - 1];
+    const sectorRelevance: Record<string, number> = {};
+    for (const sector of ["Macro", "Rates", "FX", "Equities", "Commodities", "Risk/Sentiment"]) {
+      const bias = matched.sectorBias[sector] || 0;
+      const hasEntity =
+        sector === "Equities" && (headline.entities?.length || 0) > 0
+          ? 2
+          : 0;
+      sectorRelevance[sector] = bias + hasEntity;
+    }
+    const existing = clusters.get(matched.key);
+    const next: SynthesisThemeCluster = existing
+      ? {
+          ...existing,
+          headlines: [...existing.headlines, headline],
+          freshnessScore: existing.freshnessScore + freshnessWeight(headline),
+          hasCompanyHeadline: existing.hasCompanyHeadline || (headline.entities?.length || 0) > 0
+        }
+      : {
+          key: matched.key,
+          label: matched.label,
+          headlines: [headline],
+          mechanismTerms: matched.mechanismTerms,
+          sectorRelevance,
+          isGeneric: Boolean(matched.generic),
+          freshnessScore: freshnessWeight(headline),
+          hasCompanyHeadline: (headline.entities?.length || 0) > 0
+        };
+    clusters.set(matched.key, next);
+  }
+  return [...clusters.values()]
+    .sort((a, b) => {
+      if (a.isGeneric !== b.isGeneric) {
+        return a.isGeneric ? 1 : -1;
+      }
+      const left = a.headlines.length * 2 + a.freshnessScore;
+      const right = b.headlines.length * 2 + b.freshnessScore;
+      return right - left;
+    })
+    .slice(0, 5);
+}
+
+function freshnessWeight(headline: SnapshotHeadline): number {
+  if (!headline.publishedAt) {
+    return 1;
+  }
+  const ms = Date.now() - new Date(headline.publishedAt).getTime();
+  if (!Number.isFinite(ms)) {
+    return 1;
+  }
+  if (ms < 2 * 60 * 60 * 1000) {
+    return 3;
+  }
+  if (ms < 8 * 60 * 60 * 1000) {
+    return 2;
+  }
+  return 1;
+}
+
+function buildClusteredThemeDigest(themeBoard: SynthesisThemeCluster[]): string[] {
+  const output: string[] = [];
+  themeBoard.forEach((theme, index) => {
+    output.push(`${index + 1}. ${theme.label}`);
+    theme.headlines.slice(0, 2).forEach((headline) => {
+      output.push(`   - ${headline.title} (${headline.source})`);
+    });
+  });
+  return output;
+}
+
+function deriveSynthesisTopicLabel(dominantTheme: SynthesisThemeCluster | null, fallbackHeadline: string): string {
+  if (!dominantTheme) {
+    return slugifySynthesisLabel(fallbackHeadline || "cross_asset_synthesis");
+  }
+  return slugifySynthesisLabel(dominantTheme.key);
+}
+
+function slugifySynthesisLabel(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 64) || "cross_asset_synthesis";
+}
+
+function selectSynthesisAnchorForAgent({
+  agent,
+  topicPlan,
+  context,
+  recentPosts,
+  recentSynthesisSectorCounts
+}: {
+  agent: Agent;
+  topicPlan: AgentTopicPlan;
+  context: FrozenRunContext;
+  recentPosts: AgentMessage[];
+  recentSynthesisSectorCounts: Map<string, number>;
+}): AgentSynthesisAnchorSelection | null {
+  if (context.synthesisThemeBoard.length === 0) {
+    return null;
+  }
+
+  const thesisTopic = topicPlan.matchedThesis?.topicPrimary || "";
+  const hasCompanyThemeOption = context.synthesisThemeBoard.some((theme) => theme.hasCompanyHeadline);
+  const scored = context.synthesisThemeBoard.map((theme) => {
+    const sectorScore = theme.sectorRelevance[agent.sector] || 0;
+    const thesisScore = thesisTopic && thesisTopic === theme.key ? 2 : 0;
+    const equitiesCompanyBias =
+      agent.sector === "Equities" && theme.hasCompanyHeadline ? 3 : 0;
+    const equitiesOwnershipPenalty =
+      agent.sector === "Equities" && hasCompanyThemeOption && !theme.hasCompanyHeadline ? -4 : 0;
+    const dominanceCount = recentSynthesisSectorCounts.get(agent.sector) || 0;
+    const participationAdjustment = dominanceCount >= 2 ? -2 : dominanceCount === 0 ? 1 : 0;
+    const genericPenalty = theme.isGeneric ? -5 : 0;
+    const freshness = Math.min(3, theme.freshnessScore);
+    const score =
+      sectorScore +
+      thesisScore +
+      equitiesCompanyBias +
+      equitiesOwnershipPenalty +
+      freshness +
+      genericPenalty +
+      participationAdjustment;
+    return { theme, score, participationAdjustment };
+  });
+
+  scored.sort((a, b) => b.score - a.score);
+  const best = scored[0];
+  if (!best) {
+    return null;
+  }
+
+  const repetitionChallenge = buildSynthesisRepetitionChallenge({
+    agent,
+    recentPosts,
+    theme: best.theme
+  });
+  const confidence: "high" | "medium" | "low" =
+    best.score >= 7 ? "high" : best.score >= 4 ? "medium" : "low";
+
+  const anchorHeadline = best.theme.headlines[0] || null;
+  if (!anchorHeadline && !topicPlan.matchedThesis) {
+    return null;
+  }
+
+  return {
+    themeKey: best.theme.key,
+    themeLabel: best.theme.label,
+    anchorHeadline,
+    anchorConfidence: confidence,
+    mechanismTerms: best.theme.mechanismTerms,
+    isGenericFallback: best.theme.isGeneric,
+    relevanceScore: best.score,
+    repetitionChallenge,
+    hasCompanyHeadline: best.theme.hasCompanyHeadline,
+    participationAdjustment: best.participationAdjustment
+  };
+}
+
+function buildSynthesisSectorParticipation(
+  priorRoomThreads: AgentDiscussionThread[],
+  synthesisEventIds: Set<string>
+): Map<string, number> {
+  const counts = new Map<string, number>();
+  if (synthesisEventIds.size === 0) {
+    return counts;
+  }
+  for (const thread of priorRoomThreads) {
+    const post = thread.post;
+    if (!post.eventId || !synthesisEventIds.has(post.eventId) || post.messageType !== "post") {
+      continue;
+    }
+    counts.set(post.sector, (counts.get(post.sector) || 0) + 1);
+  }
+  return counts;
+}
+
+function buildSynthesisRepetitionChallenge({
+  agent,
+  recentPosts,
+  theme
+}: {
+  agent: Agent;
+  recentPosts: AgentMessage[];
+  theme: SynthesisThemeCluster;
+}): string | null {
+  const relevant = recentPosts.slice(0, 6);
+  const repeated = relevant.filter((post) => {
+    const text = `${post.title || ""} ${post.catalyst || ""} ${post.content || ""}`.toLowerCase();
+    const themeHit = text.includes(theme.key.replace(/_/g, " ")) || text.includes(theme.label.toLowerCase());
+    const mechanismHit = theme.mechanismTerms.some((term) => text.includes(term.toLowerCase()));
+    return themeHit || mechanismHit;
+  });
+  if (repeated.length < 2) {
+    return null;
+  }
+  return [
+    "SYNTHESIS NOVELTY CHECK:",
+    `Your recent ${agent.sector} synthesis posts repeatedly used the same mechanism (${theme.label}).`,
+    "State exactly what is new versus your prior synthesis output. If nothing new exists, stay silent."
+  ].join("\n");
+}
+
+const MECHANISM_FAMILY_KEYWORDS: Record<MechanismFamily, RegExp> = {
+  labor_inflation_persistence: /\b(?:nfp|payroll|employment|unemployment|wage|labor market|core pce|cpi|inflation)\b/i,
+  fed_easing_timing: /\b(?:fed|fomc|rate cut|rate hike|policy path|higher for longer|dot plot|easing)\b/i,
+  term_premium_repricing: /\b(?:10y|2y|yield curve|term premium|auction|refunding|duration|long end|bear steepener|bull steepener)\b/i,
+  credit_stress: /\b(?:hy oas|credit spread|default|downgrade cycle|funding stress|liquidity stress|vix|risk premium)\b/i,
+  commodity_pass_through: /\b(?:wti|brent|crude|oil|gas|inventory|eia|opec|energy|pass-through)\b/i,
+  earnings_fundamentals_deterioration: /\b(?:earnings|eps|revenue|guidance|margin|bookings|arr|cash flow|valuation|target cut|downgrade)\b/i,
+  revisions_breadth_sector_weakness: /\b(?:breadth|other 490|small cap|mega-cap|revisions|sector weakness|factor|dispersion)\b/i,
+  cross_asset_setup: /\b(?:cross-asset|broad market|risk-on|risk-off|macro backdrop)\b/i
+};
+
+function rankMechanismFamilyForAgent({
+  agent,
+  topicPlan,
+  headlineAnalysis,
+  synthesisSelection,
+  marketSnapshot,
+  relevantCases,
+  knowledgeSnippets,
+  peerSnapshot
+}: {
+  agent: Agent;
+  topicPlan: AgentTopicPlan;
+  headlineAnalysis: HeadlineAnalysis | null;
+  synthesisSelection: AgentSynthesisAnchorSelection | null;
+  marketSnapshot: MarketSnapshotPayload;
+  relevantCases: import("@market-room/shared").MarketCase[];
+  knowledgeSnippets: LocalKnowledgeSnippet[];
+  peerSnapshot: FrozenPeerThesisSnapshotRow[];
+}): MechanismSelection {
+  const anchor = synthesisSelection?.anchorHeadline?.title
+    || headlineAnalysis?.headline_title
+    || topicPlan.primary.catalyst
+    || marketSnapshot.headline
+    || "";
+  const sourceText = [
+    anchor,
+    topicPlan.primary.label,
+    headlineAnalysis?.primary_mechanism || "",
+    synthesisSelection?.themeLabel || "",
+    synthesisSelection?.mechanismTerms.join(" ") || "",
+    relevantCases.slice(0, 3).map((marketCase) => `${marketCase.patternSummary} ${marketCase.implicationNote}`).join(" "),
+    knowledgeSnippets.slice(0, 6).map((snippet) => `${snippet.title} ${snippet.excerpt}`).join(" "),
+    peerSnapshot.slice(0, 5).map((peer) => `${peer.agentId} ${peer.claim}`).join(" "),
+    marketSnapshot.summary
+  ].join(" ");
+
+  let bestFamily: MechanismFamily = "cross_asset_setup";
+  let bestScore = -1;
+  const evidence: string[] = [];
+
+  (Object.keys(MECHANISM_FAMILY_KEYWORDS) as MechanismFamily[]).forEach((family) => {
+    const regex = MECHANISM_FAMILY_KEYWORDS[family];
+    let score = 0;
+    if (regex.test(sourceText)) score += 3;
+    if (regex.test(anchor)) score += 4;
+    if (headlineAnalysis?.primary_mechanism && regex.test(headlineAnalysis.primary_mechanism)) score += 3;
+    if (topicPlan.primary.label && regex.test(topicPlan.primary.label)) score += 2;
+    if (synthesisSelection?.mechanismTerms.some((term) => regex.test(term))) score += 3;
+    if (agent.sector === "Macro" && family === "fed_easing_timing") score += 1;
+    if (agent.sector === "Equities" && family === "earnings_fundamentals_deterioration") score += 2;
+    if (score > bestScore) {
+      bestScore = score;
+      bestFamily = family;
+    }
+  });
+
+  if (headlineAnalysis?.primary_mechanism) {
+    evidence.push(`headline_mechanism=${headlineAnalysis.primary_mechanism}`);
+  }
+  if (synthesisSelection?.themeLabel) {
+    evidence.push(`theme=${synthesisSelection.themeLabel}`);
+  }
+  evidence.push(`anchor=${truncateText(anchor, 100)}`);
+
+  return {
+    family: bestFamily,
+    score: bestScore,
+    evidence,
+    anchor
+  };
+}
+
+function snippetLogicFamily(snippet: LocalKnowledgeSnippet): string {
+  const text = `${snippet.title} ${snippet.excerpt}`.toLowerCase();
+  if (/\b(?:150k|core pce|nfp|payroll)\b/.test(text)) return "labor_threshold";
+  if (/\b(?:term premium|auction|refunding|duration|10y|2y)\b/.test(text)) return "rates_term";
+  if (/\b(?:hy oas|spread|default|credit)\b/.test(text)) return "credit";
+  if (/\b(?:wti|brent|opec|inventory|crude|gas)\b/.test(text)) return "commodity";
+  if (/\b(?:earnings|eps|revenue|guidance|valuation|margin)\b/.test(text)) return "equity_fundamentals";
+  return "generic";
+}
+
+function selectPromptKnowledgeSnippets({
+  agent,
+  snippets,
+  mechanism
+}: {
+  agent: Agent;
+  snippets: LocalKnowledgeSnippet[];
+  mechanism: MechanismSelection;
+}): LocalKnowledgeSnippet[] {
+  const filtered = snippets.filter((snippet) => {
+    if (agent.sector !== "Macro") {
+      return true;
+    }
+    const text = `${snippet.title} ${snippet.excerpt}`.toLowerCase();
+    const hasLaborThreshold = /\b(?:150k|core pce|nfp|payroll)\b/.test(text);
+    const laborMechanism = mechanism.family === "labor_inflation_persistence" || mechanism.family === "fed_easing_timing";
+    return !hasLaborThreshold || laborMechanism;
+  });
+
+  const seenFamilies = new Set<string>();
+  const deduped: LocalKnowledgeSnippet[] = [];
+  for (const snippet of filtered) {
+    const family = snippetLogicFamily(snippet);
+    if (seenFamilies.has(family) && family !== "generic") {
+      continue;
+    }
+    deduped.push(snippet);
+    seenFamilies.add(family);
+    if (deduped.length >= 5) {
+      break;
+    }
+  }
+  return deduped;
+}
+
+function selectPromptRelevantCases(
+  relevantCases: import("@market-room/shared").MarketCase[],
+  mechanism: MechanismSelection
+): import("@market-room/shared").MarketCase[] {
+  const regex = MECHANISM_FAMILY_KEYWORDS[mechanism.family];
+  const matched = relevantCases.filter((marketCase) =>
+    regex.test(`${marketCase.title} ${marketCase.patternSummary} ${marketCase.implicationNote}`.toLowerCase())
+  );
+  const selected = matched.length > 0 ? matched : relevantCases;
+  return selected.slice(0, 4);
+}
+
+function hasHouseViewVisibleLanguage(content: string): boolean {
+  return /\b(?:house view|house thesis|playbook|starter pack|approved long-term memory|memory snippets?|framework says|as per framework)\b/i.test(
+    content
+  );
+}
+
+function scrubHouseViewVisibleLanguage(content: string): string {
+  return content
+    .replace(/\bhouse view\b/gi, "current evidence view")
+    .replace(/\bhouse thesis\b/gi, "current thesis")
+    .replace(/\bplaybook\b/gi, "current setup")
+    .replace(/\bstarter pack\b/gi, "context")
+    .replace(/\bapproved long-term memory snippets?\b/gi, "supporting context")
+    .replace(/\bframework says\b/gi, "evidence suggests")
+    .replace(/\sas per framework\b/gi, "based on current evidence");
+}
+
+function inferMechanismFamilyFromText(text: string): MechanismFamily {
+  const lower = text.toLowerCase();
+  const entries = (Object.keys(MECHANISM_FAMILY_KEYWORDS) as MechanismFamily[])
+    .map((family) => ({
+      family,
+      hit: MECHANISM_FAMILY_KEYWORDS[family].test(lower) ? 1 : 0
+    }))
+    .sort((left, right) => right.hit - left.hit);
+  if (!entries[0] || entries[0].hit === 0) {
+    return "cross_asset_setup";
+  }
+  return entries[0].family;
+}
+
+function applyEvidenceFirstMechanismGate({
+  agent,
+  content,
+  mechanism,
+  catalyst,
+  recentPosts
+}: {
+  agent: Agent;
+  content: string;
+  mechanism: MechanismSelection;
+  catalyst: string;
+  recentPosts: AgentMessage[];
+}): {
+  content: string;
+  suppressed: boolean;
+  metrics: {
+    mechanismFamily: MechanismFamily;
+    houseViewVisible: boolean;
+    mechanismFit: boolean;
+    macroThresholdPairUsed: boolean;
+    macroThresholdPairRelevant: boolean;
+    repeatDeltaVisible: boolean;
+    repaired: boolean;
+  };
+} {
+  let nextContent = content;
+  let repaired = false;
+  const initialHouseViewVisible = hasHouseViewVisibleLanguage(nextContent);
+  if (initialHouseViewVisible) {
+    nextContent = scrubHouseViewVisibleLanguage(nextContent);
+    repaired = true;
+  }
+
+  const thresholdPairUsed = /\b(?:150\s?k|150k)\b/i.test(nextContent) && /\bcore pce\b/i.test(nextContent);
+  const thresholdPairRelevant =
+    mechanism.family === "labor_inflation_persistence" || mechanism.family === "fed_easing_timing";
+  if (agent.sector === "Macro" && thresholdPairUsed && !thresholdPairRelevant) {
+    const replacement = convictionRepairSentenceBySector(catalyst, agent.sector, mechanism.family);
+    nextContent = ensureSingleConvictionCondition(nextContent, replacement);
+    repaired = true;
+  }
+
+  const mechanismFit = MECHANISM_FAMILY_KEYWORDS[mechanism.family].test(nextContent.toLowerCase());
+  const repeatDeltaVisible = hasDeltaSignal(nextContent);
+  let suppressed = false;
+  if (agent.sector === "Macro") {
+    const recentFamilies = recentPosts
+      .slice(0, 3)
+      .map((post) => inferMechanismFamilyFromText(`${post.title || ""} ${post.catalyst || ""} ${post.content || ""}`));
+    const repeatedSameFamily = recentFamilies.filter((family) => family === mechanism.family).length >= 2;
+    if (repeatedSameFamily && !repeatDeltaVisible) {
+      suppressed = true;
+    }
+    if (thresholdPairUsed && !thresholdPairRelevant && /\b(?:150\s?k|150k)\b/i.test(nextContent) && /\bcore pce\b/i.test(nextContent)) {
+      suppressed = true;
+    }
+  }
+
+  return {
+    content: nextContent,
+    suppressed,
+    metrics: {
+      mechanismFamily: mechanism.family,
+      houseViewVisible: initialHouseViewVisible,
+      mechanismFit,
+      macroThresholdPairUsed: thresholdPairUsed,
+      macroThresholdPairRelevant: thresholdPairRelevant,
+      repeatDeltaVisible,
+      repaired
+    }
+  };
+}
+
+function ensureSingleConvictionCondition(content: string, replacement: string): string {
+  const withoutOld = content.replace(/\bThis view changes if\b[^.?!]*(?:[.?!]|$)/gi, "").replace(/\s{2,}/g, " ").trim();
+  return `${withoutOld} ${replacement}`.trim();
+}
+
+function hasSynthesisAnchorMismatch({
+  content,
+  selection
+}: {
+  content: string;
+  selection: AgentSynthesisAnchorSelection;
+}): boolean {
+  const lower = content.toLowerCase();
+  const anchorText = (selection.anchorHeadline?.title || "").toLowerCase();
+  const anchorTokens = tokenizeAnchorTerms(anchorText);
+  const anchorHit = anchorTokens.some((token) => lower.includes(token));
+  const themeHit = selection.themeLabel
+    .toLowerCase()
+    .split(/\s+/)
+    .filter((token) => token.length > 4)
+    .some((token) => lower.includes(token));
+  const mechanismHit = selection.mechanismTerms.some((term) => lower.includes(term.toLowerCase()));
+  return !(anchorHit || (themeHit && mechanismHit));
+}
+
+function tokenizeAnchorTerms(text: string): string[] {
+  const stop = new Set(["with", "from", "that", "this", "into", "after", "before", "amid", "over"]);
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter((token) => token.length > 4 && !stop.has(token))
+    .slice(0, 8);
+}
+
+function repairSynthesisAnchorContent(content: string, selection: AgentSynthesisAnchorSelection): string {
+  const anchor = selection.anchorHeadline?.title || selection.themeLabel;
+  const mechanism = selection.mechanismTerms[0] || "transmission channel";
+  const bridge = `The elected synthesis anchor is ${anchor}, and the core mechanism is ${mechanism}; this post extends that catalyst into a forward cross-asset thesis.`;
+  if (content.toLowerCase().includes(anchor.toLowerCase())) {
+    return content;
+  }
+  return `${bridge} ${content}`;
+}
+
+function countConvictionSentences(content: string): number {
+  return (content.match(/\bThis view changes if\b/gi) || []).length;
+}
+
+function keepSingleConvictionSentence(content: string): string {
+  const matches = content.match(/\bThis view changes if\b[^.?!]*(?:[.?!]|$)/gi) || [];
+  if (matches.length <= 1) {
+    return content;
+  }
+  let cleaned = content;
+  for (let i = 1; i < matches.length; i += 1) {
+    cleaned = cleaned.replace(matches[i], "").replace(/\s{2,}/g, " ");
+  }
+  return cleaned.trim();
+}
+
+function hasDirectionalCall(content: string): boolean {
+  return /\b(bullish|bearish|cautious-bullish|cautious-bearish)\b/i.test(content);
+}
+
+function hasDataAnchorNumber(content: string): boolean {
+  return /\b\d+(?:\.\d+)?\s?(?:%|bps|bp|x|bn|billion|m|million|\$|oz|bbl)\b/i.test(content);
+}
+
+function hasDeltaSignal(content: string): boolean {
+  return /\b(what changed|changed|delta|versus|vs\.|compared with|since last|now|previously)\b/i.test(content);
+}
+
+function hasSectorSpecificOpening(agent: Agent, content: string): boolean {
+  const opening = content.split(/[.?!]/)[0] || "";
+  const sectorKeywords: Record<string, RegExp> = {
+    Macro: /\b(growth|inflation|fed|policy|payrolls|macro|cpi|pce)\b/i,
+    Rates: /\b(10y|2y|yield|curve|duration|treasury|refunding)\b/i,
+    FX: /\b(dxy|usd|eur|jpy|fx|carry|currency)\b/i,
+    Equities: /\b(stock|equity|earnings|guidance|valuation|share|market cap|eps)\b/i,
+    Commodities: /\b(wti|brent|crude|gold|copper|commodity|inventory)\b/i,
+    "Risk/Sentiment": /\b(vix|spread|hy oas|risk|volatility|credit|sentiment)\b/i
+  };
+  return (sectorKeywords[agent.sector] || /.*/i).test(opening);
+}
+
+function applySynthesisPublicationQualityGate({
+  agent,
+  content,
+  selection,
+  postingDecision,
+  equityFundamentalsContext
+}: {
+  agent: Agent;
+  content: string;
+  selection: AgentSynthesisAnchorSelection;
+  postingDecision: PostingDecision;
+  equityFundamentalsContext: EquitySubjectDataContext | null;
+}): {
+  content: string;
+  flags: PostQualityFlag[];
+  suppressed: boolean;
+  repaired: boolean;
+  metrics: {
+    anchorVisible: boolean;
+    deltaVisible: boolean;
+    directionalCall: boolean;
+    dataAnchor: boolean;
+    convictionCount: number;
+    publicationGate: "passed" | "suppressed";
+  };
+} {
+  let nextContent = content;
+  const flags: PostQualityFlag[] = [];
+  let repaired = false;
+
+  const qualityState = () => {
+    const anchorVisible = !hasSynthesisAnchorMismatch({ content: nextContent, selection });
+    const deltaVisible = hasDeltaSignal(nextContent);
+    const directionalCall = hasDirectionalCall(nextContent);
+    const dataAnchor = hasDataAnchorNumber(nextContent);
+    const convictionCount = countConvictionSentences(nextContent);
+    const chainVisible = hasTransmissionChainShape(nextContent);
+    const sectorOpening = hasSectorSpecificOpening(agent, nextContent);
+    return { anchorVisible, deltaVisible, directionalCall, dataAnchor, convictionCount, chainVisible, sectorOpening };
+  };
+
+  let state = qualityState();
+
+  if (!state.directionalCall) {
+    flags.push("synthesis_directional_call_missing");
+    nextContent = `${stanceFor(agent)} ${primaryAssetLabelFor(agent)} remains the base directional view under this elected anchor. ${nextContent}`.trim();
+    repaired = true;
+  }
+
+  if (!state.dataAnchor) {
+    flags.push("synthesis_data_anchor_missing");
+  }
+
+  if (state.convictionCount > 1) {
+    flags.push("synthesis_duplicate_conviction_condition");
+    nextContent = keepSingleConvictionSentence(nextContent);
+    repaired = true;
+  }
+
+  if (!state.deltaVisible && postingDecision.actionType === "update_existing") {
+    flags.push("synthesis_delta_missing");
+    nextContent = `What changed versus the prior synthesis view is now explicit in this update. ${nextContent}`.trim();
+    repaired = true;
+  }
+
+  if (!state.sectorOpening) {
+    flags.push("synthesis_opening_not_sector_specific");
+  }
+
+  if (
+    agent.sector === "Equities" &&
+    selection.hasCompanyHeadline &&
+    equityFundamentalsContext &&
+    (equityFundamentalsContext.dataTier === "light" || equityFundamentalsContext.dataTier === "rich") &&
+    !hasVisibleFetchedFundamentals(nextContent, equityFundamentalsContext).visible
+  ) {
+    const repair = buildEquityFundamentalsRepairSentence(equityFundamentalsContext);
+    if (repair) {
+      nextContent = `${nextContent} ${repair}`.trim();
+      repaired = true;
+    }
+  }
+
+  state = qualityState();
+  const hardFail =
+    !state.anchorVisible ||
+    !state.directionalCall ||
+    !state.dataAnchor ||
+    state.convictionCount !== 1 ||
+    !state.chainVisible ||
+    !state.sectorOpening ||
+    (postingDecision.actionType === "update_existing" && !state.deltaVisible);
+
+  return {
+    content: nextContent,
+    flags: uniqueQualityFlags(flags),
+    suppressed: hardFail,
+    repaired,
+    metrics: {
+      anchorVisible: state.anchorVisible,
+      deltaVisible: state.deltaVisible,
+      directionalCall: state.directionalCall,
+      dataAnchor: state.dataAnchor,
+      convictionCount: state.convictionCount,
+      publicationGate: hardFail ? "suppressed" : "passed"
+    }
+  };
+}
+
+function mapSynthesisAction({
+  triggerMode,
+  messageType,
+  postingDecision
+}: {
+  triggerMode: DiscussionTriggerMode;
+  messageType: "post" | "comment";
+  postingDecision: PostingDecision;
+}): "new_thesis" | "thesis_update" | "silent" {
+  if (triggerMode !== "synthesis") {
+    return messageType === "post" ? "new_thesis" : "thesis_update";
+  }
+  if (postingDecision.actionType === "stay_silent" || postingDecision.actionType === "comment_only") {
+    return "silent";
+  }
+  if (postingDecision.actionType === "update_existing" || messageType === "comment") {
+    return "thesis_update";
+  }
+  return "new_thesis";
+}
+
+function extractEngagedPeerAgent(content: string, peers: FrozenPeerThesisSnapshotRow[]): string | null {
+  const lower = content.toLowerCase();
+  const match = peers.find((peer) =>
+    lower.includes(peer.agentId.toLowerCase()) || lower.includes(peer.agentName.toLowerCase())
+  );
+  return match?.agentId || null;
+}
+
+function hasTransmissionChainShape(content: string): boolean {
+  const lower = content.toLowerCase();
+  const hasMechanism = /transmi|because|drives|passes through|spillover/.test(lower);
+  const hasCrossAsset = /yield|dxy|dollar|equities|credit|vix|oil|wti|spread/.test(lower);
+  const hasFalsifier = /this view changes if/.test(lower);
+  return hasMechanism && hasCrossAsset && hasFalsifier;
+}
+
+function countParagraphBlocks(content: string): number {
+  const trimmed = content.trim();
+  if (!trimmed) {
+    return 0;
+  }
+  return trimmed
+    .split(/\n\s*\n+/)
+    .map((block) => block.trim())
+    .filter(Boolean).length;
+}
+
+function countWords(content: string): number {
+  const words = content.trim().match(/\b[\w'-]+\b/g);
+  return words ? words.length : 0;
+}
+
+function reflowSynthesisParagraphs(content: string): string {
+  const cleaned = content.replace(/\s*\n+\s*/g, " ").replace(/\s{2,}/g, " ").trim();
+  if (!cleaned) {
+    return content;
+  }
+  const sentences = cleaned.match(/[^.!?]+[.!?]+|[^.!?]+$/g)?.map((sentence) => sentence.trim()).filter(Boolean) || [];
+  if (sentences.length < 4) {
+    return content;
+  }
+  const words = countWords(cleaned);
+  const targetParagraphs = words >= 220 ? 3 : 2;
+  const chunkSize = Math.max(1, Math.ceil(sentences.length / targetParagraphs));
+  const paragraphs: string[] = [];
+  for (let i = 0; i < sentences.length; i += chunkSize) {
+    paragraphs.push(sentences.slice(i, i + chunkSize).join(" "));
+  }
+  return paragraphs.join("\n\n").trim();
+}
+
+function applySynthesisParagraphReadabilityGate(content: string): {
+  content: string;
+  paragraphs: number;
+  repaired: boolean;
+  gate: "passed" | "reflowed";
+} {
+  const words = countWords(content);
+  const initialParagraphs = countParagraphBlocks(content);
+  if (words < 140 || initialParagraphs !== 1) {
+    return {
+      content,
+      paragraphs: Math.max(1, Math.min(initialParagraphs || 1, 4)),
+      repaired: false,
+      gate: "passed"
+    };
+  }
+
+  const reflowed = reflowSynthesisParagraphs(content);
+  const paragraphCount = countParagraphBlocks(reflowed);
+  if (paragraphCount > 1) {
+    return {
+      content: reflowed,
+      paragraphs: Math.min(paragraphCount, 4),
+      repaired: true,
+      gate: "reflowed"
+    };
+  }
+
+  return {
+    content,
+    paragraphs: Math.max(1, Math.min(initialParagraphs, 4)),
+    repaired: false,
+    gate: "passed"
+  };
+}
+
+function hasStoredDataCitation(content: string): boolean {
+  return /\bcorrelation\b|\bstored data\b|\bobservations\b|\bbps\b|\b%/.test(content.toLowerCase());
 }
 
 function buildAgentTopicPlan(
@@ -2622,7 +3866,11 @@ async function requestStructuredForumPost({
   headlineAnalysis,
   verifiedMetrics,
   stanceChallenge,
-  equityFundamentalsContext
+  equityFundamentalsContext,
+  triggerMode,
+  frozenRunContext,
+  synthesisSelection,
+  mechanismSelection
 }: {
   env: Env;
   agent: Agent;
@@ -2648,6 +3896,10 @@ async function requestStructuredForumPost({
   /** Optional prompt nudge when an agent is stuck in one stance. */
   stanceChallenge: StanceLockChallenge | null;
   equityFundamentalsContext: EquitySubjectDataContext | null;
+  triggerMode: DiscussionTriggerMode;
+  frozenRunContext: FrozenRunContext;
+  synthesisSelection: AgentSynthesisAnchorSelection | null;
+  mechanismSelection: MechanismSelection;
 }): Promise<{
   title?: string;
   content?: string;
@@ -2662,13 +3914,13 @@ async function requestStructuredForumPost({
   try {
     const historicalContext = buildMarketRoomHistoricalContext(agent, generalHeadlines, sectorHeadlines);
 
-    // Analog block + cross-agent macro view — run in parallel
+    // Analog block + frozen peer-thesis view — run in parallel
     const topHeadlineTitle = sectorHeadlines[0]?.title ?? generalHeadlines[0]?.title ?? "";
     const snapshotSignal = extractSnapshotSignal(marketSnapshot);
-    const [analogBlock, crossAgentView] = await Promise.all([
+    const [analogBlock] = await Promise.all([
       Promise.resolve(buildAnalogContextBlock(topHeadlineTitle, agent.sector, snapshotSignal)),
-      buildCrossAgentMacroView(env, agent)
     ]);
+    const peerThesisView = buildPeerAgentThesesView(agent, frozenRunContext.peerSnapshot, frozenRunContext.snapshotTimestamp);
 
     // Rates Agent: fetch live treasury auction results when the headline is auction-related (4-second hard timeout)
     const isAuctionHeadline = agent.sector === "Rates" &&
@@ -2686,31 +3938,64 @@ async function requestStructuredForumPost({
     }
 
     // Build the prompt once — used by both passes
-    const postPrompt = buildForumPostPrompt(
-      agent,
-      marketSnapshot,
-      previousSnapshot,
-      discussionPlan,
-      topicPlan,
-      recentPosts,
-      relevantCases,
-      knowledgeSnippets,
-      generalHeadlines,
-      sectorHeadlines,
-      priorRoomThreads,
-      dynamicMemory,
-      agentState,
-      roomCoverage,
-      thisRunPosts,
-      headlineAnalysis,
-      historicalContext,
-      analogBlock,
-      crossAgentView,
-      equityFundamentalsContext?.promptBlock || "",
-      verifiedMetrics,
-      stanceChallenge,
-      auctionBlock
-    );
+    const postPrompt =
+      triggerMode === "synthesis"
+        ? buildSynthesisPrompt({
+            agent,
+            marketSnapshot,
+            previousSnapshot,
+            discussionPlan,
+            topicPlan,
+            recentPosts,
+            relevantCases,
+            knowledgeSnippets,
+            dynamicMemory,
+            agentState,
+            roomCoverage,
+            historicalContext,
+            analogBlock,
+            peerThesisView,
+            verifiedMetrics,
+            stanceChallenge,
+            synthesisThemeDigest: frozenRunContext.synthesisThemeDigest,
+            synthesisTopicLabel: synthesisSelection?.themeKey || frozenRunContext.synthesisTopicLabel,
+            synthesisPrimaryHeadline: synthesisSelection?.anchorHeadline?.title || frozenRunContext.synthesisPrimaryHeadline,
+            synthesisThemeLabel: synthesisSelection?.themeLabel || frozenRunContext.dominantSynthesisTheme?.label || "Cross-asset tape",
+            synthesisThemeWhy: synthesisSelection
+              ? `Selected for ${agent.sector} with relevance score ${synthesisSelection.relevanceScore} and confidence ${synthesisSelection.anchorConfidence}.`
+              : "No strong sector-specific synthesis anchor was selected.",
+            synthesisThemeDelta: recentPosts[0]
+              ? `Versus your prior synthesis post at ${recentPosts[0].createdAt}, explain exactly what changed and why this update is material now.`
+              : "First synthesis contribution in this window.",
+            synthesisRepetitionChallenge: synthesisSelection?.repetitionChallenge || null,
+            mechanismSelection
+          })
+        : buildForumPostPrompt(
+            agent,
+            marketSnapshot,
+            previousSnapshot,
+            discussionPlan,
+            topicPlan,
+            recentPosts,
+            relevantCases,
+            knowledgeSnippets,
+            generalHeadlines,
+            sectorHeadlines,
+            priorRoomThreads,
+            dynamicMemory,
+            agentState,
+            roomCoverage,
+            thisRunPosts,
+            headlineAnalysis,
+            historicalContext,
+            analogBlock,
+            peerThesisView,
+            equityFundamentalsContext?.promptBlock || "",
+            verifiedMetrics,
+            stanceChallenge,
+            auctionBlock,
+            mechanismSelection
+          );
 
     // ── Pass 1: View crystallisation ────────────────────────────────────────
     // Force a directional commitment before the full post is written.
@@ -2741,12 +4026,19 @@ async function requestStructuredForumPost({
         "Write a standalone forum post, not a reply.",
         "Make it read like a real market specialist posting in a live internal forum, not a polished strategy memo.",
         "Aim for roughly 170 to 280 words in 2 to 4 short paragraphs.",
+        triggerMode === "synthesis"
+          ? "Synthesis readability rule: do not collapse the whole post into one block paragraph; prefer 2 to 4 short paragraphs."
+          : "",
+        triggerMode === "synthesis"
+          ? "Synthesis paragraph flow: paragraph 1 = elected anchor + what changed, paragraph 2 = transmission + cross-asset impact, final paragraph = forward view + what to watch / invalidation."
+          : "",
         "Do not start with 'Hypothesis', 'Base case', 'Trade implication', 'Biggest driver', 'Main risk', or similar section labels.",
         "Do not repeat your most recent post. If little changed, call it a smaller update and explain the delta in plain language.",
         "Lead with the catalyst or market move that matters most to your sector — not the room's broad macro theme unless macro IS your sector.",
         "Your post must open with a sector-specific observation, not a generic market statement that any agent could write.",
         "Prefer the uncovered topic inventory provided to you over the room's most repeated theme.",
-        "Use the latest headlines, approved long-term memory snippets, and the previous snapshot delta to form a fresh view.",
+        "Use the latest headlines, supporting context snippets, and the previous snapshot delta to form a fresh view.",
+        "Reason from current evidence first; do not explain your thesis by saying a house view or playbook says so.",
         "Make the writing feel human, specific, and conversationally sharp.",
         // Hard analytical structure rules
         [
@@ -2830,7 +4122,8 @@ async function requestStructuredForumComment({
   dynamicMemory,
   agentState,
   roomCoverage,
-  verifiedMetrics
+  verifiedMetrics,
+  frozenRunContext
 }: {
   env: Env;
   agent: Agent;
@@ -2845,6 +4138,7 @@ async function requestStructuredForumComment({
   agentState: AgentBehavioralSummary | null;
   roomCoverage: RoomCoverageState | null;
   verifiedMetrics: VerifiedMarketMetricsContext;
+  frozenRunContext: FrozenRunContext;
 }): Promise<{
   content?: string;
   stance?: string;
@@ -2856,6 +4150,7 @@ async function requestStructuredForumComment({
   }
 
   try {
+    const peerThesisView = buildPeerAgentThesesView(agent, frozenRunContext.peerSnapshot, frozenRunContext.snapshotTimestamp);
     const payload = await generateGeminiContent(env, {
       model: getLlmModel(env),
       instructions: [
@@ -2882,7 +4177,8 @@ async function requestStructuredForumComment({
         dynamicMemory,
         agentState,
         roomCoverage,
-        verifiedMetrics
+        verifiedMetrics,
+        peerThesisView
       ),
       maxOutputTokens: 1200,  // thinking + output budget combined for Gemma 4 / Gemini 2.5
       temperature: 0.60,
@@ -3022,6 +4318,174 @@ function buildMarketDataSanityBlock(instruments: SnapshotInstrument[]): string {
   ].filter(Boolean).join("\n");
 }
 
+function buildTransmissionChainInstruction(mode: "mandatory" | "encouraged"): string {
+  return [
+    mode === "mandatory"
+      ? "REQUIRED REASONING STRUCTURE (mandatory in synthesis):"
+      : "REASONING STRUCTURE (strongly encouraged):",
+    "1. Name the trigger or market condition you are responding to.",
+    "2. Explain the transmission inside your sector.",
+    "3. Trace at least one cross-asset implication where relevant.",
+    "4. State a forward thesis with a concrete falsifier.",
+    "Write this as one coherent desk note in short paragraphs, not numbered headings."
+  ].join("\n");
+}
+
+function buildSharedPostSpecPromptBlock({
+  primaryAnchorLabel,
+  mode
+}: {
+  primaryAnchorLabel: string;
+  mode: "reactive" | "synthesis";
+}): string {
+  return [
+    mode === "synthesis"
+      ? "=== SYNTHESIS QUALITY SPEC (same quality bar as reactive) ==="
+      : "=== REACTIVE QUALITY SPEC ===",
+    `PRIMARY ANCHOR RULE: your post must stay anchored to "${primaryAnchorLabel}".`,
+    "YOUR POST MUST ANSWER ALL FIVE (in your own words, not as labelled sections):",
+    "1. WHAT HAPPENED — state the specific event/condition from the anchor above.",
+    "2. WHY IT MATTERS NOW — explain why this is material now.",
+    "3. THROUGH WHAT MECHANISM — name the exact transmission channel to your sector.",
+    "4. WHAT CHANGED — state what changed versus your prior view or prior market state.",
+    "5. WHAT TO WATCH NEXT — name ONE specific indicator/level/event that confirms or invalidates.",
+    "EVIDENCE-FIRST REASONING RULE:",
+    "G. Build visible reasoning from the elected anchor, current market state, and verified/stored data points.",
+    "H. Do not explain your thesis by citing 'house views', 'playbooks', or 'frameworks'.",
+    "I. Treat stored frameworks as backend support only; if they do not fit current evidence, do not use them.",
+    "VIEW PROTOCOL:",
+    "A. Include one explicit directional call (bullish/bearish/cautious-bullish/cautious-bearish).",
+    "B. Include at least one concrete data anchor number from provided context.",
+    "C. Include exactly one sentence that begins with 'This view changes if'.",
+    "READABILITY SHAPE:",
+    "D. Aim for 2 to 4 short paragraphs (roughly 170 to 280 words unless the signal is genuinely brief).",
+    "E. Do not collapse the post into one wall-of-text paragraph.",
+    "F. Paragraph flow should read as: anchor + what changed, then mechanism + spillover, then forward view + falsifier.",
+    "=== END QUALITY SPEC ==="
+  ].join("\n");
+}
+
+type SynthesisPromptArgs = {
+  agent: Agent;
+  marketSnapshot: MarketSnapshotPayload;
+  previousSnapshot: MarketSnapshotPayload | null;
+  discussionPlan: DiscussionPlan;
+  topicPlan: AgentTopicPlan;
+  recentPosts: AgentMessage[];
+  relevantCases: import("@market-room/shared").MarketCase[];
+  knowledgeSnippets: LocalKnowledgeSnippet[];
+  dynamicMemory: DynamicMemoryContext;
+  agentState: AgentBehavioralSummary | null;
+  roomCoverage: RoomCoverageState | null;
+  historicalContext: string;
+  analogBlock: string;
+  peerThesisView: string;
+  verifiedMetrics: VerifiedMarketMetricsContext;
+  stanceChallenge: StanceLockChallenge | null;
+  synthesisThemeDigest: string[];
+  synthesisTopicLabel: string;
+  synthesisPrimaryHeadline: string;
+  synthesisThemeLabel: string;
+  synthesisThemeWhy: string;
+  synthesisThemeDelta: string;
+  synthesisRepetitionChallenge: string | null;
+  mechanismSelection: MechanismSelection;
+};
+
+function buildSynthesisPrompt(args: SynthesisPromptArgs): string {
+  const {
+    agent,
+    marketSnapshot,
+    previousSnapshot,
+    discussionPlan,
+    topicPlan,
+    recentPosts,
+    relevantCases,
+    knowledgeSnippets,
+    dynamicMemory,
+    agentState,
+    roomCoverage,
+    historicalContext,
+    analogBlock,
+    peerThesisView,
+    verifiedMetrics,
+    stanceChallenge,
+    synthesisThemeDigest,
+    synthesisTopicLabel,
+    synthesisPrimaryHeadline,
+    synthesisThemeLabel,
+    synthesisThemeWhy,
+    synthesisThemeDelta,
+    synthesisRepetitionChallenge,
+    mechanismSelection
+  } = args;
+  const relevantInstruments = relevantInstrumentsForAgent(agent, marketSnapshot);
+  const crossAssetDeltas = buildSnapshotDeltaSummary(previousSnapshot, marketSnapshot).slice(0, 5);
+  const synthesisTask = [
+    "MODE: SYNTHESIS. You are not reacting to one headline.",
+    "Produce one of: (A) NEW THESIS, (B) THESIS UPDATE, (C) SILENT if signal is weak.",
+    "A thesis update is publishable only if the delta is material; weak updates must resolve to silent.",
+    "Do not output a casual comment-style reply.",
+    "Aim for roughly 170 to 280 words in 2 to 4 short paragraphs.",
+    "Do not collapse the whole post into one block paragraph.",
+    "Paragraph 1 should state the elected anchor and what changed.",
+    "Paragraph 2 should explain transmission plus cross-asset impact.",
+    "Final paragraph should state the forward view plus what to watch / invalidation."
+  ].join("\n");
+
+  return [
+    `Agent: ${agent.name} (${agent.sector})`,
+    synthesisTask,
+    "ELECTED SYNTHESIS ANCHOR (must lead your post):",
+    `- Theme key: ${synthesisTopicLabel}`,
+    `- Theme label: ${synthesisThemeLabel}`,
+    `- Representative headline: ${synthesisPrimaryHeadline}`,
+    `- Why this matters now: ${synthesisThemeWhy}`,
+    `- What changed vs prior run: ${synthesisThemeDelta}`,
+    "Your post must begin from this elected anchor. You may extend into cross-asset implications, but do not substitute a different invisible catalyst.",
+    `Backend-selected mechanism family (support only): ${mechanismSelection.family}. Use this only if current evidence supports it.`,
+    `Room route in the background: ${discussionPlan.profileLabel}.`,
+    `Current snapshot provider: ${marketSnapshot.provider}`,
+    `Broad room backdrop: ${marketSnapshot.headline}`,
+    `Backdrop summary: ${marketSnapshot.summary}`,
+    synthesisThemeDigest.length > 0 ? "24H MARKET THEMES (clustered):" : "",
+    ...synthesisThemeDigest,
+    relevantInstruments.length > 0 ? "Sector key instruments:" : "No sector metrics available.",
+    ...relevantInstruments.map(
+      (instrument) => `- ${instrument.label}: ${instrument.value}${instrument.change ? ` (${instrument.change})` : ""} [${instrument.source}]`
+    ),
+    crossAssetDeltas.length > 0 ? "Cross-asset deltas (most relevant):" : "",
+    ...crossAssetDeltas,
+    verifiedMetrics.block,
+    buildMarketDataSanityBlock(relevantInstruments),
+    buildDynamicMemoryPromptBlock(agent, dynamicMemory),
+    ...(peerThesisView ? [peerThesisView] : []),
+    ...(historicalContext ? [historicalContext] : []),
+    ...(analogBlock ? [analogBlock] : []),
+    ...(stanceChallenge?.block ? [stanceChallenge.block] : []),
+    ...(synthesisRepetitionChallenge ? [synthesisRepetitionChallenge] : []),
+    buildSharedPostSpecPromptBlock({
+      primaryAnchorLabel: synthesisPrimaryHeadline,
+      mode: "synthesis"
+    }),
+    ...(agentState ? [buildStatePromptBlock(agentState)] : []),
+    ...(roomCoverage ? [buildRoomCoveragePromptBlock(roomCoverage)] : []),
+    knowledgeSnippets.length > 0 ? "Supporting context snippets (backend-selected; do not cite these as 'house views'):" : "No supporting knowledge snippets were retrieved for this post.",
+    ...knowledgeSnippets.map((snippet, index) => `${index + 1}. ${snippet.title} [${snippet.category}] ${snippet.excerpt}`),
+    relevantCases.length > 0 ? "Relevant historical analogs:" : "No analog cases were retrieved for this post.",
+    ...relevantCases.map(
+      (marketCase, index) =>
+        `${index + 1}. ${marketCase.title} [${marketCase.dateLabel}] tags=${marketCase.regimeTags.join(", ")} | pattern=${marketCase.patternSummary} | implication=${marketCase.implicationNote}`
+    ),
+    recentPosts.length > 0
+      ? `Recent post context: ${recentPosts[0].createdAt} | ${recentPosts[0].title || "Untitled"} | ${truncateText(recentPosts[0].content, 180)}`
+      : "No prior post found — this is your first directional call.",
+    buildTransmissionChainInstruction("mandatory"),
+    "Your thesis must be falsifiable in the next 2-4 weeks with a specific level, print, or event.",
+    "Use deterministic figures from VERIFIED MARKET METRICS or explicit stored-data blocks. Do not cite numbers from memory."
+  ].filter(Boolean).join("\n");
+}
+
 function parseDisplayNumber(value: string): number | null {
   const match = value.replace(/,/g, "").match(/-?[\d.]+/);
   if (!match) {
@@ -3054,7 +4518,8 @@ function buildForumPostPrompt(
   equityFundamentals: string = "",
   verifiedMetrics: VerifiedMarketMetricsContext = EMPTY_VERIFIED_MARKET_METRICS_CONTEXT,
   stanceChallenge: StanceLockChallenge | null = null,
-  auctionBlock: string = ""
+  auctionBlock: string = "",
+  mechanismSelection: MechanismSelection
 ): string {
   const availableInstruments = relevantInstrumentsForAgent(agent, marketSnapshot);
   const mergedHeadlines = relevantHeadlinesForAgent(agent, [
@@ -3117,12 +4582,20 @@ function buildForumPostPrompt(
       : "Forum objective: publish a fresh market view from your own sector lane.",
     `Room route in the background: ${discussionPlan.profileLabel}. Treat that as context, not a required lead angle.`,
     `Post type for this run: ${postType}.`,
+    `Backend-selected mechanism family (support only): ${mechanismSelection.family}. Use it only if current evidence supports it.`,
     `Publishing mode for this run: ${topicPlan.action === "thread_update" ? "update your earlier thread, not a new thread" : "open a new thread if your angle is genuinely new"}.`,
     topicPlan.matchedThesis
       ? `Matched thesis in memory: ${topicPlan.matchedThesis.title} | status=${topicPlan.matchedThesis.status} | topic=${humanizeThemeKey(topicPlan.matchedThesis.topicPrimary)}`
       : "No matching live thesis was found for this angle.",
     // Primary headline analysis block (if available, shown before topic inventory)
     ...primaryHeadlineBlock,
+    buildSharedPostSpecPromptBlock({
+      primaryAnchorLabel:
+        headlineAnalysis?.headline_title ||
+        topicPlan.primary.catalyst ||
+        "primary sector catalyst",
+      mode: "reactive"
+    }),
     equityCompanyFirstBlock,
     `Preferred fresh angle for this run: ${topicPlan.primary.label}.`,
     // When a high-quality headline is identified, lock the catalyst to it so the LLM gets a consistent signal
@@ -3177,6 +4650,7 @@ function buildForumPostPrompt(
       ? `Covered themes to avoid unless you add a clearly new angle: ${topicPlan.coveredThemesToAvoid.join("; ")}`
       : "No heavy coverage warning.",
     buildRoomConsensusBlock(thisRunPosts, priorRoomThreads) ?? "",
+    buildTransmissionChainInstruction("encouraged"),
     buildDynamicMemoryPromptBlock(agent, dynamicMemory),
     ...(crossAgentView ? [crossAgentView] : []),
     ...(agentState ? [buildStatePromptBlock(agentState)] : []),
@@ -3185,7 +4659,7 @@ function buildForumPostPrompt(
     ...(analogBlock ? [analogBlock] : []),
     ...(equityFundamentals ? [equityFundamentals] : []),
     ...(auctionBlock ? [auctionBlock] : []),
-    knowledgeSnippets.length > 0 ? "Approved long-term memory snippets:" : "No approved long-term memory snippets were retrieved for this post.",
+    knowledgeSnippets.length > 0 ? "Supporting context snippets (backend-selected; do not cite these as 'house views'):" : "No supporting knowledge snippets were retrieved for this post.",
     ...knowledgeSnippets.map(
       (snippet, index) => `${index + 1}. ${snippet.title} [${snippet.category}] ${snippet.excerpt}`
     ),
@@ -3281,7 +4755,8 @@ function buildForumCommentPrompt(
   dynamicMemory: DynamicMemoryContext,
   agentState: AgentBehavioralSummary | null,
   roomCoverage: RoomCoverageState | null,
-  verifiedMetrics: VerifiedMarketMetricsContext
+  verifiedMetrics: VerifiedMarketMetricsContext,
+  peerThesisView: string
 ): string {
   const mergedHeadlines = relevantHeadlinesForAgent(agent, [
     ...sectorHeadlines,
@@ -3319,6 +4794,8 @@ function buildForumCommentPrompt(
       (snippet, index) => `${index + 1}. ${snippet.title} [${snippet.category}] ${snippet.excerpt}`
     ),
     buildDynamicMemoryPromptBlock(agent, dynamicMemory),
+    ...(peerThesisView ? [peerThesisView] : []),
+    buildTransmissionChainInstruction("encouraged"),
     ...(agentState ? [buildStatePromptBlock(agentState)] : []),
     ...(roomCoverage ? [buildRoomCoveragePromptBlock(roomCoverage)] : []),
     "Write a reply that advances the thread with a distinct angle.",
@@ -3848,16 +5325,20 @@ function applyRepeatedCatalystDecisionGate({
   agent,
   postingDecision,
   headlineAnalysis,
+  topHeadline,
   topicPlan,
   recentMessages,
-  recentAgentMessages
+  recentAgentMessages,
+  currentRunPosts
 }: {
   agent: Agent;
   postingDecision: PostingDecision;
   headlineAnalysis: HeadlineAnalysis | null;
+  topHeadline?: SnapshotHeadline;
   topicPlan: AgentTopicPlan;
   recentMessages: AgentMessage[];
   recentAgentMessages: AgentMessage[];
+  currentRunPosts: AgentMessage[];
 }): PostingDecision {
   if (postingDecision.actionType !== "new_post" && postingDecision.actionType !== "update_existing") {
     return postingDecision;
@@ -3890,6 +5371,26 @@ function applyRepeatedCatalystDecisionGate({
 
   const repeat = agentRepeat || roomRepeat;
   if (!repeat) {
+    return postingDecision;
+  }
+
+  const companyOwnedEquityCatalyst = isCompanyOwnedEquityCatalyst(headlineAnalysis, topHeadline);
+  const currentRunPostIds = new Set(currentRunPosts.map((post) => post.id));
+  if (agent.sector === "Equities" && companyOwnedEquityCatalyst && currentRunPostIds.has(repeat.message.id)) {
+    console.log(
+      `[catalyst-filter] decision_gate same-run company-owned equity catalyst bypassed title="${truncateText(catalystText, 110)}"`
+    );
+    return postingDecision;
+  }
+  if (
+    agent.sector === "Equities" &&
+    companyOwnedEquityCatalyst &&
+    repeat.matchScope === "room" &&
+    repeat.message.sector !== "Equities"
+  ) {
+    console.log(
+      `[catalyst-filter] decision_gate non-equities room repeat bypassed for equities owner title="${truncateText(catalystText, 110)}"`
+    );
     return postingDecision;
   }
 
@@ -4345,10 +5846,144 @@ function applyCompanyFinancingOwnershipGate({
   };
 }
 
+function isCompanyOwnedEquityCatalyst(
+  headlineAnalysis: HeadlineAnalysis | null,
+  topHeadline?: SnapshotHeadline
+): boolean {
+  if (!headlineAnalysis) {
+    return false;
+  }
+  const title = headlineAnalysis.headline_title || "";
+  const description = topHeadline?.description || "";
+  const text = `${title} ${description}`.toLowerCase();
+  const hasCompanyHeadline =
+    headlineAnalysis.headline_type === "company_news" ||
+    /\b(?:earnings|revenue|guidance|transcript|results|orders|sales|margin|profit|loss|dividend|buyback|merger|acquisition|ipo|layoffs?|restructur|upgrade|downgrade|rating|price\s+target|target\s+(?:raise|cut)|initiates?|reiterates?|overweight|underweight|neutral|buy|sell)\b/i.test(
+      text
+    );
+  const hasCompanySpecificity =
+    (topHeadline?.entities?.length || 0) > 0 ||
+    /\b(?:inc|corp|ltd|plc|group|holdings|class\s+[ab]|adr|common\s+stock|shares?)\b/i.test(text) ||
+    /\b[A-Z]{1,5}\b(?=\s*(?:shares?|stock|earnings|transcript|results|guidance|rating|price\s+target|downgrade|upgrade))/i.test(
+      headlineAnalysis.headline_title
+    );
+  const singleCompanyEvent =
+    /\b(?:q[1-4]|quarterly|annual)\s+(?:earnings|results)\b/i.test(text) ||
+    /\bearnings\s+transcript\b/i.test(text) ||
+    /\b(?:raises?|cuts?|maintains?)\s+(?:guidance|outlook)\b/i.test(text) ||
+    /\b(?:announces?|reports?)\b/i.test(text) && /\b(?:eps|revenue|guidance|margin|bookings|arr)\b/i.test(text) ||
+    /\b(?:acquires?|acquisition|merger|buyout|takeover|all-cash|cash-and-stock)\b/i.test(text) ||
+    /\b(?:upgrade|downgrade|price\s+target|target\s+(?:raise|cut)|initiates?|reiterates?|overweight|underweight|neutral|buy|sell)\b/i.test(text);
+  const multiEntityRoundup = (topHeadline?.entities?.length || 0) > 1;
+  const broadRoundup = /\b(?:stocks?|shares?)\b/i.test(text) &&
+    /\b(?:in focus|to watch|watchlist|roundup|across|among|sector|basket|multiple|several|mixed)\b/i.test(text);
+  const earningsSeasonAggregate =
+    /\b(?:earnings season|beat rate|companies beating|of companies beating|broad earnings)\b/i.test(text);
+  const macroOrPolicyDominant =
+    /\b(?:fomc|fed|ecb|boj|cpi|pce|nfp|payroll|treasury|auction|refunding|term premium|policy decision)\b/i.test(text);
+  const creditSystemDominant = /\b(?:banking system|systemic|credit crunch|liquidity facility|stress test)\b/i.test(text);
+
+  if (!hasCompanyHeadline || !hasCompanySpecificity || !singleCompanyEvent || multiEntityRoundup || broadRoundup || earningsSeasonAggregate) {
+    return false;
+  }
+  return !macroOrPolicyDominant && !creditSystemDominant;
+}
+
+function applyEquityOwnedCompanyHeadlineGate({
+  agent,
+  postingDecision,
+  headlineAnalysis,
+  topHeadline
+}: {
+  agent: Agent;
+  postingDecision: PostingDecision;
+  headlineAnalysis: HeadlineAnalysis | null;
+  topHeadline?: SnapshotHeadline;
+}): PostingDecision {
+  const equityOwned = isCompanyOwnedEquityCatalyst(headlineAnalysis, topHeadline);
+  if (!equityOwned || postingDecision.actionType === "stay_silent") {
+    return postingDecision;
+  }
+
+  if (agent.sector === "Equities") {
+    console.log(
+      `[ownership-gate] agent=${agent.sector} equity_owned_company_headline=yes ownership_action=keep headline="${truncateText(headlineAnalysis?.headline_title || "none", 90)}"`
+    );
+    return postingDecision;
+  }
+
+  const hasSpilloverMechanism =
+    (headlineAnalysis?.is_cross_asset_relevant || false) ||
+    (headlineAnalysis?.indirect_relevance_score || 0) >= 5 ||
+    /\b(?:spread|hy|credit|yield|dxy|risk premium|discount rate|financing cost)\b/i.test(
+      `${headlineAnalysis?.primary_mechanism || ""} ${headlineAnalysis?.headline_title || ""}`
+    );
+  const nextAction = hasSpilloverMechanism ? "comment_only" : "stay_silent";
+  console.log(
+    `[ownership-gate] agent=${agent.sector} equity_owned_company_headline=yes ownership_action=${nextAction === "comment_only" ? "comment_only" : "silent"} headline="${truncateText(headlineAnalysis?.headline_title || "none", 90)}"`
+  );
+  return {
+    ...postingDecision,
+    actionType: nextAction,
+    reasonCodes: uniqueReasonCodes([
+      ...postingDecision.reasonCodes,
+      hasSpilloverMechanism ? "headline_routed_to_comment" : "weak_catalyst_materiality_gate"
+    ])
+  };
+}
+
+function applyMacroSingleNameOwnershipGate({
+  agent,
+  postingDecision,
+  headlineAnalysis,
+  topHeadline
+}: {
+  agent: Agent;
+  postingDecision: PostingDecision;
+  headlineAnalysis: HeadlineAnalysis | null;
+  topHeadline?: SnapshotHeadline;
+}): PostingDecision {
+  if (
+    agent.sector !== "Macro" ||
+    (postingDecision.actionType !== "new_post" && postingDecision.actionType !== "update_existing") ||
+    !headlineAnalysis
+  ) {
+    return postingDecision;
+  }
+
+  const title = `${headlineAnalysis.headline_title} ${topHeadline?.description || ""}`;
+  const singleCompanyLikely =
+    isCompanyOwnedEquityCatalyst(headlineAnalysis, topHeadline) ||
+    ((topHeadline?.entities?.length || 0) === 1 && /\b(?:earnings|guidance|transcript|rating|target|dividend|buyback|acquisition|merger)\b/i.test(title));
+  const systemicFrame =
+    /\b(?:sector-wide|broad market|revisions breadth|index-level|systemic|financing conditions|credit cycle)\b/i.test(title);
+  if (!singleCompanyLikely || systemicFrame) {
+    return postingDecision;
+  }
+
+  const nextAction: PostingDecision["actionType"] =
+    headlineAnalysis.indirect_relevance_score >= 5 ? "comment_only" : "stay_silent";
+  console.log(
+    `[ownership-gate] agent=${agent.sector} single_company_catalyst=yes ownership_action=${nextAction === "comment_only" ? "comment_only" : "silent"} headline="${truncateText(headlineAnalysis.headline_title, 90)}"`
+  );
+  return {
+    ...postingDecision,
+    actionType: nextAction,
+    reasonCodes: uniqueReasonCodes([
+      ...postingDecision.reasonCodes,
+      nextAction === "comment_only" ? "headline_routed_to_comment" : "weak_catalyst_materiality_gate"
+    ])
+  };
+}
+
 function hasEquityStandaloneOwnership(
   headlineAnalysis: HeadlineAnalysis,
   topHeadline?: SnapshotHeadline
 ): boolean {
+  if (isCompanyOwnedEquityCatalyst(headlineAnalysis, topHeadline)) {
+    return true;
+  }
+
   const text = `${headlineAnalysis.headline_title} ${topHeadline?.description || ""} ${topHeadline?.source || ""}`.toLowerCase();
 
   if (headlineAnalysis.direct_relevance_score >= 3) {
@@ -4485,17 +6120,19 @@ function uniqueQualityFlags(flags: PostQualityFlag[]): PostQualityFlag[] {
 function ensureRequiredConvictionCondition({
   agent,
   content,
-  catalyst
+  catalyst,
+  mechanismFamily
 }: {
   agent: Agent;
   content: string;
   catalyst: string;
+  mechanismFamily?: MechanismFamily;
 }): string {
   if (/\bThis view changes if\b/i.test(content) && !isWeakConvictionCondition(content)) {
     return content;
   }
 
-  const repaired = `${content.trim()} ${convictionRepairSentence(agent, catalyst)}`.trim();
+  const repaired = `${content.trim()} ${convictionRepairSentence(agent, catalyst, mechanismFamily)}`.trim();
   console.log(`[conviction-repair] agent=${agent.sector} appended ${/\bThis view changes if\b/i.test(content) ? "stronger" : "required"} condition`);
   return repaired;
 }
@@ -4504,17 +6141,31 @@ function ensureStanceLockReviewIfRequired({
   content,
   stanceChallenge,
   catalyst,
-  stance
+  stance,
+  sector,
+  mechanismFamily
 }: {
   content: string;
   stanceChallenge: StanceLockChallenge | null;
   catalyst: string;
   stance: string;
+  sector: Agent["sector"];
+  mechanismFamily?: MechanismFamily;
 }): string {
   if (!stanceChallenge?.active) {
     return content;
   }
   if (/\b(evidence against|still holds|does not change|doesn't change|counter[-\s]?evidence|contradict|re-evaluat|challenge)\b/i.test(content)) {
+    console.log(`[stance-lock-repair] mode=skipped clean=yes agent=${sector}`);
+    return content;
+  }
+
+  const hasAccountability =
+    /\b(?:prior view|prior call|since (?:my|our) last|versus (?:my|our) prior|compared with (?:my|our) prior|was wrong|was right|partially right)\b/i.test(
+      content
+    );
+  if (hasAccountability && /\bThis view changes if\b/i.test(content) && !isWeakConvictionCondition(content)) {
+    console.log(`[stance-lock-repair] mode=skipped clean=yes agent=${sector}`);
     return content;
   }
 
@@ -4523,30 +6174,75 @@ function ensureStanceLockReviewIfRequired({
   const conditionMatch = content.match(
     /\b(?:unless|except if|only if|provided that|contingent on)\s+([^.!?]{15,80}[.!?]?)/i
   );
+  const convictionSentence = (
+    content.match(/\bThis view changes if\b[^.?!]*(?:[.?!]|$)/gi) || []
+  ).find((sentence) => isStrongConvictionSentence(sentence));
+  const sectorDefaultSentence = convictionRepairSentenceBySector(catalyst, sector, mechanismFamily);
+  const genericSectorFallback = /\bnamed catalyst\b/i.test(sectorDefaultSentence);
+  const mode = conditionMatch
+    ? "existing_condition"
+    : convictionSentence
+      ? "existing_condition"
+      : genericSectorFallback
+        ? "generic_fallback"
+        : "sector_default";
   const conditionClause = conditionMatch
     ? `reconsidering specifically if ${conditionMatch[1].trim().replace(/[.!?]$/, "")}`
-    : `reconsidering if a materially different ${truncateText(catalyst, 55)} outcome emerges`;
-
-  const repairSentence = `The ${stance.replace(/-/g, " ")} read still holds here, but it needs ${conditionClause}.`;
-  console.log(`[stance-lock-repair] rewritten stance=${stanceChallenge.stance} streak=${stanceChallenge.streak} condition=${conditionMatch ? "extracted" : "fallback"}`);
-  return `${content.trim()} ${repairSentence}`.trim();
+    : convictionSentence
+      ? "while that invalidation condition remains unmet"
+      : `only if ${sectorDefaultSentence.replace(/^This view changes if\s*/i, "").replace(/[.!?]$/, "")}`;
+  const repairSentence = `The ${stance.replace(/-/g, " ")} read still holds here, but ${conditionClause}.`;
+  let repaired = `${content.trim()} ${repairSentence}`.trim();
+  let clean = true;
+  if (/\b(materially different|outcome emerges)\b/i.test(repaired) || /\.\.\.|…/.test(repaired)) {
+    const safeSentence = `The ${stance.replace(/-/g, " ")} read still holds here, but only if incoming data does not invalidate the stated mechanism over the next two weeks.`;
+    repaired = `${content.trim()} ${safeSentence}`.trim();
+    clean = false;
+  }
+  console.log(
+    `[stance-lock-repair] mode=${mode} clean=${clean ? "yes" : "no"} agent=${sector} streak=${stanceChallenge.streak}`
+  );
+  return repaired;
 }
 
-function convictionRepairSentence(agent: Agent, catalyst: string): string {
+function convictionRepairSentence(agent: Agent, catalyst: string, mechanismFamily?: MechanismFamily): string {
+  return convictionRepairSentenceBySector(catalyst, agent.sector, mechanismFamily);
+}
+
+function convictionRepairSentenceBySector(
+  catalyst: string,
+  sector: Agent["sector"],
+  mechanismFamily?: MechanismFamily
+): string {
+  if (mechanismFamily === "labor_inflation_persistence" || mechanismFamily === "fed_easing_timing") {
+    return "This view changes if monthly payroll momentum and core PCE both move decisively against the stated policy path within the next two releases.";
+  }
+  if (mechanismFamily === "term_premium_repricing") {
+    return "This view changes if the US 10Y yield and curve slope move more than 20bps against the stated term-premium direction within the next five sessions.";
+  }
+  if (mechanismFamily === "credit_stress") {
+    return "This view changes if HY OAS and equity volatility both reverse more than 5% against this credit-stress signal within the next three sessions.";
+  }
+  if (mechanismFamily === "commodity_pass_through") {
+    return "This view changes if benchmark energy prices and inventory prints move against this pass-through channel for two consecutive updates.";
+  }
+  if (mechanismFamily === "earnings_fundamentals_deterioration" || mechanismFamily === "revisions_breadth_sector_weakness") {
+    return "This view changes if company guidance and sector breadth both improve materially against the stated weakness over the next two reporting checkpoints.";
+  }
   const catalystText = catalyst.toLowerCase();
-  if (agent.sector === "Commodities" || /\boil|wti|brent|crude|gas|opec|eia|inventory|strait\b/.test(catalystText)) {
+  if (sector === "Commodities" || /\boil|wti|brent|crude|gas|opec|eia|inventory|strait\b/.test(catalystText)) {
     return "This view changes if EIA crude inventories print two consecutive moves above 3mb against the current supply signal within the next two weekly reports.";
   }
-  if (agent.sector === "Rates" || /\byield|treasury|fed|fomc|curve|duration|auction\b/.test(catalystText)) {
+  if (sector === "Rates" || /\byield|treasury|fed|fomc|curve|duration|auction\b/.test(catalystText)) {
     return "This view changes if the US 10Y yield moves more than 25bps against the stated direction within the next five sessions.";
   }
-  if (agent.sector === "FX" || /\bdollar|dxy|usd|jpy|eur|carry|currency|fx\b/.test(catalystText)) {
+  if (sector === "FX" || /\bdollar|dxy|usd|jpy|eur|carry|currency|fx\b/.test(catalystText)) {
     return "This view changes if DXY reverses by more than 1% while the 10Y yield confirms the opposite direction within the next five sessions.";
   }
-  if (agent.sector === "Equities" || /\bstock|equity|shares|earnings|nasdaq|s&p|spy|xlf|iwm\b/.test(catalystText)) {
+  if (sector === "Equities" || /\bstock|equity|shares|earnings|nasdaq|s&p|spy|xlf|iwm\b/.test(catalystText)) {
     return "This view changes if sector breadth or earnings guidance moves more than 2% against the stated thesis within the next two weeks.";
   }
-  if (agent.sector === "Risk/Sentiment" || /\bvix|credit|spread|risk|sentiment|volatility|crowding\b/.test(catalystText)) {
+  if (sector === "Risk/Sentiment" || /\bvix|credit|spread|risk|sentiment|volatility|crowding\b/.test(catalystText)) {
     return "This view changes if VIX and HY OAS both move more than 5% against the stated risk signal within the next three sessions.";
   }
   return "This view changes if the named catalyst is contradicted by a fresh market print moving more than 2% within the next two weeks.";
@@ -4751,17 +6447,20 @@ function evaluateFxCorrelationGrounding({
   agent,
   content,
   headlineAnalysis,
-  recentPosts
+  recentPosts,
+  historicalContext
 }: {
   agent: Agent;
   content: string;
   headlineAnalysis: HeadlineAnalysis | null;
   recentPosts: AgentMessage[];
+  historicalContext: string;
 }): PostQualityFlag[] {
   if (agent.sector !== "FX") {
     return [];
   }
 
+  const fxCorrelationContext = parseFxCorrelationContext(historicalContext);
   const catalystText = [headlineAnalysis?.headline_title, headlineAnalysis?.primary_mechanism].filter(Boolean).join(" ");
   const relevant = /\b(oil|wti|brent|commodity fx|aud|cad|nok|broad dollar)\b/i.test(catalystText);
   const citedValueMatch =
@@ -4772,17 +6471,20 @@ function evaluateFxCorrelationGrounding({
   const staticAnchor = /\b-0\.55\b/.test(content);
 
   console.log(
-    `[fx-correlation] relevant=${relevant} computed_block_present=true cited=${cited} value=${citedValue || "none"}`
+    `[fx-correlation] relevant=${relevant} computed_block_present=${fxCorrelationContext.present} cited=${cited} value=${citedValue || "none"} expected=${fxCorrelationContext.value || "none"}`
   );
 
   const flags: PostQualityFlag[] = [];
-  if (relevant && cited) {
+  if (relevant && fxCorrelationContext.present && cited && citedValue === fxCorrelationContext.value) {
     flags.push("fx_correlation_from_computed_block");
   }
-  if (relevant && !cited) {
+  if (relevant && fxCorrelationContext.present && !cited) {
     flags.push("fx_correlation_missing_when_required");
   }
-  if (staticAnchor) {
+  if (
+    (staticAnchor && (!fxCorrelationContext.present || fxCorrelationContext.value !== "-0.55")) ||
+    (fxCorrelationContext.present && cited && citedValue !== fxCorrelationContext.value)
+  ) {
     flags.push("fx_correlation_static_anchor_suspected");
   }
 
@@ -4805,9 +6507,64 @@ function evaluateFxCorrelationGrounding({
   return flags;
 }
 
+function enforceFxCorrelationQuality({
+  agent,
+  content,
+  headlineAnalysis,
+  historicalContext
+}: {
+  agent: Agent;
+  content: string;
+  headlineAnalysis: HeadlineAnalysis | null;
+  historicalContext: string;
+}): { content: string; shouldSuppress: boolean; reason?: string } {
+  if (agent.sector !== "FX") {
+    return { content, shouldSuppress: false };
+  }
+
+  const fxCorrelationContext = parseFxCorrelationContext(historicalContext);
+  const relevant = /\b(oil|wti|brent|commodity fx|aud|cad|nok|broad dollar)\b/i.test(
+    [headlineAnalysis?.headline_title, headlineAnalysis?.primary_mechanism].filter(Boolean).join(" ")
+  );
+  const citedValueMatch =
+    content.match(/\bcorrelation(?: of)?\s*([+-]?\d+(?:\.\d+)?)\b/i) ||
+    content.match(/\bBroad Dollar[^.\n]{0,50}WTI[^.\n]{0,40}([+-]?\d+(?:\.\d+)?)\b/i);
+  const citedValue = citedValueMatch?.[1] || null;
+
+  if (!relevant || !fxCorrelationContext.present) {
+    return { content, shouldSuppress: false };
+  }
+
+  if (!citedValue) {
+    const repaired = `${content.trim()} Stored data shows Broad Dollar YoY% vs WTI YoY% correlation of ${fxCorrelationContext.value}, so the transmission should hit commodity FX more directly than a generic broad-dollar call.`.trim();
+    console.log(`[fx-correlation] repair_applied=true value=${fxCorrelationContext.value}`);
+    return { content: repaired, shouldSuppress: false };
+  }
+
+  if (citedValue !== fxCorrelationContext.value) {
+    console.log(
+      `[fx-correlation] repair_applied=false cited=${citedValue} expected=${fxCorrelationContext.value} reason=mismatch`
+    );
+    return { content, shouldSuppress: true, reason: "mismatch" };
+  }
+
+  return { content, shouldSuppress: false };
+}
+
+function parseFxCorrelationContext(historicalContext: string): { present: boolean; value: string | null } {
+  const match = historicalContext.match(
+    /Broad Dollar YoY% vs WTI YoY% correlation:\s*([+-]?\d+(?:\.\d+)?)/i
+  );
+  return {
+    present: Boolean(match),
+    value: match?.[1] || null
+  };
+}
+
 function shouldSuppressWeakEquityCompanyPost(
   agent: Agent,
   headlineAnalysis: HeadlineAnalysis | null,
+  topHeadline: SnapshotHeadline | undefined,
   content: string,
   catalyst: string
 ): boolean {
@@ -4817,6 +6574,20 @@ function shouldSuppressWeakEquityCompanyPost(
 
   const evidenceCount = countCompanyLevelNumericEvidence(content);
   if (evidenceCount >= 2) {
+    console.log(
+      `[equities-company-fallback] fact_present=yes source=post_content catalyst="${truncateText(catalyst, 90)}"`
+    );
+    return false;
+  }
+
+  const headlineText = `${topHeadline?.title || ""} ${topHeadline?.description || ""} ${catalyst}`;
+  const hasHeadlineCompanyFact =
+    /\$\s?\d+(?:\.\d+)?\s?(?:bn|billion|m|million)?\b/i.test(headlineText) ||
+    /\b\d+(?:\.\d+)?\s?%\s?(?:revenue|sales|margin|eps|guidance|growth|decline|beat|miss)\b/i.test(headlineText);
+  if (hasHeadlineCompanyFact) {
+    console.log(
+      `[equities-company-fallback] fact_present=yes source=headline_context catalyst="${truncateText(catalyst, 90)}"`
+    );
     return false;
   }
 
@@ -4826,7 +6597,17 @@ function shouldSuppressWeakEquityCompanyPost(
   // Major M&A can publish if the article itself supplies deal economics even
   // when Yahoo fundamentals are unavailable. Ordinary earnings/company posts
   // need company-level numbers or they become generic breadth commentary.
-  return !isMajorDeal;
+  if (isMajorDeal) {
+    console.log(
+      `[equities-company-fallback] fact_present=yes source=deal_value catalyst="${truncateText(catalyst, 90)}"`
+    );
+    return false;
+  }
+
+  console.log(
+    `[equities-company-fallback] fact_present=no ownership_action=silent catalyst="${truncateText(catalyst, 90)}"`
+  );
+  return true;
 }
 
 function shouldSuppressUnsafeMetricPost(agent: Agent, flags: PostQualityFlag[]): boolean {

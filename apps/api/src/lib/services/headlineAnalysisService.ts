@@ -100,7 +100,7 @@ const HEADLINE_TYPE_PATTERNS: Array<{ type: HeadlineType; pattern: RegExp }> = [
   { type: "commodity_specific", pattern: /\b(?:opec|crude|brent|wti|barrel|lng|natural\s+gas|gasoline|oil\s+(?:price|market|supply|demand)|gold|silver|copper|alumin(?:i|)um|iron\s+ore|wheat|corn|soy|bcf|storage\s+draw)\b/i },
   { type: "geopolitical",     pattern: /\b(?:sanction|geopolit|war|conflict|embargo|tariff|trade\s+war|nato|ukraine|russia|iran|china\s+(?:taiwan|military)|escalat)\b/i },
   { type: "market_structure", pattern: /\b(?:etf\s+flow|futures\s+rollover|margin\s+call|circuit\s+breaker|volatility\s+(?:regime|index|spike)|options?\s+expir|gamma|vix|squeeze|short\s+covering)\b/i },
-  { type: "company_news",     pattern: /\b(?:earnings|revenue|guidance|beats?\s+estimates?|misses?\s+estimates?|buyback|dividend|merger|acquisition|ipo|layoffs?|restructur)\b/i },
+  { type: "company_news",     pattern: /\b(?:earnings|revenue|guidance|beats?\s+estimates?|misses?\s+estimates?|buyback|dividend|merger|acquisition|ipo|layoffs?|restructur|upgrade|downgrade|rating|price\s+target|target\s+(?:raise|cut)|initiates?|reiterates?|overweight|underweight|neutral)\b/i },
 ];
 
 function classifyHeadlineType(title: string): HeadlineType {
@@ -142,7 +142,7 @@ const SECTOR_KEYWORDS: Record<string, string[]> = {
   Macro:            ["fed", "inflation", "cpi", "pce", "gdp", "jobs", "payroll", "growth", "retail", "consumer", "policy", "yield", "spending"],
   Rates:            ["yield", "treasury", "bond", "curve", "breakeven", "auction", "fed", "duration", "slr", "leverage", "bps"],
   FX:               ["dollar", "fx", "currency", "euro", "yen", "sterling", "carry", "em", "funding", "dxy", "exchange"],
-  Equities:         ["stock", "equity", "earnings", "ai", "semiconductor", "bank", "sector", "breadth", "s&p", "nasdaq", "valuation"],
+  Equities:         ["stock", "equity", "earnings", "ai", "semiconductor", "bank", "sector", "breadth", "s&p", "nasdaq", "valuation", "upgrade", "downgrade", "rating", "price target", "analyst", "target cut", "target raise", "overweight", "underweight", "neutral"],
   Commodities:      ["oil", "wti", "brent", "crude", "barrel", "gas", "gold", "copper", "opec", "metal", "inventory", "supply", "demand", "bcf", "storage", "draw", "futures", "lng", "wheat", "corn"],
   "Risk/Sentiment": ["risk", "volatility", "credit", "spread", "fragile", "positioning", "selloff", "bitcoin", "vix", "default"]
 };
@@ -156,7 +156,19 @@ function headlineText(headline: SnapshotHeadline): string {
 function scoreDirectRelevance(headline: SnapshotHeadline, sectorKeywords: string[]): number {
   const text = headlineText(headline);
   const matches = sectorKeywords.filter((kw) => text.includes(kw)).length;
-  return Math.min(10, matches * 2 + (matches > 0 ? 1 : 0));
+  const baseScore = matches * 2 + (matches > 0 ? 1 : 0);
+  const isEquitiesFamily = sectorKeywords.includes("equity") && sectorKeywords.includes("stock");
+  if (!isEquitiesFamily) {
+    return Math.min(10, baseScore);
+  }
+
+  const analystAction = /\b(?:upgrade|downgrade|rating|price\s+target|target\s+(?:raise|cut)|initiates?|reiterates?|overweight|underweight|neutral|buy|sell)\b/i.test(text);
+  const hasCompanySpecificity =
+    (headline.entities?.length || 0) > 0 ||
+    /\b(?:inc|corp|ltd|plc|group|holdings|class\s+[ab]|adr|common\s+stock|shares?)\b/i.test(text) ||
+    /\b[A-Z]{1,5}\b(?=\s*(?:shares?|stock|rating|price target|target))/i.test(headline.title);
+  const adjustedScore = baseScore + (analystAction && hasCompanySpecificity ? 3 : 0);
+  return Math.min(10, adjustedScore);
 }
 
 function scoreIndirectRelevance(headline: SnapshotHeadline, sectorKeywords: string[]): number {
@@ -460,17 +472,45 @@ function findHistoricalAnalog(title: string): string | null {
 function recommendAction(
   analysis: Pick<HeadlineAnalysis,
     "market_signal_strength" | "direct_relevance_score" | "primary_mechanism" |
-    "is_new_information" | "is_cross_asset_relevant">,
-  matchedThesisId: string | null
+    "is_new_information" | "is_cross_asset_relevant" | "headline_type">,
+  matchedThesisId: string | null,
+  options?: {
+    singleCompanyOwned?: boolean;
+    broadCompanyRoundup?: boolean;
+  }
 ): { recommended_action: HeadlineAnalysis["recommended_action"]; comment_purpose: string | null } {
   // Always silence noise
   if (analysis.market_signal_strength === "noise") {
     return { recommended_action: "stay_silent", comment_purpose: null };
   }
 
+  const companyOwnedHeadline =
+    analysis.headline_type === "company_news" &&
+    analysis.direct_relevance_score >= 5 &&
+    analysis.is_new_information;
+  const singleCompanyOwned = Boolean(options?.singleCompanyOwned);
+  const broadCompanyRoundup = Boolean(options?.broadCompanyRoundup);
+
   // Low sector relevance + no thesis to update → silence
   if (analysis.direct_relevance_score < 3 && !matchedThesisId) {
     return { recommended_action: "stay_silent", comment_purpose: null };
+  }
+
+  // Matched thesis should remain the primary path for company catalysts so we
+  // refresh existing views instead of duplicating top-level posts.
+  if (matchedThesisId) {
+    return { recommended_action: "update_existing", comment_purpose: null };
+  }
+
+  // Company-owned headlines should default to a visible top-level post when they
+  // are clearly new and relevant enough to matter.
+  if (companyOwnedHeadline && singleCompanyOwned) {
+    return { recommended_action: "new_post", comment_purpose: null };
+  }
+  if (companyOwnedHeadline && broadCompanyRoundup) {
+    return analysis.is_cross_asset_relevant
+      ? { recommended_action: "comment_on_other", comment_purpose: "add_cross_asset_spillover" }
+      : { recommended_action: "stay_silent", comment_purpose: null };
   }
 
   // Unclear mechanism + not high relevance → do not force a new post
@@ -488,11 +528,6 @@ function recommendAction(
       return { recommended_action: "comment_on_other", comment_purpose: "confirm_existing_thesis" };
     }
     return { recommended_action: "stay_silent", comment_purpose: null };
-  }
-
-  // Matched thesis → always update (new or stale; staleness handled by posting decision layer)
-  if (matchedThesisId) {
-    return { recommended_action: "update_existing", comment_purpose: null };
   }
 
   // High or medium signal + any sector match + known mechanism → new post.
@@ -530,7 +565,7 @@ function analyzeHeadlineForAgent(
 ): HeadlineAnalysis {
   const type = classifyHeadlineType(headline.title);
   const signalStrength = scoreSignalStrength(headline.title);
-  const directScore = scoreDirectRelevance(headline, context.sectorKeywords);
+  let directScore = scoreDirectRelevance(headline, context.sectorKeywords);
   const indirectScore = scoreIndirectRelevance(headline, context.sectorKeywords);
   const crossAsset = isCrossAssetRelevant(headline);
   const mechanism = extractPrimaryMechanism(headline, type);
@@ -538,6 +573,32 @@ function analyzeHeadlineForAgent(
   const whatChanged = extractWhatChanged(headline.title);
   const isNew = checkIsNewInformation(headline, context.recentPosts, context.openTheses);
   const analog = findHistoricalAnalog(headline.title);
+  const analystAction = /\b(?:upgrade|downgrade|rating|price\s+target|target\s+(?:raise|cut)|initiates?|reiterates?|overweight|underweight|neutral|buy|sell)\b/i.test(
+    headlineText(headline)
+  );
+  const hasCompanySpecificity =
+    (headline.entities?.length || 0) > 0 ||
+    /\b(?:inc|corp|ltd|plc|group|holdings|class\s+[ab]|adr|common\s+stock|shares?)\b/i.test(headlineText(headline));
+  const headlineLower = headlineText(headline);
+  const multiEntityRoundup = (headline.entities?.length || 0) > 1;
+  const broadCompanyRoundup =
+    multiEntityRoundup ||
+    (/\b(?:stocks?|shares?)\b/i.test(headlineLower) &&
+      /\b(?:in focus|to watch|watchlist|roundup|across|among|sector|basket|multiple|several|mixed)\b/i.test(headlineLower)) ||
+    /\b(?:earnings season|beat rate|companies beating|of companies beating|broad earnings)\b/i.test(headlineLower);
+  const singleCompanyOwned =
+    type === "company_news" &&
+    hasCompanySpecificity &&
+    !broadCompanyRoundup &&
+    (/\b(?:q[1-4]|quarterly|annual)\s+(?:earnings|results)\b/i.test(headlineLower) ||
+      /\bearnings\s+transcript\b/i.test(headlineLower) ||
+      /\b(?:raises?|cuts?|maintains?)\s+(?:guidance|outlook)\b/i.test(headlineLower) ||
+      /\b(?:announces?|reports?)\b/i.test(headlineLower) && /\b(?:eps|revenue|guidance|margin|bookings|arr)\b/i.test(headlineLower) ||
+      /\b(?:acquires?|acquisition|merger|buyout|takeover|all-cash|cash-and-stock)\b/i.test(headlineLower) ||
+      analystAction);
+  if (agent.sector === "Equities" && analystAction && hasCompanySpecificity) {
+    directScore = Math.min(10, Math.max(directScore, 7));
+  }
 
   const matchedThesis = context.openTheses.find((t) =>
     assets.some((a) => detectAffectedAssets(t.canonicalClaim).includes(a)) ||
@@ -546,8 +607,12 @@ function analyzeHeadlineForAgent(
 
   const { recommended_action, comment_purpose } = recommendAction(
     { market_signal_strength: signalStrength, direct_relevance_score: directScore,
-      primary_mechanism: mechanism, is_new_information: isNew, is_cross_asset_relevant: crossAsset },
-    matchedThesis?.id ?? null
+      primary_mechanism: mechanism, is_new_information: isNew, is_cross_asset_relevant: crossAsset, headline_type: type },
+    matchedThesis?.id ?? null,
+    {
+      singleCompanyOwned,
+      broadCompanyRoundup
+    }
   );
 
   return {

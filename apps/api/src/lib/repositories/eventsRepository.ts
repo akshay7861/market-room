@@ -39,6 +39,25 @@ export function createEventsRepository(env: Env) {
       return row ?? null;
     },
 
+    async listRecentDiscussionEvents(limit = 12): Promise<MarketEvent[]> {
+      const rows = await env.DB.prepare(
+        `SELECT
+          id,
+          event_type AS eventType,
+          title,
+          summary,
+          payload_json AS payloadJson,
+          snapshot_id AS snapshotId,
+          created_at AS createdAt
+        FROM events
+        WHERE event_type = 'market_discussion_run'
+        ORDER BY created_at DESC
+        LIMIT ?`
+      ).bind(limit).all<MarketEvent>();
+
+      return rows.results ?? [];
+    },
+
     async countAll(): Promise<number> {
       const row = await env.DB.prepare("SELECT COUNT(*) AS total FROM events").first<{ total: number }>();
       return row?.total ?? 0;

@@ -2,9 +2,8 @@ import type { AgentMessage, NoveltyAssessment, PostingDecision } from "@market-r
 import type { Env } from "../../index";
 
 export function createMessagesRepository(env: Env) {
-  function selectColumns(clientId: string | null): string {
-    const safeClientId = clientId ? `'${clientId.replace(/'/g, "''")}'` : "NULL";
-
+  // clientId is always passed as the FIRST bind() parameter — never interpolated.
+  function selectColumns(): string {
     return `SELECT
         messages.id,
         messages.room_id AS roomId,
@@ -41,7 +40,7 @@ export function createMessagesRepository(env: Env) {
           SELECT reaction
           FROM message_reactions
           WHERE message_id = messages.id
-            AND client_id = ${safeClientId}
+            AND client_id = ?
           LIMIT 1
         ) AS viewerReaction,
         messages.created_at AS createdAt`;
@@ -49,18 +48,19 @@ export function createMessagesRepository(env: Env) {
 
   async function selectMessageByClause(
     clause: string,
-    bindValues: Array<string | number>,
+    bindValues: Array<string | number | null>,
     clientId: string | null = null
   ): Promise<AgentMessage | null> {
     const statement = env.DB.prepare(
-      `${selectColumns(clientId)}
+      `${selectColumns()}
       FROM messages
       INNER JOIN agents ON agents.id = messages.agent_id
       LEFT JOIN theses ON theses.id = messages.thesis_id
       ${clause}
       LIMIT 1`
     );
-    const row = await statement.bind(...bindValues).first<AgentMessage>();
+    // clientId must be first — it corresponds to the ? in the viewerReaction subquery.
+    const row = await statement.bind(clientId, ...bindValues).first<AgentMessage>();
     return row ?? null;
   }
 
@@ -113,7 +113,7 @@ export function createMessagesRepository(env: Env) {
 
     async listByRoom(roomId: string, limit = 30, clientId: string | null = null): Promise<AgentMessage[]> {
       const result = await env.DB.prepare(
-        `${selectColumns(clientId)}
+        `${selectColumns()}
         FROM messages
         INNER JOIN agents ON agents.id = messages.agent_id
         LEFT JOIN theses ON theses.id = messages.thesis_id
@@ -121,7 +121,7 @@ export function createMessagesRepository(env: Env) {
         ORDER BY messages.created_at DESC
         LIMIT ?`
       )
-        .bind(roomId, limit)
+        .bind(clientId, roomId, limit)
         .all<AgentMessage>();
 
       return [...result.results].reverse();
@@ -129,14 +129,14 @@ export function createMessagesRepository(env: Env) {
 
     async listByEvent(eventId: string, clientId: string | null = null): Promise<AgentMessage[]> {
       const result = await env.DB.prepare(
-        `${selectColumns(clientId)}
+        `${selectColumns()}
         FROM messages
         INNER JOIN agents ON agents.id = messages.agent_id
         LEFT JOIN theses ON theses.id = messages.thesis_id
         WHERE messages.event_id = ?
         ORDER BY messages.created_at ASC`
       )
-        .bind(eventId)
+        .bind(clientId, eventId)
         .all<AgentMessage>();
 
       return result.results;
@@ -144,7 +144,7 @@ export function createMessagesRepository(env: Env) {
 
     async listRecentByAgent(agentId: string, limit = 6, clientId: string | null = null): Promise<AgentMessage[]> {
       const result = await env.DB.prepare(
-        `${selectColumns(clientId)}
+        `${selectColumns()}
         FROM messages
         INNER JOIN agents ON agents.id = messages.agent_id
         LEFT JOIN theses ON theses.id = messages.thesis_id
@@ -153,7 +153,7 @@ export function createMessagesRepository(env: Env) {
         ORDER BY messages.created_at DESC
         LIMIT ?`
       )
-        .bind(agentId, limit)
+        .bind(clientId, agentId, limit)
         .all<AgentMessage>();
 
       return result.results;
@@ -174,7 +174,7 @@ export function createMessagesRepository(env: Env) {
       comments: AgentMessage[];
     }> {
       const postResult = await env.DB.prepare(
-        `${selectColumns(clientId).replaceAll("messages.", "parent.")}
+        `${selectColumns().replaceAll("messages.", "parent.")}
         FROM messages AS parent
         INNER JOIN agents ON agents.id = parent.agent_id
         LEFT JOIN theses ON theses.id = parent.thesis_id
@@ -206,7 +206,7 @@ export function createMessagesRepository(env: Env) {
         LIMIT ?
         OFFSET ?`
       )
-        .bind(roomId, limitPosts, offsetPosts)
+        .bind(clientId, roomId, limitPosts, offsetPosts)
         .all<AgentMessage>();
 
       const posts = postResult.results;
@@ -220,14 +220,14 @@ export function createMessagesRepository(env: Env) {
 
       const placeholders = posts.map(() => "?").join(", ");
       const commentRows = await env.DB.prepare(
-        `${selectColumns(clientId)}
+        `${selectColumns()}
         FROM messages
         INNER JOIN agents ON agents.id = messages.agent_id
         LEFT JOIN theses ON theses.id = messages.thesis_id
         WHERE messages.parent_message_id IN (${placeholders})
         ORDER BY messages.created_at ASC`
       )
-        .bind(...posts.map((post) => post.id))
+        .bind(clientId, ...posts.map((post) => post.id))
         .all<AgentMessage>();
 
       const commentCounts = new Map<string, number>();

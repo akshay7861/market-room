@@ -3,6 +3,7 @@ import type { Env } from "../../index";
 
 const fedRssUrl = "https://www.federalreserve.gov/feeds/press_all.xml";
 const treasuryPressUrl = "https://home.treasury.gov/news/press-releases";
+const FED_CORE_CATALYST_MAX_AGE_HOURS = 36;
 
 export type OfficialNewsMaterialityTier = "high" | "medium" | "low";
 
@@ -99,7 +100,17 @@ export function classifyOfficialNewsMateriality(headline: SnapshotHeadline): Off
 
   const isSystemicInstitution = /\b(goldman|morgan stanley|jpmorgan|jp morgan|citigroup|bank of america|wells fargo|deutsche bank|ubs|credit suisse|barclays|hsbc|bnpp|bnp paribas|soci[eé]t[eé] g[eé]n[eé]rale|standard chartered|industrial and commercial bank of china|icbc|gsib|g-sib)\b/i.test(text);
 
-  if (/\b(fomc statement|federal open market committee statement|minutes of the federal open market committee|economic projections|summary of economic projections|sep\b|monetary policy report)\b/i.test(text)) {
+  const isFedCorePolicyRelease = /\b(fomc statement|federal open market committee statement|minutes of the federal open market committee|economic projections|summary of economic projections|sep\b|monetary policy report)\b/i.test(
+    text
+  );
+  if (isFedCorePolicyRelease) {
+    const recency = classifyOfficialReleaseRecency(headline.publishedAt, FED_CORE_CATALYST_MAX_AGE_HOURS);
+    if (!recency.fresh) {
+      return {
+        tier: "low",
+        reason: recency.reason
+      };
+    }
     return { tier: "high", reason: "monetary_policy_core_release" };
   }
 
@@ -118,6 +129,39 @@ export function classifyOfficialNewsMateriality(headline: SnapshotHeadline): Off
   }
 
   return { tier: "low", reason: "unclassified_fed_release_not_autonomous_catalyst" };
+}
+
+function classifyOfficialReleaseRecency(
+  publishedAt: string | undefined,
+  maxAgeHours: number
+): { fresh: boolean; reason: string } {
+  if (!publishedAt) {
+    return {
+      fresh: false,
+      reason: "missing_published_at_for_monetary_policy_core_release"
+    };
+  }
+
+  const publishedAtMs = Date.parse(publishedAt);
+  if (!Number.isFinite(publishedAtMs)) {
+    return {
+      fresh: false,
+      reason: "missing_published_at_for_monetary_policy_core_release"
+    };
+  }
+
+  const ageHours = Math.max(0, (Date.now() - publishedAtMs) / 3600000);
+  if (ageHours > maxAgeHours) {
+    return {
+      fresh: false,
+      reason: "stale_monetary_policy_core_release"
+    };
+  }
+
+  return {
+    fresh: true,
+    reason: "fresh_monetary_policy_core_release"
+  };
 }
 
 async function fetchTreasuryHeadlines(): Promise<SnapshotHeadline[]> {
@@ -251,4 +295,69 @@ export function isDataLakeOnlyHeadline(headline: SnapshotHeadline): boolean {
     source.includes("energy information administration") ||
     /\blatest official print\b/.test(title)
   );
+}
+
+// ─── Treasury Auction Data (TreasuryDirect.gov) ─────────────────────────────
+// Fetches live auction results so the Rates agent can cite verified bid-to-cover
+// ratios and high yields rather than relying on LLM recall.
+
+type TreasuryAuctionResult = {
+  term: string;
+  auctionDate: string;
+  highYield: string;
+  bidToCoverRatio: string;
+  tendered: string;
+  allottedAtHigh: string;
+};
+
+export async function fetchRecentTreasuryAuctionData(): Promise<TreasuryAuctionResult[]> {
+  const BASE = "https://api.treasurydirect.gov/TA_WS/securities/auctioned";
+  // Note = 2Y/5Y/7Y/10Y; Bond = 20Y/30Y
+  const types = ["Note", "Bond"];
+  const results: TreasuryAuctionResult[] = [];
+
+  for (const type of types) {
+    try {
+      const url = `${BASE}?type=${type}&pagesize=4&format=json`;
+      const res = await fetch(url, { signal: AbortSignal.timeout(4000) });
+      if (!res.ok) {
+        console.log(`[treasury-auction] fetch failed type=${type} status=${res.status}`);
+        continue;
+      }
+      const data = await res.json() as Record<string, string>[];
+      for (const item of data) {
+        if (item["bidToCoverRatio"] && item["highYield"]) {
+          results.push({
+            term: item["term"] || type,
+            auctionDate: (item["auctionDate"] || "").substring(0, 10),
+            highYield: item["highYield"],
+            bidToCoverRatio: item["bidToCoverRatio"],
+            tendered: item["tendered"] || "",
+            allottedAtHigh: item["allottedAtHigh"] || ""
+          });
+        }
+      }
+    } catch {
+      console.log(`[treasury-auction] fetch error or timeout type=${type}`);
+    }
+  }
+
+  const recent = results.slice(0, 6);
+  console.log(`[treasury-auction] fetched=${recent.length} auctions`);
+  return recent;
+}
+
+export function formatAuctionDataBlock(auctions: TreasuryAuctionResult[]): string {
+  if (!auctions.length) {
+    return "AUCTION DATA UNAVAILABLE: Do not cite specific bid-to-cover ratios or tail sizes — reference directional auction demand only.";
+  }
+  const lines = auctions.map(
+    (a) =>
+      `  ${a.term} (${a.auctionDate}): high yield ${a.highYield}%, bid/cover ${a.bidToCoverRatio}x` +
+      (a.tendered ? `, tendered $${a.tendered}` : "")
+  );
+  return [
+    "LIVE AUCTION RESULTS (TreasuryDirect.gov — cite these figures directly, do not invent alternatives):",
+    ...lines
+  ].join("\n");
 }
