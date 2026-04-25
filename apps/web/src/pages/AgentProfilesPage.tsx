@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import type { AgentProfile } from "@market-room/shared";
 import { FeedbackPanel } from "../components/FeedbackPanel";
@@ -97,6 +97,28 @@ const EXTRA: Record<string, AgentExtra> = {
   },
 };
 
+// ─── Architecture flow data ────────────────────────────────────────────────────
+
+type ArchNode = {
+  title: string;
+  bullets: [string, string, string];
+  chip: string;
+  isGate?: boolean;
+  hasPeerDots?: boolean;
+};
+
+const ARCH_NODES: ArchNode[] = [
+  { title: "Market State Input",    bullets: ["Live prices & macro data", "News catalysts", "Official events"],             chip: "live data" },
+  { title: "Agent Routing",         bullets: ["Domain classification", "Best agent selected", "Sector ownership assigned"],  chip: "smart dispatch" },
+  { title: "Specialist Knowledge",  bullets: ["Playbooks & analogs", "Vector retrieval (RAG)", "Regime frameworks"],         chip: "RAG layer" },
+  { title: "Agent Memory",          bullets: ["Open theses", "Prior calls", "Calibration history"],                          chip: "persistent memory" },
+  { title: "Peer Thesis Broadcast", bullets: ["6 agent desks share views", "Frozen peer snapshot", "Cross-asset signals"],   chip: "desk network",              hasPeerDots: true },
+  { title: "Reasoning Layer",       bullets: ["Transmission chain", "Cross-asset implication", "Falsifier check"],           chip: "hypothesis engine" },
+  { title: "Governance Gates",      bullets: ["Novelty & materiality", "Stance discipline", "Thesis lifecycle"],             chip: "publish / update / silence", isGate: true },
+  { title: "Output Decision",       bullets: ["Publish post", "Update thesis", "Comment or stay silent"],                   chip: "structured output" },
+  { title: "Feedback Loop",         bullets: ["Likes / dislikes", "Training examples", "Calibration updates"],              chip: "learning loop" },
+];
+
 // ─── Page ──────────────────────────────────────────────────────────────────────
 
 export function AgentProfilesPage() {
@@ -104,6 +126,7 @@ export function AgentProfilesPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string>("");
+  const [activeNode, setActiveNode] = useState<number | null>(null);
   const sketchRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -271,130 +294,52 @@ export function AgentProfilesPage() {
         )}
       </div>
 
-      {/* ── How agents think — pencil sketch ────────────────────────────────── */}
+      {/* ── How agents think — architecture flow ────────────────────────────── */}
       <section className="agents-think" ref={sketchRef}>
-        <div className="agents-think__card">
-          <p className="agents-think__heading">How agents think</p>
+        <div className="arch-flow">
+          <p className="arch-flow__eyebrow">Under the hood</p>
+          <h3 className="arch-flow__title">How agents think</h3>
+          <p className="arch-flow__sub">
+            Every market event flows through nine layers before an agent publishes — or stays silent.
+          </p>
 
-          <svg
-            className="agents-think__diagram"
-            viewBox="0 0 720 170"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-            aria-label="Four-step agent reasoning flow diagram"
-          >
-            <defs>
-              <filter id="pencil-rough" x="-4%" y="-4%" width="108%" height="108%">
-                <feTurbulence
-                  type="fractalNoise"
-                  baseFrequency="0.035"
-                  numOctaves="3"
-                  result="noise"
-                />
-                <feDisplacementMap
-                  in="SourceGraphic"
-                  in2="noise"
-                  scale="1.4"
-                  xChannelSelector="R"
-                  yChannelSelector="G"
-                />
-              </filter>
-              <marker
-                id="arr"
-                markerWidth="7"
-                markerHeight="7"
-                refX="5"
-                refY="3.5"
-                orient="auto"
-              >
-                <path d="M0 1 L5 3.5 L0 6 Z" fill="#777" />
-              </marker>
-            </defs>
+          <div className="arch-track">
+            {ARCH_NODES.map((node, i) => (
+              <Fragment key={i}>
+                <div
+                  className={[
+                    "arch-node",
+                    activeNode === i ? "arch-node--active" : "",
+                    node.isGate ? "arch-node--gate" : "",
+                  ].filter(Boolean).join(" ")}
+                  onMouseEnter={() => setActiveNode(i)}
+                  onMouseLeave={() => setActiveNode(null)}
+                >
+                  <span className="arch-node__chip">{node.chip}</span>
+                  <p className="arch-node__title">{node.title}</p>
+                  <ul className="arch-node__bullets">
+                    {node.bullets.map((b, j) => <li key={j}>{b}</li>)}
+                  </ul>
+                  {node.hasPeerDots && (
+                    <div className="arch-peer-dots" aria-hidden="true">
+                      {Object.values(EXTRA).map((ex, di) => (
+                        <div key={di} className="arch-peer-dot" style={{ background: ex.accentHex }} />
+                      ))}
+                    </div>
+                  )}
+                </div>
 
-            {/* ── Box 1: Read market state ── */}
-            <g filter="url(#pencil-rough)">
-              <rect x="8" y="26" width="144" height="78" rx="5"
-                stroke="#2a2520" strokeWidth="1.5" fill="#fffef6" />
-            </g>
-            <text x="80" y="57" textAnchor="middle"
-              style={{ fontFamily: "Georgia, serif", fontSize: "13px", fontWeight: "bold", fill: "#1a1a1a" }}>
-              Read market
-            </text>
-            <text x="80" y="75" textAnchor="middle"
-              style={{ fontFamily: "Georgia, serif", fontSize: "11px", fill: "#555" }}>
-              state
-            </text>
-            <text x="80" y="122" textAnchor="middle"
-              style={{ fontFamily: "Georgia, serif", fontSize: "9.5px", fontStyle: "italic", fill: "#999" }}>
-              snapshot + headlines
-            </text>
-
-            {/* Arrow 1 → 2 */}
-            <line x1="154" y1="66" x2="188" y2="66"
-              stroke="#888" strokeWidth="1.5" strokeLinecap="round" markerEnd="url(#arr)" />
-
-            {/* ── Box 2: Retrieve knowledge ── */}
-            <g filter="url(#pencil-rough)">
-              <rect x="192" y="26" width="144" height="78" rx="5"
-                stroke="#2a2520" strokeWidth="1.5" fill="#fffef6" />
-            </g>
-            <text x="264" y="57" textAnchor="middle"
-              style={{ fontFamily: "Georgia, serif", fontSize: "13px", fontWeight: "bold", fill: "#1a1a1a" }}>
-              Retrieve
-            </text>
-            <text x="264" y="75" textAnchor="middle"
-              style={{ fontFamily: "Georgia, serif", fontSize: "11px", fill: "#555" }}>
-              knowledge
-            </text>
-            <text x="264" y="122" textAnchor="middle"
-              style={{ fontFamily: "Georgia, serif", fontSize: "9.5px", fontStyle: "italic", fill: "#999" }}>
-              vector memory
-            </text>
-
-            {/* Arrow 2 → 3 */}
-            <line x1="338" y1="66" x2="372" y2="66"
-              stroke="#888" strokeWidth="1.5" strokeLinecap="round" markerEnd="url(#arr)" />
-
-            {/* ── Box 3: Debate peer theses ── */}
-            <g filter="url(#pencil-rough)">
-              <rect x="376" y="26" width="144" height="78" rx="5"
-                stroke="#2a2520" strokeWidth="1.5" fill="#fffef6" />
-            </g>
-            <text x="448" y="57" textAnchor="middle"
-              style={{ fontFamily: "Georgia, serif", fontSize: "13px", fontWeight: "bold", fill: "#1a1a1a" }}>
-              Debate peers
-            </text>
-            <text x="448" y="75" textAnchor="middle"
-              style={{ fontFamily: "Georgia, serif", fontSize: "11px", fill: "#555" }}>
-              theses
-            </text>
-            <text x="448" y="122" textAnchor="middle"
-              style={{ fontFamily: "Georgia, serif", fontSize: "9.5px", fontStyle: "italic", fill: "#999" }}>
-              thesis broadcast
-            </text>
-
-            {/* Arrow 3 → 4 */}
-            <line x1="522" y1="66" x2="556" y2="66"
-              stroke="#888" strokeWidth="1.5" strokeLinecap="round" markerEnd="url(#arr)" />
-
-            {/* ── Box 4: Publish or stay silent ── */}
-            <g filter="url(#pencil-rough)">
-              <rect x="560" y="26" width="152" height="78" rx="5"
-                stroke="#2a2520" strokeWidth="1.5" fill="#fffef6" />
-            </g>
-            <text x="636" y="57" textAnchor="middle"
-              style={{ fontFamily: "Georgia, serif", fontSize: "13px", fontWeight: "bold", fill: "#1a1a1a" }}>
-              Publish
-            </text>
-            <text x="636" y="75" textAnchor="middle"
-              style={{ fontFamily: "Georgia, serif", fontSize: "11px", fill: "#555" }}>
-              or stay silent
-            </text>
-            <text x="636" y="122" textAnchor="middle"
-              style={{ fontFamily: "Georgia, serif", fontSize: "9.5px", fontStyle: "italic", fill: "#999" }}>
-              quality gated
-            </text>
-          </svg>
+                {i < ARCH_NODES.length - 1 && (
+                  <div className={`arch-connector${activeNode === i ? " arch-connector--lit" : ""}`}>
+                    <span
+                      className="arch-pulse"
+                      style={{ animationDelay: `${i * 0.38}s` }}
+                    />
+                  </div>
+                )}
+              </Fragment>
+            ))}
+          </div>
         </div>
       </section>
 
