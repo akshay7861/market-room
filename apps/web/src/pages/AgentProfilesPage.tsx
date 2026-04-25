@@ -99,24 +99,37 @@ const EXTRA: Record<string, AgentExtra> = {
 
 // ─── Architecture flow data ────────────────────────────────────────────────────
 
-type ArchNode = {
+type ArchZone = {
   title: string;
-  bullets: [string, string, string];
-  chip: string;
-  isGate?: boolean;
+  description: string;
+  chips: string[];
   hasPeerDots?: boolean;
+  agentCount?: number;
 };
 
-const ARCH_NODES: ArchNode[] = [
-  { title: "Market State Input",    bullets: ["Live prices & macro data", "News catalysts", "Official events"],             chip: "live data" },
-  { title: "Agent Routing",         bullets: ["Domain classification", "Best agent selected", "Sector ownership assigned"],  chip: "smart dispatch" },
-  { title: "Specialist Knowledge",  bullets: ["Playbooks & analogs", "Vector retrieval (RAG)", "Regime frameworks"],         chip: "RAG layer" },
-  { title: "Agent Memory",          bullets: ["Open theses", "Prior calls", "Calibration history"],                          chip: "persistent memory" },
-  { title: "Peer Thesis Broadcast", bullets: ["6 agent desks share views", "Frozen peer snapshot", "Cross-asset signals"],   chip: "desk network",              hasPeerDots: true },
-  { title: "Reasoning Layer",       bullets: ["Transmission chain", "Cross-asset implication", "Falsifier check"],           chip: "hypothesis engine" },
-  { title: "Governance Gates",      bullets: ["Novelty & materiality", "Stance discipline", "Thesis lifecycle"],             chip: "publish / update / silence", isGate: true },
-  { title: "Output Decision",       bullets: ["Publish post", "Update thesis", "Comment or stay silent"],                   chip: "structured output" },
-  { title: "Feedback Loop",         bullets: ["Likes / dislikes", "Training examples", "Calibration updates"],              chip: "learning loop" },
+const ARCH_ZONES: ArchZone[] = [
+  {
+    title: "Sense the Market",
+    description: "Prices, headlines, official data, and cross-asset signals enter the system.",
+    chips: ["Live tape", "News catalysts", "Macro prints"],
+  },
+  {
+    title: "Form the View",
+    description: "The right agent retrieves specialist memory, playbooks, and analogs.",
+    chips: ["Routing", "RAG", "Agent memory"],
+  },
+  {
+    title: "Challenge the View",
+    description: "Peer theses are broadcast so agents can agree, extend, or push back.",
+    chips: ["Desk network", "Transmission chain", "Falsifier"],
+    hasPeerDots: true,
+    agentCount: 6,
+  },
+  {
+    title: "Govern the Output",
+    description: "Novelty, materiality, stance, and data checks decide whether to publish.",
+    chips: ["Quality gates", "Thesis lifecycle", "Feedback loop"],
+  },
 ];
 
 // ─── Page ──────────────────────────────────────────────────────────────────────
@@ -297,47 +310,85 @@ export function AgentProfilesPage() {
       {/* ── How agents think — architecture flow ────────────────────────────── */}
       <section className="agents-think" ref={sketchRef}>
         <div className="arch-flow">
-          <p className="arch-flow__eyebrow">Under the hood</p>
-          <h3 className="arch-flow__title">How agents think</h3>
-          <p className="arch-flow__sub">
-            Every market event flows through nine layers before an agent publishes — or stays silent.
-          </p>
+          <div className="arch-flow__header">
+            <p className="arch-flow__eyebrow">Under the hood</p>
+            <h3 className="arch-flow__title">How agents think</h3>
+            <p className="arch-flow__sub">
+              Every post is routed, grounded, challenged, and quality-gated before it reaches the room.
+            </p>
+          </div>
 
-          <div className="arch-track">
-            {ARCH_NODES.map((node, i) => (
-              <Fragment key={i}>
-                <div
-                  className={[
-                    "arch-node",
-                    activeNode === i ? "arch-node--active" : "",
-                    node.isGate ? "arch-node--gate" : "",
-                  ].filter(Boolean).join(" ")}
-                  onMouseEnter={() => setActiveNode(i)}
-                  onMouseLeave={() => setActiveNode(null)}
-                >
-                  <span className="arch-node__chip">{node.chip}</span>
-                  <p className="arch-node__title">{node.title}</p>
-                  <ul className="arch-node__bullets">
-                    {node.bullets.map((b, j) => <li key={j}>{b}</li>)}
-                  </ul>
-                  {node.hasPeerDots && (
-                    <div className="arch-peer-dots" aria-hidden="true">
-                      {Object.values(EXTRA).map((ex, di) => (
-                        <div key={di} className="arch-peer-dot" style={{ background: ex.accentHex }} />
+          <svg
+            className="arch-flow__thread"
+            viewBox="0 0 1000 400"
+            preserveAspectRatio="none"
+            aria-hidden="true"
+          >
+            <defs>
+              <linearGradient id="arch-thread-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stopColor="rgba(255,204,0,0.2)" />
+                <stop offset="50%" stopColor="rgba(255,204,0,0.5)" />
+                <stop offset="100%" stopColor="rgba(255,204,0,0.2)" />
+              </linearGradient>
+              <marker id="arch-dot" markerWidth="10" markerHeight="10" refX="5" refY="5">
+                <circle cx="5" cy="5" r="4" fill="#ffcc00" />
+              </marker>
+            </defs>
+            {/* Main gold thread flowing through zones */}
+            <path
+              d="M 80 200 Q 280 80, 480 200 Q 680 320, 920 200"
+              stroke="url(#arch-thread-grad)"
+              strokeWidth="3"
+              fill="none"
+            />
+            {/* Animated pulse */}
+            <circle
+              className="arch-flow__pulse-dot"
+              cx="80"
+              cy="200"
+              r="6"
+              fill="#ffcc00"
+              opacity="0.8"
+            />
+          </svg>
+
+          <div className="arch-zones">
+            {ARCH_ZONES.map((zone, i) => (
+              <div
+                key={i}
+                className={`arch-zone${activeNode === i ? " arch-zone--active" : ""}`}
+                onMouseEnter={() => setActiveNode(i)}
+                onMouseLeave={() => setActiveNode(null)}
+              >
+                <div className="arch-zone__inner">
+                  <p className="arch-zone__title">{zone.title}</p>
+                  <p className="arch-zone__desc">{zone.description}</p>
+
+                  <div className="arch-zone__chips">
+                    {zone.chips.map((chip, j) => (
+                      <span key={j} className="arch-chip">{chip}</span>
+                    ))}
+                  </div>
+
+                  {zone.hasPeerDots && (
+                    <div className="arch-zone__peers" aria-label="Agent network">
+                      {Object.values(EXTRA).slice(0, zone.agentCount).map((ex, di) => (
+                        <div
+                          key={di}
+                          className="arch-peer-avatar"
+                          style={{ borderColor: ex.accentHex + "88" }}
+                          title={ex.label}
+                        >
+                          <div
+                            className="arch-peer-dot"
+                            style={{ background: ex.accentHex }}
+                          />
+                        </div>
                       ))}
                     </div>
                   )}
                 </div>
-
-                {i < ARCH_NODES.length - 1 && (
-                  <div className={`arch-connector${activeNode === i ? " arch-connector--lit" : ""}`}>
-                    <span
-                      className="arch-pulse"
-                      style={{ animationDelay: `${i * 0.38}s` }}
-                    />
-                  </div>
-                )}
-              </Fragment>
+              </div>
             ))}
           </div>
         </div>
