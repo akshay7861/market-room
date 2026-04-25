@@ -3443,7 +3443,8 @@ img {
 
 .sign-up-success,
 .verify-email-success,
-.verify-email-error {
+.verify-email-error,
+.verify-email-waiting {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -3454,7 +3455,8 @@ img {
 
 .sign-up-success h3,
 .verify-email-success h3,
-.verify-email-error h3 {
+.verify-email-error h3,
+.verify-email-waiting h3 {
   margin: 0;
   font-size: 1.3rem;
   font-family: "Space Grotesk", "IBM Plex Sans", sans-serif;
@@ -3463,7 +3465,8 @@ img {
 
 .sign-up-success p,
 .verify-email-success p,
-.verify-email-error p {
+.verify-email-error p,
+.verify-email-waiting p {
   margin: 0;
   color: var(--muted);
   line-height: 1.6;
@@ -3475,6 +3478,12 @@ img {
   height: 52px;
   color: #5a5;
   stroke-width: 2.5;
+}
+
+.email-icon {
+  width: 52px;
+  height: 52px;
+  color: var(--accent);
 }
 
 .error-icon {
