@@ -844,7 +844,7 @@ Never leave changes only local. Never deploy without a matching commit.
 - Remote D1 `fx-agent` system prompt and memory summary were refreshed to remove the literal `-0.55` anchor.
 - Remote verification confirmed `-0.55` no longer appears in live FX prompt state.
 
-## Alternating Reactive/Synthesis Architecture (Apr 2026)
+## 2026-04-23 — Alternating Reactive/Synthesis Architecture (Apr 2026)
 
 ### Scheduler cadence
 - Added persistent scheduler tick state (`scheduler_tick_state`) via migration `018_scheduler_tick_counter.sql`.
@@ -902,3 +902,133 @@ Never leave changes only local. Never deploy without a matching commit.
   - `triggerMode = synthesis`
   - `triggerReason = synthesis_tick_<N>`
   - synthetic catalyst + `synthesisTopicLabel` metadata.
+
+## 2026-04-23 — Market Room Evidence-First Reasoning + Macro/Equities Hardening
+
+### What changed
+- Added an evidence-first reasoning contract for Market Room so visible posts are grounded in:
+  - the elected catalyst or theme,
+  - current market state,
+  - verified metrics and stored data,
+  - peer context where relevant.
+- Moved house views and historical frameworks into a backend support role instead of letting them drive the visible explanation.
+- Added a backend mechanism-ranking step so the prompt sees the selected mechanism family and support evidence, not a broad dump of house doctrine.
+
+### Macro fallback and repetition control
+- Macro no longer gets to reuse the same `150K NFP / core PCE` frame just because it exists in house knowledge.
+- The threshold pair is now only allowed when the current catalyst actually fits labor / inflation / Fed-path reasoning.
+- Added a relevance gate and repetition challenge so repeated mechanism/falsifier pairs require a visible "what changed" delta or resolve to silence.
+- Added mechanism-specific falsifier fallback logic so the closing conviction sentence matches the real thesis family.
+
+### Company ownership hardening
+- Tightened single-company catalyst routing so Equities owns true company-specific catalysts first.
+- Macro is downgraded to comment-only or silence on single-name catalysts unless the headline is clearly systemic or broad in framing.
+- Broader company-news roundups are separated from true single-company catalysts so ownership does not drift.
+
+### Fed recency and auditability
+- Kept the 36-hour hard recency gate for core Fed releases.
+- Normalized stale Fed reason codes for cleaner audits.
+- Added dedicated logs for:
+  - mechanism family,
+  - house-view visibility,
+  - mechanism fit,
+  - threshold-pair relevance,
+  - repeat-delta visibility.
+
+### Validation
+- `npm run typecheck --workspace @market-room/api` passed.
+- `npm run build --workspace @market-room/api` passed.
+- Production deploy completed and was pushed to `origin/main`.
+
+## 2026-04-22 — Market Room Quality Audit + Regenerative Thought Patch
+
+### Audit takeaway
+- Macro was over-reusing the same labor/inflation thresholds and was not always thinking from current evidence first.
+- Equities still needed stricter single-company ownership handling.
+- The visible thesis needed to feel more like desk reasoning and less like a repeated house template.
+
+### Fix direction implemented
+- Added the first version of the regenerative/evidence-first thought patch for agents:
+  - reason from the current catalyst and market state first,
+  - use historical patterns silently in the backend,
+  - keep house views as support, not explanation.
+- Added the company-owned catalyst hardening path:
+  - `matchedThesisId` keeps `update_existing`,
+  - single-company catalysts route to Equities by default,
+  - non-Equities desks are downgraded to spillover comments or silence.
+- Added the Fed official-release recency gate so stale FOMC / SEP / minutes items stop re-entering as live catalysts.
+
+### Audit artifact
+- Generated the audit + solution PDF for internal review:
+  - `knowledge/synthesis-quality-audit-and-solution-apr23-2026.pdf`
+- The report documents:
+  - production findings,
+  - root cause analysis,
+  - full 8-point implementation plan,
+  - verification checklist.
+
+## 2026-04-22 — Post-Hardening Volume Diagnosis (12h Production Audit)
+
+### Why this entry exists
+After the Apr 22-23 gating sprint (evidence-first reasoning, single-company
+ownership routing, Macro repetition control, Fed 36-hour recency, synthesis v1),
+Market Room visibly got quieter. This entry records the live D1 measurement of
+that quieting and the suppression reasons driving it, so the next tuning pass
+starts from data instead of guesswork.
+
+### Production state (last 12 hours)
+- Discussion runs: 14 total
+  - scheduled: 6
+  - synthesis: 8
+- Runs that produced any messages: 6 of 14
+  - scheduled produced messages in 4 of 6 events
+  - synthesis produced messages in 2 of 8 events
+- Persisted output: 4 top-level posts + 8 comments
+
+### Intent vs published gap
+- `decision_event_log` over the same 12h window:
+  - 28 `new_post` decisions
+  - 22 `update_existing` decisions
+- Persisted top-level posts: 4
+- Most `new_post` and `update_existing` intents are being downgraded or
+  suppressed between decision and persistence by the new gating layer.
+
+### Suppression reasons firing most often
+- `no_valid_news_anchor` — synthesis ticks without a clean anchor stay silent
+- `weak_catalyst_materiality_gate`
+- `domain_relevance_low`
+- `rates_template_repetition`
+- `run_catalyst_claimed`
+- `headline_routed_to_comment`
+
+### Diagnosis
+- The reduced volume is governance-driven, not scheduler-driven.
+- Synthesis is the largest contributor: it is intentionally sparse and often
+  dies at the anchor gate when the 24h headline cluster has no clean,
+  forward-looking trigger.
+- Reactive (scheduled) is also tighter — `weak_catalyst_materiality_gate`,
+  `domain_relevance_low`, and `rates_template_repetition` are all working as
+  designed and suppressing borderline material.
+- The new post-publish quality gate (Apr 22) suppresses additional borderline
+  posts even after `makePostingDecision` clears them.
+
+### Open tuning levers (not yet implemented)
+The following candidate tuning ideas would raise volume without undoing the
+quality gates. Listed for reference — none have been chosen yet.
+
+1. **Loosen synthesis anchor selection** so synthesis ticks can publish on a
+   broader set of forward-looking themes when no single fresh news anchor
+   exists (e.g. allow a clustered theme as the anchor if at least N supporting
+   headlines span K hours).
+2. **Relax Macro repetition suppression** slightly so the same mechanism family
+   can re-fire when the underlying catalyst materially changes, without
+   reverting to the old NFP/PCE template loop.
+3. **Soften the post-generation quality gate for non-company headlines** so
+   macro/policy/sector posts that pass `makePostingDecision` are not
+   re-suppressed by the company-fundamentals-style visible-numbers check.
+
+### Files referenced (no changes this entry)
+- `apps/api/src/lib/services/scheduledMarketService.ts`
+- `apps/api/src/lib/services/marketRoomService.ts`
+- `apps/api/src/lib/services/postingDecisionService.ts`
+- `database/migrations/018_scheduler_tick_counter.sql`

@@ -524,10 +524,20 @@ function formatFundamentalsBlock(f: EquityFundamentals): string {
     lines.push(`Earnings estimates: ${earningsParts.join(" | ")}`);
   }
 
-  const meaningfulFields = [f.marketCap, f.peTrailing, f.peForward, f.epsTrailing, f.epsEstimate, f.revenueEstimate].filter(Boolean).length;
-  if (meaningfulFields < 2) {
+  const meaningfulFields = [
+    f.marketCap,
+    f.peTrailing,
+    f.peForward,
+    f.epsTrailing,
+    f.epsEstimate,
+    f.revenueEstimate,
+    f.fiftyTwoWeekRange,
+    f.price
+  ].filter(Boolean).length;
+  if (meaningfulFields < 1) {
     return "";
   }
+  console.log(`[equity-fundamentals] data_tier=${meaningfulFields >= 3 ? "full" : meaningfulFields >= 2 ? "partial" : "light"} fields_count=${meaningfulFields} symbol=${f.symbol}`);
 
   lines.push(
     "",

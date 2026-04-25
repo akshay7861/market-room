@@ -87,6 +87,10 @@ type FrozenRunContext = {
   snapshotTimestamp: string;
   peerSnapshotVersion: string;
   peerSnapshot: FrozenPeerThesisSnapshotRow[];
+  roomSynthesisHeadlines: SnapshotHeadline[];
+  synthesisHeadlinesByAgentId: Map<string, SnapshotHeadline[]>;
+  roomSynthesisThemeBoard: SynthesisThemeCluster[];
+  synthesisThemeBoardByAgentId: Map<string, SynthesisThemeCluster[]>;
   synthesisThemeBoard: SynthesisThemeCluster[];
   dominantSynthesisTheme: SynthesisThemeCluster | null;
   synthesisThemeDigest: string[];
@@ -126,6 +130,12 @@ type AgentSynthesisAnchorSelection = {
   repetitionChallenge: string | null;
   hasCompanyHeadline: boolean;
   participationAdjustment: number;
+  selectionMode: "strict";
+  selectionSource: "agent_board" | "room_board";
+  selectionReason:
+    | "selected_company_theme"
+    | "selected_macro_theme"
+    | "room_fallback";
 };
 
 type DiscussionPlan = {
@@ -206,6 +216,23 @@ type ThesisWritePlan =
 type PlannedForumEntry = {
   message: AgentMessage;
   thesisWrite: ThesisWritePlan | null;
+};
+
+type ForumGenerationDiagnostics = {
+  agentsConsidered: number;
+  topLevelCandidates: number;
+  suppressedAfterGeneration: number;
+  commentsOnly: number;
+  publishedPosts: number;
+  bestCandidateScore: number;
+  floorRescueUsed: boolean;
+  hardFailSuppressions: number;
+  softFailSuppressions: number;
+};
+
+type ForumGenerationResult = {
+  entries: PlannedForumEntry[];
+  diagnostics: ForumGenerationDiagnostics;
 };
 
 type CatalystFilterScope = "general" | "sector";
@@ -433,12 +460,20 @@ export async function runMarketDiscussion(
     now,
     snapshot: enrichedSnapshotPayload,
     peerSnapshot: frozenPeerSnapshot,
-    headlines: generalCatalystHeadlines
+    roomHeadlines: generalCatalystHeadlines,
+    activeAgents,
+    sectorHeadlinesByAgentId
   });
   console.log(
     `[run-context] mode=${triggerMode} snapshot_ts=${frozenRunContext.snapshotTimestamp} peer_snapshot_version=${frozenRunContext.peerSnapshotVersion} context=${frozenRunContext.runContextId}`
   );
   if (triggerMode === "synthesis") {
+    const agentThemeCounts = activeAgents
+      .map((agent) => `${agent.id}:${(frozenRunContext.synthesisThemeBoardByAgentId.get(agent.id) || []).length}`)
+      .join(",");
+    console.log(
+      `[synthesis-selection] run_context=${frozenRunContext.runContextId} room_synthesis_headlines=${frozenRunContext.roomSynthesisHeadlines.length} room_theme_count=${frozenRunContext.roomSynthesisThemeBoard.length} agent_theme_counts=${agentThemeCounts}`
+    );
     console.log(
       `[synthesis-mode] tick=${options.triggerReason || "synthesis"} topic=${frozenRunContext.synthesisTopicLabel} catalyst="${truncateText(frozenRunContext.synthesisPrimaryHeadline, 80)}" agents=${discussionPlan.selectedAgents.map((agent) => agent.id).join(",")}`
     );
@@ -534,9 +569,22 @@ export async function runMarketDiscussion(
     );
   }
 
-  const generatedForumEntries =
+  const forumGenerationResult =
     discussionPlan.selectedAgents.length === 0
-      ? []
+      ? {
+          entries: [],
+          diagnostics: {
+            agentsConsidered: 0,
+            topLevelCandidates: 0,
+            suppressedAfterGeneration: 0,
+            commentsOnly: 0,
+            publishedPosts: 0,
+            bestCandidateScore: 0,
+            floorRescueUsed: false,
+            hardFailSuppressions: 0,
+            softFailSuppressions: 0
+          }
+        }
       : isLlmConfigured(env)
         ? await generateAgentForumPosts({
             env,
@@ -554,7 +602,22 @@ export async function runMarketDiscussion(
             triggerMode,
             frozenRunContext
         })
-        : generateMockForumPosts(activeAgents, marketSnapshotPayload, room.id, event.id, snapshot.id);
+        : {
+            entries: generateMockForumPosts(activeAgents, marketSnapshotPayload, room.id, event.id, snapshot.id),
+            diagnostics: {
+              agentsConsidered: discussionPlan.selectedAgents.length,
+              topLevelCandidates: discussionPlan.selectedAgents.length,
+              suppressedAfterGeneration: 0,
+              commentsOnly: 0,
+              publishedPosts: discussionPlan.selectedAgents.length,
+              bestCandidateScore: 0,
+              floorRescueUsed: false,
+              hardFailSuppressions: 0,
+              softFailSuppressions: 0
+            }
+          };
+  const generatedForumEntries = forumGenerationResult.entries;
+  const forumDiagnostics = forumGenerationResult.diagnostics;
 
   const generatedPostEntries = generatedForumEntries.filter((entry) => entry.message.messageType === "post");
   const generatedSelfUpdateEntries = generatedForumEntries.filter((entry) => entry.message.messageType === "comment");
@@ -584,6 +647,21 @@ export async function runMarketDiscussion(
             frozenRunContext
           })
         : generateMockForumComments(activeAgents, generatedPosts, room.id, event.id);
+
+  const publishedTopLevelPosts = generatedPostEntries.length;
+  const commentsOnlyCount = forumDiagnostics.commentsOnly;
+  const suppressedAfterGenerationCount = forumDiagnostics.suppressedAfterGeneration;
+  const hardFailSuppressions = forumDiagnostics.hardFailSuppressions;
+  const softFailSuppressions = forumDiagnostics.softFailSuppressions;
+  const emptyRun = triggerMode === "synthesis" ? (publishedTopLevelPosts === 0 ? "yes" : "no") : "n/a";
+  console.log(
+    `[run-volume] mode=${triggerMode} context=${frozenRunContext.runContextId} agents_considered=${forumDiagnostics.agentsConsidered} top_level_candidates=${forumDiagnostics.topLevelCandidates} suppressed_after_generation=${suppressedAfterGenerationCount} comments_only=${commentsOnlyCount} published_posts=${publishedTopLevelPosts}`
+  );
+  if (triggerMode === "synthesis") {
+    console.log(
+      `[synthesis-volume] context=${frozenRunContext.runContextId} empty_run=${emptyRun} best_candidate_score=${forumDiagnostics.bestCandidateScore} floor_rescue_used=${forumDiagnostics.floorRescueUsed ? "yes" : "no"} hard_fail=${hardFailSuppressions} soft_fail_accumulated=${softFailSuppressions}`
+    );
+  }
 
   const plannedEntries = [...generatedForumEntries, ...generatedComments].sort((left, right) =>
     left.message.createdAt.localeCompare(right.message.createdAt)
@@ -1109,13 +1187,24 @@ async function generateAgentForumPosts({
   snapshotId: string;
   triggerMode: DiscussionTriggerMode;
   frozenRunContext: FrozenRunContext;
-}): Promise<PlannedForumEntry[]> {
+}): Promise<ForumGenerationResult> {
   const repositories = createRepositories(env);
   const sortedAgents = sortAgentsForForum(agents);
   const recentRoomCoverage = buildRoomThemeCoverage(priorRoomThreads);
   const runThemeCoverage = new Map<string, number>();
   const recentThesesByOwner = new Map<string, Thesis[]>();
   const entries: PlannedForumEntry[] = [];
+  const diagnostics: ForumGenerationDiagnostics = {
+    agentsConsidered: 0,
+    topLevelCandidates: 0,
+    suppressedAfterGeneration: 0,
+    commentsOnly: 0,
+    publishedPosts: 0,
+    bestCandidateScore: 0,
+    floorRescueUsed: false,
+    hardFailSuppressions: 0,
+    softFailSuppressions: 0
+  };
   const roomCoverage = await repositories.roomCoverage.getByRoomId(roomId);
   const recentDiscussionEvents = await repositories.events.listRecentDiscussionEvents(16);
   const recentSynthesisEventIds = new Set(
@@ -1138,6 +1227,7 @@ async function generateAgentForumPosts({
   const verifiedMetrics = buildVerifiedMarketMetricsContext(marketSnapshot);
   // Tracks posts published earlier in this same run so subsequent agents can avoid echoing them.
   const thisRunPosts: AgentMessage[] = [];
+  let floorRescueClaimed = false;
 
   for (const thesis of recentTheses) {
     recentThesesByOwner.set(thesis.ownerAgentId, [...(recentThesesByOwner.get(thesis.ownerAgentId) || []), thesis]);
@@ -1146,6 +1236,7 @@ async function generateAgentForumPosts({
   const agentLoop = triggerMode === "synthesis" ? discussionPlan.selectedAgents : sortedAgents;
 
   for (const [index, agent] of agentLoop.entries()) {
+    diagnostics.agentsConsidered += 1;
     const sectorHeadlines = sectorHeadlinesByAgentId.get(agent.id) || [];
     const [recentPosts, relevantCases, knowledgeSnippets, dynamicMemory, agentState] = await Promise.all([
       repositories.messages.listRecentByAgent(agent.id, 8),  // 8 not 4 — wider cross-run novelty window
@@ -1188,12 +1279,23 @@ async function generateAgentForumPosts({
             recentSynthesisSectorCounts
           })
         : null;
+    const agentHeadlinePool = (frozenRunContext.synthesisHeadlinesByAgentId.get(agent.id) || []).length;
+    const agentThemeCount = (frozenRunContext.synthesisThemeBoardByAgentId.get(agent.id) || []).length;
 
     if (triggerMode === "synthesis" && !synthesisSelection) {
+      console.log(
+        `[synthesis-selection] agent=${agent.id} selection_source=none agent_headline_pool=${agentHeadlinePool} agent_theme_count=${agentThemeCount} selection_reason=no_valid_news_anchor context=${frozenRunContext.runContextId}`
+      );
       console.log(
         `[synthesis-mode] agent=${agent.id} action=silent topic=${frozenRunContext.synthesisTopicLabel} reason=no_valid_news_anchor context=${frozenRunContext.runContextId}`
       );
       continue;
+    }
+    if (triggerMode === "synthesis" && synthesisSelection) {
+      diagnostics.bestCandidateScore = Math.max(diagnostics.bestCandidateScore, synthesisSelection.relevanceScore);
+      console.log(
+        `[synthesis-selection] agent=${agent.id} selection_source=${synthesisSelection.selectionSource} agent_headline_pool=${agentHeadlinePool} agent_theme_count=${agentThemeCount} selection_reason=${synthesisSelection.selectionReason} score=${synthesisSelection.relevanceScore} theme=${synthesisSelection.themeKey} context=${frozenRunContext.runContextId}`
+      );
     }
 
     const topicPlan =
@@ -1227,6 +1329,10 @@ async function generateAgentForumPosts({
         })
       : null;
     const topHeadlineForDiagnostics = topSectorHeadlines.find((headline) => headline.title === headlineAnalysis?.headline_title) || topSectorHeadlines[0];
+    const selectedSynthesisAnchorHeadline =
+      triggerMode === "synthesis" ? (synthesisSelection?.anchorHeadline || undefined) : undefined;
+    const synthesisCompanyOwnedEquityAnchor = isSingleCompanyEquityAnchor(selectedSynthesisAnchorHeadline);
+    const ownershipHeadlineForGates = selectedSynthesisAnchorHeadline || topHeadlineForDiagnostics;
     const mechanismSelection = rankMechanismFamilyForAgent({
       agent,
       topicPlan,
@@ -1272,7 +1378,7 @@ async function generateAgentForumPosts({
       agent,
       postingDecision: domainAdjustedDecision,
       headlineAnalysis,
-      topHeadline: topHeadlineForDiagnostics
+      topHeadline: ownershipHeadlineForGates
     });
 
     // ── Run-level catalyst guard ──────────────────────────────────────────────
@@ -1299,7 +1405,8 @@ async function generateAgentForumPosts({
         headlineAnalysis.headline_type
       );
 
-      const companyOwnedEquityCatalyst = isCompanyOwnedEquityCatalyst(headlineAnalysis, topHeadlineForDiagnostics);
+      const companyOwnedEquityCatalyst =
+        synthesisCompanyOwnedEquityAnchor || isCompanyOwnedEquityCatalyst(headlineAnalysis, ownershipHeadlineForGates);
       const catalystAlreadyClaimed = thisRunPosts.some((p) => {
         if (companyOwnedEquityCatalyst && agent.sector === "Equities") {
           return false;
@@ -1325,6 +1432,26 @@ async function generateAgentForumPosts({
     // was made less than 90 minutes ago AND novelty is low, silence this run.
     const finalPostingDecision = (() => {
       if (triggerMode === "synthesis") {
+        if (synthesisCompanyOwnedEquityAnchor && agent.sector !== "Equities") {
+          return {
+            ...postingDecision,
+            actionType: "stay_silent" as const,
+            reasonCodes: uniqueReasonCodes([...postingDecision.reasonCodes, "weak_catalyst_materiality_gate" as const])
+          };
+        }
+        if (
+          synthesisCompanyOwnedEquityAnchor &&
+          agent.sector === "Equities" &&
+          (postingDecision.actionType === "comment_only" || postingDecision.actionType === "stay_silent")
+        ) {
+          return {
+            ...postingDecision,
+            actionType: topicPlan.matchedThesis ? "update_existing" as const : "new_post" as const,
+            reasonCodes: uniqueReasonCodes(
+              postingDecision.reasonCodes.filter((code) => code !== "run_catalyst_claimed")
+            )
+          };
+        }
         if (
           synthesisSelection &&
           synthesisSelection.isGenericFallback &&
@@ -1385,14 +1512,16 @@ async function generateAgentForumPosts({
       agent,
       postingDecision: financingOwnershipAdjustedDecision,
       headlineAnalysis,
-      topHeadline: topHeadlineForDiagnostics
+      topHeadline: ownershipHeadlineForGates,
+      forceEquityOwnership: synthesisCompanyOwnedEquityAnchor
     });
 
     const macroSingleNameAdjustedDecision = applyMacroSingleNameOwnershipGate({
       agent,
       postingDecision: equityOwnedCompanyHeadlineAdjustedDecision,
       headlineAnalysis,
-      topHeadline: topHeadlineForDiagnostics
+      topHeadline: ownershipHeadlineForGates,
+      forceSingleCompany: synthesisCompanyOwnedEquityAnchor
     });
 
     const weakDomainAdjustedDecision = applyNoFreshWeakDomainDecisionGate(macroSingleNameAdjustedDecision);
@@ -1409,24 +1538,63 @@ async function generateAgentForumPosts({
       agent,
       postingDecision: ratesTemplateAdjustedDecision,
       headlineAnalysis,
-      topHeadline: topHeadlineForDiagnostics,
+      topHeadline: ownershipHeadlineForGates,
       topicPlan,
       recentMessages: [...flattenThreadPosts(priorRoomThreads, 80), ...thisRunPosts],
       recentAgentMessages: recentPosts,
       currentRunPosts: thisRunPosts
     });
+    const routingRecoveredDecision = applyScheduledReactiveTopLevelRecoveryGate({
+      triggerMode,
+      agent,
+      postingDecision: repetitionAdjustedDecision,
+      headlineAnalysis,
+      topHeadline: ownershipHeadlineForGates,
+      domainRelevance,
+      noveltyAssessment,
+      topicPlan
+    });
     const stanceChallenge = buildStanceLockChallenge(agent, recentPosts);
-    const generationDecision =
+    let generationDecision =
       stanceChallenge?.active &&
-      (repetitionAdjustedDecision.actionType === "new_post" || repetitionAdjustedDecision.actionType === "update_existing")
+      (routingRecoveredDecision.actionType === "new_post" || routingRecoveredDecision.actionType === "update_existing")
         ? {
-            ...repetitionAdjustedDecision,
-            reasonCodes: uniqueReasonCodes([...repetitionAdjustedDecision.reasonCodes, "stance_lock_challenge" as const])
+            ...routingRecoveredDecision,
+            reasonCodes: uniqueReasonCodes([...routingRecoveredDecision.reasonCodes, "stance_lock_challenge" as const])
           }
-        : repetitionAdjustedDecision;
+        : routingRecoveredDecision;
     if (agent.sector === "Equities") {
       console.log(
         `[equities-standalone] eligible=${topSectorHeadlines.length} top="${truncateText(topSectorHeadlines[0]?.title || "none", 80)}" decision=${generationDecision.actionType} headline_signal=${headlineAnalysis?.market_signal_strength || "none"}`
+      );
+    }
+    if (generationDecision.actionType === "new_post" || generationDecision.actionType === "update_existing") {
+      diagnostics.topLevelCandidates += 1;
+    }
+    const shouldUseSynthesisFloorRescue =
+      triggerMode === "synthesis" &&
+      !floorRescueClaimed &&
+      entries.filter((entry) => entry.message.messageType === "post").length === 0 &&
+      synthesisSelection !== null &&
+      isEligibleForSynthesisFloorRescue({
+        selection: synthesisSelection,
+        mechanism: mechanismSelection,
+        postingDecision: generationDecision
+      });
+    let floorRescuePlanned = false;
+    if (
+      shouldUseSynthesisFloorRescue &&
+      (generationDecision.actionType === "stay_silent" || generationDecision.actionType === "comment_only")
+    ) {
+      floorRescuePlanned = true;
+      floorRescueClaimed = true;
+      generationDecision = {
+        ...generationDecision,
+        actionType: topicPlan.matchedThesis ? "update_existing" : "new_post"
+      };
+      diagnostics.topLevelCandidates += 1;
+      console.log(
+        `[synthesis-mode] agent=${agent.id} floor_rescue=attempted theme=${synthesisSelection.themeKey} score=${synthesisSelection.relevanceScore} context=${frozenRunContext.runContextId}`
       );
     }
 
@@ -1452,6 +1620,9 @@ async function generateAgentForumPosts({
     });
 
     if (!willPost) {
+      if (generationDecision.actionType === "comment_only") {
+        diagnostics.commentsOnly += 1;
+      }
       if (triggerMode === "synthesis") {
         console.log(
           `[synthesis-mode] agent=${agent.id} action=silent topic=${frozenRunContext.synthesisTopicLabel} reason=${generationDecision.reasonCodes.join("|") || "decision_gate"} context=${frozenRunContext.runContextId}`
@@ -1539,6 +1710,16 @@ async function generateAgentForumPosts({
           (headlineAnalysis && headlineAnalysis.market_signal_strength !== "noise" ? headlineAnalysis.headline_title : "") ||
           topicPlan.primary.catalyst ||
           fallbackCatalyst(agent, marketSnapshot);
+    if (triggerMode === "synthesis" && isSingleCompanyEquityCatalystText(finalCatalyst) && agent.sector !== "Equities") {
+      diagnostics.suppressedAfterGeneration += 1;
+      if (floorRescuePlanned) {
+        floorRescueClaimed = false;
+      }
+      console.log(
+        `[ownership-gate] agent=${agent.sector} synthesis_company_catalyst=yes ownership_action=silent catalyst="${truncateText(finalCatalyst, 90)}" context=${frozenRunContext.runContextId}`
+      );
+      continue;
+    }
     let resolvedContent = ensureRequiredConvictionCondition({
       agent,
       content: trimToWordLimit(
@@ -1568,6 +1749,10 @@ async function generateAgentForumPosts({
       `[evidence-first] agent=${agent.id} mechanism_family=${evidenceGate.metrics.mechanismFamily} house_view_visible=${evidenceGate.metrics.houseViewVisible ? "yes" : "no"} mechanism_fit=${evidenceGate.metrics.mechanismFit ? "yes" : "no"} macro_threshold_pair_used=${evidenceGate.metrics.macroThresholdPairUsed ? "yes" : "no"} macro_threshold_pair_relevant=${evidenceGate.metrics.macroThresholdPairRelevant ? "yes" : "no"} repeat_delta_visible=${evidenceGate.metrics.repeatDeltaVisible ? "yes" : "no"} repair_applied=${evidenceGate.metrics.repaired ? "yes" : "no"}`
     );
     if (evidenceGate.suppressed) {
+      diagnostics.suppressedAfterGeneration += 1;
+      if (floorRescuePlanned) {
+        floorRescueClaimed = false;
+      }
       console.log(
         `[evidence-first] agent=${agent.id} action=silent reason=mechanism_relevance_gate context=${frozenRunContext.runContextId}`
       );
@@ -1650,6 +1835,11 @@ async function generateAgentForumPosts({
         if (!repairedMismatch) {
           postQualityFlags = uniqueQualityFlags([...postQualityFlags, "synthesis_anchor_repaired"]);
         } else {
+          diagnostics.suppressedAfterGeneration += 1;
+          diagnostics.hardFailSuppressions += 1;
+          if (floorRescuePlanned) {
+            floorRescueClaimed = false;
+          }
           console.log(
             `[synthesis-mode] agent=${agent.id} action=silent topic=${synthesisSelection.themeKey} reason=anchor_mismatch_unrepaired context=${frozenRunContext.runContextId}`
           );
@@ -1672,10 +1862,26 @@ async function generateAgentForumPosts({
         `[synthesis-quality] agent=${agent.id} anchor_visible=${synthesisGate.metrics.anchorVisible ? "yes" : "no"} delta_visible=${synthesisGate.metrics.deltaVisible ? "yes" : "no"} directional_call=${synthesisGate.metrics.directionalCall ? "yes" : "no"} data_anchor=${synthesisGate.metrics.dataAnchor ? "yes" : "no"} conviction_count=${synthesisGate.metrics.convictionCount} repair_applied=${synthesisGate.repaired ? "yes" : "no"} publication_gate=${synthesisGate.metrics.publicationGate} paragraphs=${paragraphGate.paragraphs} paragraph_repair=${paragraphGate.repaired ? "yes" : "no"} paragraph_gate=${paragraphGate.gate}`
       );
       if (synthesisGate.suppressed) {
-        console.log(
-          `[synthesis-mode] agent=${agent.id} action=silent topic=${synthesisSelection.themeKey} reason=publication_quality_gate context=${frozenRunContext.runContextId}`
-        );
-        continue;
+        if (floorRescuePlanned && synthesisGate.metrics.publicationGate !== "suppressed_hard_fail") {
+          diagnostics.softFailSuppressions += 1;
+          console.log(
+            `[synthesis-mode] agent=${agent.id} floor_rescue=override topic=${synthesisSelection.themeKey} reason=${synthesisGate.metrics.publicationGate} context=${frozenRunContext.runContextId}`
+          );
+        } else {
+          diagnostics.suppressedAfterGeneration += 1;
+          if (synthesisGate.metrics.publicationGate === "suppressed_hard_fail") {
+            diagnostics.hardFailSuppressions += 1;
+          } else {
+            diagnostics.softFailSuppressions += 1;
+          }
+          if (floorRescuePlanned) {
+            floorRescueClaimed = false;
+          }
+          console.log(
+            `[synthesis-mode] agent=${agent.id} action=silent topic=${synthesisSelection.themeKey} reason=${synthesisGate.metrics.publicationGate} context=${frozenRunContext.runContextId}`
+          );
+          continue;
+        }
       }
     }
 
@@ -1686,6 +1892,10 @@ async function generateAgentForumPosts({
     }
 
     if (shouldSuppressWeakEquityCompanyPost(agent, headlineAnalysis, topHeadlineForDiagnostics, resolvedContent, finalCatalyst)) {
+      diagnostics.suppressedAfterGeneration += 1;
+      if (floorRescuePlanned) {
+        floorRescueClaimed = false;
+      }
       console.log(
         `[equities-quality] suppressed stock-specific post reason=missing_company_numbers title="${truncateText(titleResolution.title ?? finalCatalyst, 100)}"`
       );
@@ -1693,6 +1903,10 @@ async function generateAgentForumPosts({
     }
 
     if (fxCorrelationEnforcement.shouldSuppress) {
+      diagnostics.suppressedAfterGeneration += 1;
+      if (floorRescuePlanned) {
+        floorRescueClaimed = false;
+      }
       console.log(
         `[fx-correlation] suppressed reason=${fxCorrelationEnforcement.reason || "quality"} title="${truncateText(titleResolution.title ?? finalCatalyst, 100)}"`
       );
@@ -1700,6 +1914,10 @@ async function generateAgentForumPosts({
     }
 
     if (equityVisibility.shouldSuppress) {
+      diagnostics.suppressedAfterGeneration += 1;
+      if (floorRescuePlanned) {
+        floorRescueClaimed = false;
+      }
       console.log(
         `[equity-fundamentals] suppressed_after_repair=true title="${truncateText(titleResolution.title ?? finalCatalyst, 100)}"`
       );
@@ -1707,6 +1925,10 @@ async function generateAgentForumPosts({
     }
 
     if (shouldSuppressUnsafeMetricPost(agent, postQualityFlags)) {
+      diagnostics.suppressedAfterGeneration += 1;
+      if (floorRescuePlanned) {
+        floorRescueClaimed = false;
+      }
       console.log(
         `[post-quality:${agent.name}] suppressed reason=unverified_metric_claim title="${truncateText(titleResolution.title ?? finalCatalyst, 100)}"`
       );
@@ -1719,6 +1941,10 @@ async function generateAgentForumPosts({
     };
 
     if (shouldSuppressRatesTemplatePost(agent, headlineAnalysis, resolvedContent, recentPosts)) {
+      diagnostics.suppressedAfterGeneration += 1;
+      if (floorRescuePlanned) {
+        floorRescueClaimed = false;
+      }
       console.log(
         `[rates-quality] suppressed template repeat title="${truncateText(titleResolution.title ?? finalCatalyst, 100)}"`
       );
@@ -1726,6 +1952,10 @@ async function generateAgentForumPosts({
     }
 
     if (shouldSuppressEquityBreadthRepeatPost(agent, postQualityFlags, recentPosts)) {
+      diagnostics.suppressedAfterGeneration += 1;
+      if (floorRescuePlanned) {
+        floorRescueClaimed = false;
+      }
       console.log(
         `[equities-quality] suppressed breadth_repeat title="${truncateText(titleResolution.title ?? finalCatalyst, 100)}"`
       );
@@ -1739,6 +1969,7 @@ async function generateAgentForumPosts({
       postingDecision: generationDecision
     });
     if (triggerMode === "synthesis" && synthesisAction === "silent") {
+      diagnostics.commentsOnly += 1;
       console.log(
         `[synthesis-mode] agent=${agent.id} action=silent topic=${frozenRunContext.synthesisTopicLabel} reason=low_signal`
       );
@@ -1793,9 +2024,21 @@ async function generateAgentForumPosts({
     });
     runThemeCoverage.set(topicPlan.primary.themeKey, (runThemeCoverage.get(topicPlan.primary.themeKey) || 0) + 1);
     thisRunPosts.push(message);
+    if (message.messageType === "post") {
+      diagnostics.publishedPosts += 1;
+    }
+    if (floorRescuePlanned) {
+      diagnostics.floorRescueUsed = true;
+      console.log(
+        `[synthesis-mode] agent=${agent.id} floor_rescue=published topic=${frozenRunContext.synthesisTopicLabel} context=${frozenRunContext.runContextId}`
+      );
+    }
   }
 
-  return entries;
+  return {
+    entries,
+    diagnostics
+  };
 }
 
 async function generateAgentForumComments({
@@ -2171,22 +2414,47 @@ function buildFrozenRunContext({
   now,
   snapshot,
   peerSnapshot,
-  headlines
+  roomHeadlines,
+  activeAgents,
+  sectorHeadlinesByAgentId
 }: {
   triggerMode: DiscussionTriggerMode;
   triggerReason?: string;
   now: string;
   snapshot: MarketSnapshotPayload;
   peerSnapshot: FrozenPeerThesisSnapshotRow[];
-  headlines: SnapshotHeadline[];
+  roomHeadlines: SnapshotHeadline[];
+  activeAgents: Agent[];
+  sectorHeadlinesByAgentId: Map<string, SnapshotHeadline[]>;
 }): FrozenRunContext {
   const runContextId = crypto.randomUUID();
-  const synthesisThemeBoard = triggerMode === "synthesis"
-    ? buildSynthesisThemeBoard(headlines)
+  const synthesisHeadlinesByAgentId = new Map<string, SnapshotHeadline[]>();
+  for (const agent of activeAgents) {
+    const perAgentHeadlines = dedupeHeadlines([
+      ...roomHeadlines,
+      ...(sectorHeadlinesByAgentId.get(agent.id) || [])
+    ]).slice(0, 28);
+    synthesisHeadlinesByAgentId.set(agent.id, perAgentHeadlines);
+  }
+  const roomSynthesisHeadlines = dedupeHeadlines([
+    ...roomHeadlines,
+    ...activeAgents.flatMap((agent) => synthesisHeadlinesByAgentId.get(agent.id) || [])
+  ]).slice(0, 32);
+  const roomSynthesisThemeBoard = triggerMode === "synthesis"
+    ? buildSynthesisThemeBoard(roomSynthesisHeadlines)
     : [];
-  const synthesisThemeDigest = triggerMode === "synthesis" ? buildClusteredThemeDigest(synthesisThemeBoard) : [];
-  const dominantSynthesisTheme = synthesisThemeBoard[0] || null;
-  const newsAnchors = headlines.filter((headline) => !/synthesis_tick_|cross asset tape|market room/i.test(headline.title));
+  const synthesisThemeBoardByAgentId = new Map<string, SynthesisThemeCluster[]>();
+  if (triggerMode === "synthesis") {
+    for (const agent of activeAgents) {
+      synthesisThemeBoardByAgentId.set(
+        agent.id,
+        buildSynthesisThemeBoard(synthesisHeadlinesByAgentId.get(agent.id) || [])
+      );
+    }
+  }
+  const synthesisThemeDigest = triggerMode === "synthesis" ? buildClusteredThemeDigest(roomSynthesisThemeBoard) : [];
+  const dominantSynthesisTheme = roomSynthesisThemeBoard[0] || null;
+  const newsAnchors = roomSynthesisHeadlines.filter((headline) => !/synthesis_tick_|cross asset tape|market room/i.test(headline.title));
   const synthesisTopicLabel = triggerMode === "synthesis"
     ? deriveSynthesisTopicLabel(dominantSynthesisTheme, snapshot.headline)
     : "reactive_mode";
@@ -2202,7 +2470,11 @@ function buildFrozenRunContext({
     snapshotTimestamp: now,
     peerSnapshotVersion: `${now}:${peerSnapshot.length}`,
     peerSnapshot,
-    synthesisThemeBoard,
+    roomSynthesisHeadlines,
+    synthesisHeadlinesByAgentId,
+    roomSynthesisThemeBoard,
+    synthesisThemeBoardByAgentId,
+    synthesisThemeBoard: roomSynthesisThemeBoard,
     dominantSynthesisTheme,
     synthesisThemeDigest,
     synthesisTopicLabel,
@@ -2344,13 +2616,18 @@ function selectSynthesisAnchorForAgent({
   recentPosts: AgentMessage[];
   recentSynthesisSectorCounts: Map<string, number>;
 }): AgentSynthesisAnchorSelection | null {
-  if (context.synthesisThemeBoard.length === 0) {
+  const agentThemeBoard = context.synthesisThemeBoardByAgentId.get(agent.id) || [];
+  const roomThemeBoard = context.roomSynthesisThemeBoard;
+  if (agentThemeBoard.length === 0 && roomThemeBoard.length === 0) {
     return null;
   }
 
   const thesisTopic = topicPlan.matchedThesis?.topicPrimary || "";
-  const hasCompanyThemeOption = context.synthesisThemeBoard.some((theme) => theme.hasCompanyHeadline);
-  const scored = context.synthesisThemeBoard.map((theme) => {
+  const hasCompanyThemeOption = agentThemeBoard.some((theme) => theme.hasCompanyHeadline);
+  const scoreTheme = (
+    theme: SynthesisThemeCluster,
+    source: "agent_board" | "room_board"
+  ): { theme: SynthesisThemeCluster; score: number; participationAdjustment: number; source: "agent_board" | "room_board" } => {
     const sectorScore = theme.sectorRelevance[agent.sector] || 0;
     const thesisScore = thesisTopic && thesisTopic === theme.key ? 2 : 0;
     const equitiesCompanyBias =
@@ -2361,6 +2638,7 @@ function selectSynthesisAnchorForAgent({
     const participationAdjustment = dominanceCount >= 2 ? -2 : dominanceCount === 0 ? 1 : 0;
     const genericPenalty = theme.isGeneric ? -5 : 0;
     const freshness = Math.min(3, theme.freshnessScore);
+    const sourceBias = source === "agent_board" ? 2 : 0;
     const score =
       sectorScore +
       thesisScore +
@@ -2368,12 +2646,17 @@ function selectSynthesisAnchorForAgent({
       equitiesOwnershipPenalty +
       freshness +
       genericPenalty +
-      participationAdjustment;
-    return { theme, score, participationAdjustment };
-  });
+      participationAdjustment +
+      sourceBias;
+    return { theme, score, participationAdjustment, source };
+  };
+  const scored = [
+    ...agentThemeBoard.map((theme) => scoreTheme(theme, "agent_board")),
+    ...roomThemeBoard.map((theme) => scoreTheme(theme, "room_board"))
+  ];
 
   scored.sort((a, b) => b.score - a.score);
-  const best = scored[0];
+  const best = scored.find((candidate) => !candidate.theme.isGeneric && candidate.theme.headlines.length > 0) || scored[0];
   if (!best) {
     return null;
   }
@@ -2401,7 +2684,15 @@ function selectSynthesisAnchorForAgent({
     relevanceScore: best.score,
     repetitionChallenge,
     hasCompanyHeadline: best.theme.hasCompanyHeadline,
-    participationAdjustment: best.participationAdjustment
+    participationAdjustment: best.participationAdjustment,
+    selectionMode: "strict",
+    selectionSource: best.source,
+    selectionReason:
+      best.source === "room_board"
+        ? "room_fallback"
+        : agent.sector === "Equities" && best.theme.hasCompanyHeadline
+          ? "selected_company_theme"
+          : "selected_macro_theme"
   };
 }
 
@@ -2653,27 +2944,39 @@ function applyEvidenceFirstMechanismGate({
     repaired = true;
   }
 
-  const thresholdPairUsed = /\b(?:150\s?k|150k)\b/i.test(nextContent) && /\bcore pce\b/i.test(nextContent);
+  let thresholdPairUsed = /\b(?:150\s?k|150k)\b/i.test(nextContent) && /\bcore pce\b/i.test(nextContent);
   const thresholdPairRelevant =
     mechanism.family === "labor_inflation_persistence" || mechanism.family === "fed_easing_timing";
   if (agent.sector === "Macro" && thresholdPairUsed && !thresholdPairRelevant) {
+    nextContent = stripMacroThresholdPairSentences(nextContent);
     const replacement = convictionRepairSentenceBySector(catalyst, agent.sector, mechanism.family);
     nextContent = ensureSingleConvictionCondition(nextContent, replacement);
     repaired = true;
+    thresholdPairUsed = /\b(?:150\s?k|150k)\b/i.test(nextContent) && /\bcore pce\b/i.test(nextContent);
   }
 
-  const mechanismFit = MECHANISM_FAMILY_KEYWORDS[mechanism.family].test(nextContent.toLowerCase());
-  const repeatDeltaVisible = hasDeltaSignal(nextContent);
+  let mechanismFit = MECHANISM_FAMILY_KEYWORDS[mechanism.family].test(nextContent.toLowerCase());
+  if (!mechanismFit) {
+    nextContent = `The operative transmission mechanism here is ${mechanism.family.replace(/_/g, " ")}, and the elected catalyst must be read through that channel. ${nextContent}`.trim();
+    repaired = true;
+    mechanismFit = MECHANISM_FAMILY_KEYWORDS[mechanism.family].test(nextContent.toLowerCase());
+  }
+  let repeatDeltaVisible = hasDeltaSignal(nextContent);
   let suppressed = false;
   if (agent.sector === "Macro") {
     const recentFamilies = recentPosts
       .slice(0, 3)
       .map((post) => inferMechanismFamilyFromText(`${post.title || ""} ${post.catalyst || ""} ${post.content || ""}`));
-    const repeatedSameFamily = recentFamilies.filter((family) => family === mechanism.family).length >= 2;
+    const repeatedSameFamily = recentFamilies.filter((family) => family === mechanism.family).length >= 3;
     if (repeatedSameFamily && !repeatDeltaVisible) {
-      suppressed = true;
+      nextContent = `What changed now versus the prior macro read is explicit here: the current catalyst shifts the mechanism through ${mechanism.family.replace(/_/g, " ")}. ${nextContent}`.trim();
+      repaired = true;
+      repeatDeltaVisible = hasDeltaSignal(nextContent);
+      if (!repeatDeltaVisible) {
+        suppressed = true;
+      }
     }
-    if (thresholdPairUsed && !thresholdPairRelevant && /\b(?:150\s?k|150k)\b/i.test(nextContent) && /\bcore pce\b/i.test(nextContent)) {
+    if (thresholdPairUsed && !thresholdPairRelevant) {
       suppressed = true;
     }
   }
@@ -2691,6 +2994,16 @@ function applyEvidenceFirstMechanismGate({
       repaired
     }
   };
+}
+
+function stripMacroThresholdPairSentences(content: string): string {
+  const sentences = content.split(/(?<=[.?!])\s+/);
+  const filtered = sentences.filter((sentence) => {
+    const has150k = /\b(?:150\s?k|150k)\b/i.test(sentence);
+    const hasCorePce = /\bcore pce\b/i.test(sentence);
+    return !(has150k && hasCorePce);
+  });
+  return filtered.join(" ").replace(/\s{2,}/g, " ").trim();
 }
 
 function ensureSingleConvictionCondition(content: string, replacement: string): string {
@@ -2779,6 +3092,30 @@ function hasSectorSpecificOpening(agent: Agent, content: string): boolean {
   return (sectorKeywords[agent.sector] || /.*/i).test(opening);
 }
 
+function isEligibleForSynthesisFloorRescue({
+  selection,
+  mechanism,
+  postingDecision
+}: {
+  selection: AgentSynthesisAnchorSelection;
+  mechanism: MechanismSelection;
+  postingDecision: PostingDecision;
+}): boolean {
+  if (selection.isGenericFallback || !selection.anchorHeadline) {
+    return false;
+  }
+  if (selection.relevanceScore < 3 || mechanism.score < 3) {
+    return false;
+  }
+  // Only rescue soft outcomes; do not rescue explicit hard rejections.
+  return (
+    postingDecision.actionType === "comment_only" ||
+    postingDecision.actionType === "stay_silent" ||
+    postingDecision.reasonCodes.includes("no_fresh_signal") ||
+    postingDecision.reasonCodes.includes("weak_catalyst_materiality_gate")
+  );
+}
+
 function applySynthesisPublicationQualityGate({
   agent,
   content,
@@ -2802,7 +3139,7 @@ function applySynthesisPublicationQualityGate({
     directionalCall: boolean;
     dataAnchor: boolean;
     convictionCount: number;
-    publicationGate: "passed" | "suppressed";
+    publicationGate: "passed" | "suppressed_hard_fail" | "suppressed_soft_fail_accumulated";
   };
 } {
   let nextContent = content;
@@ -2863,19 +3200,31 @@ function applySynthesisPublicationQualityGate({
   }
 
   state = qualityState();
-  const hardFail =
-    !state.anchorVisible ||
-    !state.directionalCall ||
-    !state.dataAnchor ||
-    state.convictionCount !== 1 ||
-    !state.chainVisible ||
-    !state.sectorOpening ||
-    (postingDecision.actionType === "update_existing" && !state.deltaVisible);
+  const hardFailureReasons: string[] = [];
+  if (!state.anchorVisible) hardFailureReasons.push("anchor_not_visible");
+  if (!state.directionalCall) hardFailureReasons.push("directional_call_missing");
+  if (state.convictionCount !== 1) hardFailureReasons.push("conviction_count_invalid");
+
+  let softFailureCount = 0;
+  if (!state.dataAnchor) softFailureCount += 1;
+  if (!state.chainVisible) softFailureCount += 1;
+  if (!state.sectorOpening && agent.sector === "Equities") softFailureCount += 1;
+  if (postingDecision.actionType === "update_existing" && !state.deltaVisible) softFailureCount += 1;
+
+  const hardFail = hardFailureReasons.length > 0;
+  const softFailAccumulated = softFailureCount >= 4;
+  const suppressed = hardFail || softFailAccumulated;
+  const publicationGate: "passed" | "suppressed_hard_fail" | "suppressed_soft_fail_accumulated" =
+    hardFail
+      ? "suppressed_hard_fail"
+      : softFailAccumulated
+        ? "suppressed_soft_fail_accumulated"
+        : "passed";
 
   return {
     content: nextContent,
     flags: uniqueQualityFlags(flags),
-    suppressed: hardFail,
+    suppressed,
     repaired,
     metrics: {
       anchorVisible: state.anchorVisible,
@@ -2883,7 +3232,7 @@ function applySynthesisPublicationQualityGate({
       directionalCall: state.directionalCall,
       dataAnchor: state.dataAnchor,
       convictionCount: state.convictionCount,
-      publicationGate: hardFail ? "suppressed" : "passed"
+      publicationGate
     }
   };
 }
@@ -5394,6 +5743,17 @@ function applyRepeatedCatalystDecisionGate({
     return postingDecision;
   }
 
+  if (
+    postingDecision.actionType === "update_existing" &&
+    postingDecision.targetThesisId &&
+    repeat.message.thesisId === postingDecision.targetThesisId
+  ) {
+    console.log(
+      `[catalyst-filter] decision_gate update_existing same-thesis bypass title="${truncateText(catalystText, 110)}" thesis=${postingDecision.targetThesisId}`
+    );
+    return postingDecision;
+  }
+
   console.log(
     `[catalyst-filter] decision_gate repeated title="${truncateText(catalystText, 110)}" agent=${agent.name} matched=${repeat.matchScope} prior="${truncateText(repeat.message.title || repeat.message.catalyst || "", 90)}"`
   );
@@ -5873,7 +6233,13 @@ function isCompanyOwnedEquityCatalyst(
     /\b(?:raises?|cuts?|maintains?)\s+(?:guidance|outlook)\b/i.test(text) ||
     /\b(?:announces?|reports?)\b/i.test(text) && /\b(?:eps|revenue|guidance|margin|bookings|arr)\b/i.test(text) ||
     /\b(?:acquires?|acquisition|merger|buyout|takeover|all-cash|cash-and-stock)\b/i.test(text) ||
-    /\b(?:upgrade|downgrade|price\s+target|target\s+(?:raise|cut)|initiates?|reiterates?|overweight|underweight|neutral|buy|sell)\b/i.test(text);
+    /\b(?:upgrade|downgrade|price\s+target|target\s+(?:raise|cut)|initiates?|reiterates?|overweight|underweight|neutral|buy|sell)\b/i.test(text) ||
+    /\b(?:cost\s+(?:cut|reduction|saving)|restructur|layoffs?|workforce\s+(?:reduction|cut)|hiring\s+freeze)\b/i.test(text) ||
+    /\b(?:launches?|unveils?|introduces?|debuts?|ships?)\s+(?:new\s+)?(?:product|service|platform|chip|model|version|release|update)\b/i.test(text) ||
+    /\b(?:names?|appoints?|hires?|promotes?|departs?|steps?\s+down|resigns?|fired|ousted)\s+.{0,30}(?:ceo|cfo|coo|cto|chair(?:man|person)?|president|director)\b/i.test(text) ||
+    /\b(?:wins?|secures?|signs?|awarded)\s+.{0,40}(?:contract|deal|agreement|partnership|customer|order)\b/i.test(text) ||
+    /\b(?:raises?\s+capital|files?\s+for\s+ipo|spin[-\s]?off|sells?\s+(?:unit|division|business)|stake\s+(?:sale|purchase)|debt\s+(?:offering|raise)|secondary\s+offering)\b/i.test(text) ||
+    /\b(?:fda\s+approval|clinical\s+trial|drug\s+approval|patent\s+(?:granted|filed|denied)|recall|investigation|lawsuit\s+(?:filed|settled)|settles?\s+(?:with|case)|antitrust)\b/i.test(text);
   const multiEntityRoundup = (topHeadline?.entities?.length || 0) > 1;
   const broadRoundup = /\b(?:stocks?|shares?)\b/i.test(text) &&
     /\b(?:in focus|to watch|watchlist|roundup|across|among|sector|basket|multiple|several|mixed)\b/i.test(text);
@@ -5889,18 +6255,77 @@ function isCompanyOwnedEquityCatalyst(
   return !macroOrPolicyDominant && !creditSystemDominant;
 }
 
+function isSingleCompanyEquityAnchor(headline?: SnapshotHeadline): boolean {
+  if (!headline) {
+    return false;
+  }
+  const text = `${headline.title} ${headline.description || ""}`;
+  const entities = headline.entities || [];
+  const hasCompanySpecificity =
+    entities.length === 1 ||
+    /\b(?:inc|corp|ltd|plc|group|holdings|class\s+[ab]|adr|common\s+stock|shares?)\b/i.test(text) ||
+    /\b[A-Z]{1,5}\b(?=\s*(?:shares?|stock|earnings|transcript|results|guidance|rating|price\s+target|downgrade|upgrade))/i.test(
+      headline.title
+    );
+  const singleCompanyEvent =
+    /\b(?:q[1-4]|quarterly|annual)\s+(?:earnings|results)\b/i.test(text) ||
+    /\bearnings\s+transcript\b/i.test(text) ||
+    /\b(?:raises?|cuts?|maintains?)\s+(?:guidance|outlook)\b/i.test(text) ||
+    /\b(?:announces?|reports?)\b/i.test(text) && /\b(?:eps|revenue|guidance|margin|bookings|arr)\b/i.test(text) ||
+    /\b(?:acquires?|acquisition|merger|buyout|takeover|all-cash|cash-and-stock)\b/i.test(text) ||
+    /\b(?:upgrade|downgrade|price\s+target|target\s+(?:raise|cut)|initiates?|reiterates?|overweight|underweight|neutral|buy|sell)\b/i.test(text) ||
+    /\bstock\s+surges?\b/i.test(text) ||
+    /\b(?:cost\s+(?:cut|reduction|saving)|restructur|layoffs?|workforce\s+(?:reduction|cut)|hiring\s+freeze)\b/i.test(text) ||
+    /\b(?:launches?|unveils?|introduces?|debuts?|ships?)\s+(?:new\s+)?(?:product|service|platform|chip|model|version|release|update)\b/i.test(text) ||
+    /\b(?:names?|appoints?|hires?|promotes?|departs?|steps?\s+down|resigns?|fired|ousted)\s+.{0,30}(?:ceo|cfo|coo|cto|chair(?:man|person)?|president|director)\b/i.test(text) ||
+    /\b(?:wins?|secures?|signs?|awarded)\s+.{0,40}(?:contract|deal|agreement|partnership|customer|order)\b/i.test(text) ||
+    /\b(?:raises?\s+capital|files?\s+for\s+ipo|spin[-\s]?off|sells?\s+(?:unit|division|business)|stake\s+(?:sale|purchase)|debt\s+(?:offering|raise)|secondary\s+offering)\b/i.test(text) ||
+    /\b(?:fda\s+approval|clinical\s+trial|drug\s+approval|patent\s+(?:granted|filed|denied)|recall|investigation|lawsuit\s+(?:filed|settled)|settles?\s+(?:with|case)|antitrust)\b/i.test(text);
+  const broadRoundup =
+    /\b(?:stocks?|shares?)\b/i.test(text) &&
+    /\b(?:in focus|to watch|watchlist|roundup|across|among|sector|basket|multiple|several|mixed)\b/i.test(text);
+  const macroOrPolicyDominant =
+    /\b(?:fomc|fed|ecb|boj|cpi|pce|nfp|payroll|treasury|auction|refunding|term premium|policy decision)\b/i.test(text);
+  return hasCompanySpecificity && singleCompanyEvent && !broadRoundup && !macroOrPolicyDominant;
+}
+
+function isSingleCompanyEquityCatalystText(catalyst: string): boolean {
+  const text = catalyst || "";
+  const hasCompanySpecificity =
+    /\b[A-Z]{1,5}\b(?=\s*(?:shares?|stock|earnings|transcript|results|guidance|rating|price\s+target|downgrade|upgrade))/i.test(text) ||
+    /\b(?:inc|corp|ltd|plc|group|holdings|class\s+[ab]|adr|shares?|stock)\b/i.test(text);
+  const singleCompanyEvent =
+    /\b(?:q[1-4]|quarterly|annual)\s+(?:earnings|results)\b/i.test(text) ||
+    /\bearnings\s+transcript\b/i.test(text) ||
+    /\b(?:upgrade|downgrade|price\s+target|target\s+(?:raise|cut)|initiates?|reiterates?|overweight|underweight|neutral|buy|sell)\b/i.test(text) ||
+    /\bstock\s+surges?\b/i.test(text) ||
+    /\b(?:acquir|acquisition|merger|takeover|deal|buyout)\b/i.test(text) ||
+    /\b(?:cost\s+(?:cut|reduction|saving)|restructur|layoffs?|workforce\s+(?:reduction|cut)|hiring\s+freeze)\b/i.test(text) ||
+    /\b(?:launches?|unveils?|introduces?|debuts?|ships?)\s+(?:new\s+)?(?:product|service|platform|chip|model|version|release|update)\b/i.test(text) ||
+    /\b(?:names?|appoints?|hires?|promotes?|departs?|steps?\s+down|resigns?|fired|ousted)\s+.{0,30}(?:ceo|cfo|coo|cto|chair(?:man|person)?|president|director)\b/i.test(text) ||
+    /\b(?:wins?|secures?|signs?|awarded)\s+.{0,40}(?:contract|deal|agreement|partnership|customer|order)\b/i.test(text) ||
+    /\b(?:raises?\s+capital|files?\s+for\s+ipo|spin[-\s]?off|sells?\s+(?:unit|division|business)|stake\s+(?:sale|purchase)|debt\s+(?:offering|raise)|secondary\s+offering)\b/i.test(text) ||
+    /\b(?:fda\s+approval|clinical\s+trial|drug\s+approval|patent\s+(?:granted|filed|denied)|recall|investigation|lawsuit\s+(?:filed|settled)|settles?\s+(?:with|case)|antitrust)\b/i.test(text);
+  const broadRoundup =
+    /\b(?:stocks?|shares?)\b/i.test(text) &&
+    /\b(?:in focus|to watch|watchlist|roundup|across|among|sector|basket|multiple|several|mixed)\b/i.test(text);
+  return hasCompanySpecificity && singleCompanyEvent && !broadRoundup;
+}
+
 function applyEquityOwnedCompanyHeadlineGate({
   agent,
   postingDecision,
   headlineAnalysis,
-  topHeadline
+  topHeadline,
+  forceEquityOwnership = false
 }: {
   agent: Agent;
   postingDecision: PostingDecision;
   headlineAnalysis: HeadlineAnalysis | null;
   topHeadline?: SnapshotHeadline;
+  forceEquityOwnership?: boolean;
 }): PostingDecision {
-  const equityOwned = isCompanyOwnedEquityCatalyst(headlineAnalysis, topHeadline);
+  const equityOwned = forceEquityOwnership || isCompanyOwnedEquityCatalyst(headlineAnalysis, topHeadline);
   if (!equityOwned || postingDecision.actionType === "stay_silent") {
     return postingDecision;
   }
@@ -5936,12 +6361,14 @@ function applyMacroSingleNameOwnershipGate({
   agent,
   postingDecision,
   headlineAnalysis,
-  topHeadline
+  topHeadline,
+  forceSingleCompany = false
 }: {
   agent: Agent;
   postingDecision: PostingDecision;
   headlineAnalysis: HeadlineAnalysis | null;
   topHeadline?: SnapshotHeadline;
+  forceSingleCompany?: boolean;
 }): PostingDecision {
   if (
     agent.sector !== "Macro" ||
@@ -5953,6 +6380,7 @@ function applyMacroSingleNameOwnershipGate({
 
   const title = `${headlineAnalysis.headline_title} ${topHeadline?.description || ""}`;
   const singleCompanyLikely =
+    forceSingleCompany ||
     isCompanyOwnedEquityCatalyst(headlineAnalysis, topHeadline) ||
     ((topHeadline?.entities?.length || 0) === 1 && /\b(?:earnings|guidance|transcript|rating|target|dividend|buyback|acquisition|merger)\b/i.test(title));
   const systemicFrame =
@@ -6018,6 +6446,52 @@ function applyNoFreshWeakDomainDecisionGate(postingDecision: PostingDecision): P
     ...postingDecision,
     actionType: "stay_silent",
     reasonCodes: uniqueReasonCodes([...postingDecision.reasonCodes, "weak_catalyst_materiality_gate" as const])
+  };
+}
+
+function applyScheduledReactiveTopLevelRecoveryGate({
+  triggerMode,
+  agent,
+  postingDecision,
+  headlineAnalysis,
+  topHeadline,
+  domainRelevance,
+  noveltyAssessment,
+  topicPlan
+}: {
+  triggerMode: DiscussionTriggerMode;
+  agent: Agent;
+  postingDecision: PostingDecision;
+  headlineAnalysis: HeadlineAnalysis | null;
+  topHeadline?: SnapshotHeadline;
+  domainRelevance: DomainRelevanceResult;
+  noveltyAssessment: NoveltyAssessment;
+  topicPlan: AgentTopicPlan;
+}): PostingDecision {
+  if (triggerMode !== "scheduled" || postingDecision.actionType !== "comment_only" || !headlineAnalysis) {
+    return postingDecision;
+  }
+  if (postingDecision.reasonCodes.includes("run_catalyst_claimed" as PostingDecision["reasonCodes"][number])) {
+    return postingDecision;
+  }
+  const strongSignal =
+    headlineAnalysis.market_signal_strength !== "low" &&
+    headlineAnalysis.direct_relevance_score >= 4 &&
+    headlineAnalysis.primary_mechanism.trim().length > 0;
+  const strongContext = noveltyAssessment.compositeScore >= 40 || topicPlan.hasMeaningfulFreshSignal;
+  const domainOk = domainRelevance.verdict !== "irrelevant";
+  const sectorOwned = agent.sector === "Equities"
+    ? hasEquityStandaloneOwnership(headlineAnalysis, topHeadline)
+    : headlineAnalysis.direct_relevance_score >= 3;
+  if (!strongSignal || !strongContext || !domainOk || !sectorOwned) {
+    return postingDecision;
+  }
+  console.log(
+    `[volume-recovery] mode=scheduled action=comment_only->new_post agent=${agent.sector} headline="${truncateText(headlineAnalysis.headline_title, 90)}"`
+  );
+  return {
+    ...postingDecision,
+    actionType: "new_post"
   };
 }
 
@@ -6604,10 +7078,41 @@ function shouldSuppressWeakEquityCompanyPost(
     return false;
   }
 
+  // Qualitative carve-out: post is single-company-specific and contains substantive
+  // event language even if the LLM couldn't anchor to live numbers (e.g. Yahoo down).
+  // Better to publish a qualitative view than to stay silent — flagged for governance.
+  if (hasSubstantiveCompanyEventLanguage(content, catalyst)) {
+    console.log(
+      `[equities-company-fallback] fact_present=no qualitative_substance=yes catalyst="${truncateText(catalyst, 90)}"`
+    );
+    return false;
+  }
+
   console.log(
     `[equities-company-fallback] fact_present=no ownership_action=silent catalyst="${truncateText(catalyst, 90)}"`
   );
   return true;
+}
+
+/**
+ * Detects whether a post contains a single-company subject + an event verb
+ * from the expanded singleCompanyEvent vocabulary. Used as a fallback so that
+ * substantive qualitative posts can publish when fundamentals fetch fails.
+ */
+function hasSubstantiveCompanyEventLanguage(content: string, catalyst: string): boolean {
+  const text = `${content} ${catalyst}`;
+  const hasSubject =
+    /\b[A-Z][A-Za-z0-9&\.\-]{2,}(?:\s+(?:Inc|Corp|Corporation|Ltd|Plc|Group|Holdings|AG|SA|NV))?\b/.test(content) ||
+    /\b[A-Z]{1,5}\b(?=\s*(?:shares?|stock|earnings|guidance|rating|price\s+target|downgrade|upgrade|reports?|announces?))/.test(text);
+  const hasEventVerb =
+    /\b(?:earnings|revenue|guidance|results|transcript|margin|profit|loss|dividend|buyback|merger|acquisition|ipo|layoffs?|restructur|upgrade|downgrade|rating|target)\b/i.test(text) ||
+    /\b(?:cost\s+(?:cut|reduction|saving)|workforce\s+(?:reduction|cut)|hiring\s+freeze)\b/i.test(text) ||
+    /\b(?:launches?|unveils?|introduces?|debuts?|ships?)\s+(?:new\s+)?(?:product|service|platform|chip|model|version|release|update)\b/i.test(text) ||
+    /\b(?:names?|appoints?|hires?|promotes?|departs?|steps?\s+down|resigns?|fired|ousted)\s+.{0,30}(?:ceo|cfo|coo|cto|chair(?:man|person)?|president|director)\b/i.test(text) ||
+    /\b(?:wins?|secures?|signs?|awarded)\s+.{0,40}(?:contract|deal|agreement|partnership|customer|order)\b/i.test(text) ||
+    /\b(?:raises?\s+capital|files?\s+for\s+ipo|spin[-\s]?off|sells?\s+(?:unit|division|business)|stake\s+(?:sale|purchase))\b/i.test(text) ||
+    /\b(?:fda\s+approval|clinical\s+trial|drug\s+approval|patent|recall|investigation|lawsuit|settles?|antitrust)\b/i.test(text);
+  return hasSubject && hasEventVerb;
 }
 
 function shouldSuppressUnsafeMetricPost(agent: Agent, flags: PostQualityFlag[]): boolean {
