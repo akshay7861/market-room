@@ -1,6 +1,7 @@
 import type { Env } from "../../index";
 import type { User, AuthResponse } from "@market-room/shared";
 import { createRepositories } from "../repositories";
+import { sendVerificationEmail, subscribeToNewsletter } from "./emailService";
 
 /**
  * Hash a plaintext password using PBKDF2 (available in Cloudflare Workers).
@@ -147,9 +148,11 @@ export async function signUp(
     // Create member status record
     await repos.users.createMemberStatus(user.id, "pending");
 
-    // TODO: Send verification email with token
-    // For now, just log it for testing
-    console.log(`[AUTH] Verification token for ${email}: ${token}`);
+    // Send verification email
+    const emailResult = await sendVerificationEmail(env, email, firstName, token);
+    if (!emailResult.ok) {
+      console.warn(`[AUTH] Email send failed for ${email}, but user was created. Token: ${token}`);
+    }
 
     return { ok: true, user };
   } catch (error) {
@@ -202,6 +205,12 @@ export async function verifyEmail(
 
     // Update member status to active
     await repos.users.updateMemberStatus(user.id, "active", new Date().toISOString());
+
+    // Subscribe to newsletter
+    const loopsResult = await subscribeToNewsletter(env, email, user.firstName, user.lastName);
+    if (!loopsResult.ok) {
+      console.warn(`[AUTH] Newsletter subscription failed for ${email}, but email was verified.`);
+    }
 
     return { ok: true, message: "Email verified successfully." };
   } catch (error) {

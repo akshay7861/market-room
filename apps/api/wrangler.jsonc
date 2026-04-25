@@ -46,5 +46,14 @@
     "SYNTHESIS_EVERY_N_TICKS": "2",
     "ADMIN_API_ENABLED": "true",
     "KNOWLEDGE_VECTOR_RETRIEVAL": "true"
+  },
+  "env": {
+    "production": {
+      "vars": {
+        // Add your actual keys here:
+        // "RESEND_API_KEY": "re_...",
+        // "LOOPS_API_KEY": "..."
+      }
+    }
   }
 }
