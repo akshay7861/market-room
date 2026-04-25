@@ -1,4 +1,5 @@
 import type {
+  AdminMember,
   AdminSummary,
   AgentLearningView,
   AgentKnowledgeStore,
@@ -344,6 +345,32 @@ export async function downloadTrainingExamplesExport(
     blob,
     filename: filenameMatch?.[1] || `training-examples-${groupBy}.jsonl`
   };
+}
+
+// ── Admin: member management ──────────────────────────────────────────────
+
+export async function fetchAdminMembers(): Promise<AdminMember[]> {
+  const payload = await fetchJson<{ ok: boolean; members: AdminMember[] }>("/api/admin/users");
+  return payload.members;
+}
+
+export async function deleteAdminMember(userId: string): Promise<void> {
+  const headers = new Headers({ "X-Client-Id": getClientId() });
+  const adminToken = getAdminToken();
+  if (adminToken) headers.set("X-Admin-Token", adminToken);
+  const response = await fetch(`${API_BASE_URL}/api/admin/users/${userId}`, {
+    method: "DELETE",
+    headers,
+  });
+  if (!response.ok) throw new Error(`Delete failed: ${response.status}`);
+}
+
+export async function forceVerifyAdminMember(userId: string): Promise<void> {
+  await fetchJson(`/api/admin/users/${userId}/verify`, { method: "POST" });
+}
+
+export async function resendVerificationAdminMember(userId: string): Promise<void> {
+  await fetchJson(`/api/admin/users/${userId}/resend-verification`, { method: "POST" });
 }
 
 export async function reactToMessage(

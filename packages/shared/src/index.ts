@@ -27,6 +27,11 @@ export type LoginRequest = {
   password: string;
 };
 
+export type AdminMember = User & {
+  memberStatus: string;
+  joinedAt: string | null;
+};
+
 export type AuthResponse = {
   ok: boolean;
   user?: User;

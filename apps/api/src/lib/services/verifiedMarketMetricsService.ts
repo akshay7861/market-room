@@ -191,7 +191,7 @@ function parseDisplayNumber(value: string): number | null {
 
 function unitForInstrument(instrument: SnapshotInstrument): string {
   if (/%/.test(instrument.value)) return "%";
-  if (/\$/.test(instrument.value)) return "";
+  if (/\$/.test(instrument.value)) return "$";
   return "";
 }
 

@@ -702,6 +702,49 @@ async function routeRequest(request: Request, env: Env, ctx: ExecutionContext): 
     });
   }
 
+  // ── Admin: user management ───────────────────────────────────────────────
+  if (url.pathname === "/api/admin/users" && request.method === "GET") {
+    const repos = createRepositories(env);
+    const members = await repos.users.listAllUsers();
+    return json({ ok: true, members });
+  }
+
+  const adminUserMatch = url.pathname.match(/^\/api\/admin\/users\/([^/]+)(\/verify|\/resend-verification)?$/);
+  if (adminUserMatch) {
+    const userId = adminUserMatch[1]!;
+    const action = adminUserMatch[2];
+
+    if (request.method === "DELETE" && !action) {
+      const repos = createRepositories(env);
+      await repos.users.deleteUser(userId);
+      return json({ ok: true });
+    }
+
+    if (request.method === "POST" && action === "/verify") {
+      const repos = createRepositories(env);
+      await repos.users.updateUser(userId, {
+        emailVerified: true,
+        emailVerificationToken: null,
+        emailVerificationExpiry: null,
+      });
+      await repos.users.updateMemberStatus(userId, "active", new Date().toISOString());
+      return json({ ok: true });
+    }
+
+    if (request.method === "POST" && action === "/resend-verification") {
+      const repos = createRepositories(env);
+      const user = await repos.users.getUserById(userId);
+      if (!user) return json({ ok: false, message: "User not found" }, { status: 404 });
+      const { generateEmailVerificationToken } = await import("../lib/services/authService");
+      const { sendVerificationEmail } = await import("../lib/services/emailService");
+      const token = generateEmailVerificationToken();
+      const expiry = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+      await repos.users.updateUser(userId, { emailVerificationToken: token, emailVerificationExpiry: expiry });
+      await sendVerificationEmail(env, user.email, user.firstName, token);
+      return json({ ok: true });
+    }
+  }
+
   if (url.pathname === "/api/auth/me" && request.method === "GET") {
     const sessionToken = request.headers.get("Cookie")?.split("session=")[1]?.split(";")[0];
     if (!sessionToken) {
@@ -723,7 +766,7 @@ function buildCorsHeaders(allowedOrigin: string): Record<string, string> {
   return {
     "Access-Control-Allow-Origin": allowedOrigin,
     "Access-Control-Allow-Headers": "Content-Type, X-Client-Id, X-Admin-Token",
-    "Access-Control-Allow-Methods": "GET,POST,PATCH,OPTIONS",
+    "Access-Control-Allow-Methods": "GET,POST,PATCH,DELETE,OPTIONS",
     "Vary": "Origin"
   };
 }

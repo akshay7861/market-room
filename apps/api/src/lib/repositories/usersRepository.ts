@@ -267,5 +267,29 @@ export function createUsersRepository(env: Env) {
         .bind(status, status === "active" ? joinedAt || new Date().toISOString() : null, new Date().toISOString(), userId)
         .run();
     },
+
+    async listAllUsers(): Promise<Array<User & { memberStatus: string; joinedAt: string | null }>> {
+      const rows = await env.DB.prepare(
+        `SELECT
+          u.id, u.email, u.first_name, u.last_name,
+          u.email_verified, u.created_at, u.updated_at,
+          COALESCE(ms.membership_status, 'pending') AS membership_status,
+          ms.joined_at
+        FROM users u
+        LEFT JOIN user_member_status ms ON ms.user_id = u.id
+        ORDER BY u.created_at DESC`
+      ).all<UserRow & { membership_status: string; joined_at: string | null }>();
+
+      return (rows.results ?? []).map((row) => ({
+        ...mapUserRow(row),
+        memberStatus: row.membership_status,
+        joinedAt: row.joined_at,
+      }));
+    },
+
+    async deleteUser(userId: string): Promise<void> {
+      // Cascades to user_sessions and user_member_status via FK
+      await env.DB.prepare(`DELETE FROM users WHERE id = ?`).bind(userId).run();
+    },
   };
 }

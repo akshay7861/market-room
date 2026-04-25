@@ -1,16 +1,20 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
-import type { AdminSummary, AgentProfile, UpdateAgentInput } from "@market-room/shared";
+import type { AdminMember, AdminSummary, AgentProfile, UpdateAgentInput } from "@market-room/shared";
 import { AdminAgentEditor } from "../components/AdminAgentEditor";
 import { FeedbackPanel } from "../components/FeedbackPanel";
 import { StatCard } from "../components/StatCard";
 import {
   clearAdminToken,
+  deleteAdminMember,
   downloadTrainingExamplesExport,
   fetchAdminAgents,
+  fetchAdminMembers,
   fetchAdminSummary,
+  forceVerifyAdminMember,
   getAdminToken,
   refreshLearningSignals,
+  resendVerificationAdminMember,
   setAdminToken,
   updateAdminAgent
 } from "../lib/api";
@@ -27,6 +31,10 @@ export function AdminPage() {
   const [learningMessage, setLearningMessage] = useState<string | null>(null);
   const [refreshNonce, setRefreshNonce] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [members, setMembers] = useState<AdminMember[]>([]);
+  const [membersLoading, setMembersLoading] = useState(false);
+  const [membersError, setMembersError] = useState<string | null>(null);
+  const [memberAction, setMemberAction] = useState<string | null>(null); // userId being acted on
 
   useEffect(() => {
     if (!adminTokenReady) {
@@ -42,6 +50,12 @@ export function AdminPage() {
       })
       .catch(() => setError("Could not load admin data."))
       .finally(() => setIsLoading(false));
+
+    setMembersLoading(true);
+    fetchAdminMembers()
+      .then(setMembers)
+      .catch(() => setMembersError("Could not load members."))
+      .finally(() => setMembersLoading(false));
   }, [adminTokenReady]);
 
   function handleUnlockAdmin(event: FormEvent<HTMLFormElement>) {
@@ -91,6 +105,44 @@ export function AdminPage() {
       setLearningMessage("Could not refresh learning signals.");
     } finally {
       setIsRefreshingLearning(false);
+    }
+  }
+
+  async function handleDeleteMember(userId: string, email: string) {
+    if (!confirm(`Delete member ${email}? This cannot be undone.`)) return;
+    setMemberAction(userId);
+    try {
+      await deleteAdminMember(userId);
+      setMembers((prev) => prev.filter((m) => m.id !== userId));
+    } catch {
+      setMembersError("Failed to delete member.");
+    } finally {
+      setMemberAction(null);
+    }
+  }
+
+  async function handleVerifyMember(userId: string) {
+    setMemberAction(userId);
+    try {
+      await forceVerifyAdminMember(userId);
+      setMembers((prev) =>
+        prev.map((m) => m.id === userId ? { ...m, emailVerified: true, memberStatus: "active" } : m)
+      );
+    } catch {
+      setMembersError("Failed to verify member.");
+    } finally {
+      setMemberAction(null);
+    }
+  }
+
+  async function handleResendVerification(userId: string) {
+    setMemberAction(userId);
+    try {
+      await resendVerificationAdminMember(userId);
+    } catch {
+      setMembersError("Failed to resend verification.");
+    } finally {
+      setMemberAction(null);
     }
   }
 
@@ -234,6 +286,96 @@ export function AdminPage() {
             : "Scheduled mode is disabled. Manual runs from the Market Room button are still available."}
         </p>
         <p className="muted">Default scheduled brief: {summary?.schedulerPrompt || "Not set"}</p>
+      </section>
+
+      {/* ── Members ─────────────────────────────────────────────────── */}
+      <section className="panel stack-sm">
+        <div className="room-heading">
+          <div>
+            <h3>Members</h3>
+            <p className="muted">
+              {members.length} registered · {members.filter((m) => m.emailVerified).length} verified · {members.filter((m) => m.memberStatus === "active").length} active
+            </p>
+          </div>
+          <button
+            className="button button-secondary"
+            type="button"
+            onClick={() => {
+              setMembersLoading(true);
+              fetchAdminMembers()
+                .then(setMembers)
+                .catch(() => setMembersError("Could not refresh members."))
+                .finally(() => setMembersLoading(false));
+            }}
+          >
+            Refresh
+          </button>
+        </div>
+
+        {membersError && <p className="muted" style={{ color: "#e55" }}>{membersError}</p>}
+
+        {membersLoading ? (
+          <p className="muted">Loading members...</p>
+        ) : members.length === 0 ? (
+          <p className="muted">No members yet.</p>
+        ) : (
+          <div className="admin-members-table">
+            <div className="admin-members-header">
+              <span>Name</span>
+              <span>Email</span>
+              <span>Status</span>
+              <span>Joined</span>
+              <span>Actions</span>
+            </div>
+            {members.map((m) => (
+              <div key={m.id} className="admin-members-row">
+                <span>{m.firstName} {m.lastName}</span>
+                <span className="admin-members-email">{m.email}</span>
+                <span>
+                  <span className={`admin-member-badge admin-member-badge--${m.emailVerified ? "verified" : "pending"}`}>
+                    {m.emailVerified ? "✓ verified" : "unverified"}
+                  </span>
+                </span>
+                <span className="muted" style={{ fontSize: "0.78rem" }}>
+                  {m.joinedAt ? new Date(m.joinedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "2-digit" }) : m.createdAt ? new Date(m.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "2-digit" }) : "—"}
+                </span>
+                <span className="admin-members-actions">
+                  {!m.emailVerified && (
+                    <>
+                      <button
+                        className="button button-secondary"
+                        style={{ fontSize: "0.75rem", padding: "4px 10px" }}
+                        disabled={memberAction === m.id}
+                        onClick={() => handleVerifyMember(m.id)}
+                        type="button"
+                      >
+                        Force verify
+                      </button>
+                      <button
+                        className="button button-secondary"
+                        style={{ fontSize: "0.75rem", padding: "4px 10px" }}
+                        disabled={memberAction === m.id}
+                        onClick={() => handleResendVerification(m.id)}
+                        type="button"
+                      >
+                        Resend email
+                      </button>
+                    </>
+                  )}
+                  <button
+                    className="button button-secondary"
+                    style={{ fontSize: "0.75rem", padding: "4px 10px", color: "#e55", borderColor: "#e55" }}
+                    disabled={memberAction === m.id}
+                    onClick={() => handleDeleteMember(m.id, m.email)}
+                    type="button"
+                  >
+                    Delete
+                  </button>
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
 
       {agents.length === 0 ? (
