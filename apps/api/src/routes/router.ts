@@ -6,7 +6,10 @@ import type {
   LearningRefreshResult,
   ScheduledRunResult,
   TrainingExamplesExportGroupBy,
-  UpdateAgentInput
+  UpdateAgentInput,
+  SignUpRequest,
+  VerifyEmailRequest,
+  LoginRequest
 } from "@market-room/shared";
 import { json } from "../lib/http";
 import {
@@ -46,6 +49,13 @@ import { isKnowledgeCategory } from "../lib/services/agentKnowledgeService";
 import { runScheduledMarketCheck } from "../lib/services/scheduledMarketService";
 import { fetchLatestMarketSnapshot } from "../lib/market-data";
 import { loadRoom } from "../lib/room";
+import {
+  signUp,
+  verifyEmail,
+  login,
+  validateSession,
+  logout
+} from "../lib/services/authService";
 import type { Env } from "../index";
 
 const ALLOWED_ORIGINS = new Set([
@@ -621,6 +631,89 @@ async function routeRequest(request: Request, env: Env, ctx: ExecutionContext): 
     const result = await runScheduledMarketCheck(env, "manual_test");
     ctx.waitUntil(Promise.resolve(result as ScheduledRunResult));
     return json(result);
+  }
+
+  // ── Auth endpoints ──────────────────────────────────────────────────────────
+  if (url.pathname === "/api/auth/sign-up" && request.method === "POST") {
+    const body = (await request.json().catch(() => null)) as SignUpRequest | null;
+    if (!body || !body.email || !body.firstName || !body.lastName || !body.password) {
+      return json(
+        { ok: false, message: "Email, first name, last name, and password are required." },
+        { status: 400 }
+      );
+    }
+
+    const result = await signUp(env, body.email, body.firstName, body.lastName, body.password);
+    return json(result, { status: result.ok ? 201 : 400 });
+  }
+
+  if (url.pathname === "/api/auth/verify-email" && request.method === "POST") {
+    const body = (await request.json().catch(() => null)) as VerifyEmailRequest | null;
+    if (!body || !body.email || !body.token) {
+      return json(
+        { ok: false, message: "Email and token are required." },
+        { status: 400 }
+      );
+    }
+
+    const result = await verifyEmail(env, body.email, body.token);
+    return json(result, { status: result.ok ? 200 : 400 });
+  }
+
+  if (url.pathname === "/api/auth/login" && request.method === "POST") {
+    const body = (await request.json().catch(() => null)) as LoginRequest | null;
+    if (!body || !body.email || !body.password) {
+      return json(
+        { ok: false, message: "Email and password are required." },
+        { status: 400 }
+      );
+    }
+
+    const result = await login(env, body.email, body.password);
+    if (!result.ok) {
+      return json(result, { status: 401 });
+    }
+
+    // Set session cookie (httpOnly, secure, sameSite)
+    const headers = new Headers({
+      "Content-Type": "application/json",
+      "Set-Cookie": `session=${result.sessionToken}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=2592000`
+    });
+
+    return new Response(JSON.stringify({ ok: true, user: result.user }), {
+      status: 200,
+      headers
+    });
+  }
+
+  if (url.pathname === "/api/auth/logout" && request.method === "POST") {
+    const sessionToken = request.headers.get("Cookie")?.split("session=")[1]?.split(";")[0];
+    if (sessionToken) {
+      await logout(env, sessionToken);
+    }
+
+    const headers = new Headers({
+      "Set-Cookie": "session=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0"
+    });
+
+    return new Response(JSON.stringify({ ok: true }), {
+      status: 200,
+      headers
+    });
+  }
+
+  if (url.pathname === "/api/auth/me" && request.method === "GET") {
+    const sessionToken = request.headers.get("Cookie")?.split("session=")[1]?.split(";")[0];
+    if (!sessionToken) {
+      return json({ ok: false, message: "Not authenticated" }, { status: 401 });
+    }
+
+    const user = await validateSession(env, sessionToken);
+    if (!user) {
+      return json({ ok: false, message: "Session invalid or expired" }, { status: 401 });
+    }
+
+    return json({ ok: true, user });
   }
 
   return json({ error: "Not found" }, { status: 404 });

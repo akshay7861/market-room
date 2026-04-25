@@ -1,3 +1,38 @@
+// === User & Auth ===
+
+export type User = {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  emailVerified: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type SignUpRequest = {
+  email: string;
+  firstName: string;
+  lastName: string;
+  password: string;
+};
+
+export type VerifyEmailRequest = {
+  email: string;
+  token: string;
+};
+
+export type LoginRequest = {
+  email: string;
+  password: string;
+};
+
+export type AuthResponse = {
+  ok: boolean;
+  user?: User;
+  message?: string;
+};
+
 // === Agent Profile ===
 
 export type Agent = {

@@ -3306,6 +3306,320 @@ img {
   }
 }
 
+/* ── Auth pages ──────────────────────────────────────────────────────────── */
+
+.page-header {
+  display: grid;
+  gap: 10px;
+}
+
+.page-header h2 {
+  font-family: "Space Grotesk", "IBM Plex Sans", sans-serif;
+  font-size: clamp(1.8rem, 3vw, 2.8rem);
+  letter-spacing: -0.05em;
+  margin: 0;
+}
+
+.page-header p {
+  color: var(--muted);
+  margin: 0;
+  max-width: 480px;
+  line-height: 1.6;
+  font-size: 0.94rem;
+}
+
+.text-muted { color: var(--muted); }
+.text-small { font-size: 0.8rem; }
+.text-center { text-align: center; }
+.link { color: var(--text); font-weight: 600; text-decoration: underline; }
+
+/* ── Form elements ── */
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-group label {
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.form-group input {
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1.5px solid var(--panel-border);
+  background: var(--panel);
+  font-size: 0.94rem;
+  font-family: inherit;
+  color: var(--text);
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.form-group input:focus {
+  outline: none;
+  border-color: rgba(255, 204, 0, 0.5);
+  box-shadow: 0 0 0 3px rgba(255, 204, 0, 0.12);
+}
+
+.form-group input:disabled,
+.input-disabled {
+  background: rgba(0, 0, 0, 0.03);
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.form-error {
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: rgba(200, 0, 0, 0.06);
+  border: 1px solid rgba(200, 0, 0, 0.14);
+  color: #b00;
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+
+/* ── Sign Up page ── */
+
+.sign-up-page,
+.verify-email-page,
+.create-profile-page {
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.sign-up-card,
+.verify-email-card,
+.create-profile-card {
+  padding: clamp(24px, 4vw, 40px);
+}
+
+.sign-up-form,
+.create-profile-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.sign-up-form .button,
+.create-profile-form .button {
+  margin-top: 4px;
+}
+
+/* ── Password strength ── */
+
+.password-strength {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.strength-bar {
+  height: 4px;
+  border-radius: 999px;
+  transition: all 300ms ease;
+}
+
+.strength-bar.strength-weak { width: 33%; background: #e55; }
+.strength-bar.strength-fair { width: 66%; background: #f90; }
+.strength-bar.strength-good { width: 100%; background: #5a5; }
+
+.strength-label.strength-weak { color: #e55; font-weight: 700; }
+.strength-label.strength-fair { color: #f90; font-weight: 700; }
+.strength-label.strength-good { color: #5a5; font-weight: 700; }
+
+/* ── Success / error states ── */
+
+.sign-up-success,
+.verify-email-success,
+.verify-email-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 14px;
+  padding: 16px 0;
+}
+
+.sign-up-success h3,
+.verify-email-success h3,
+.verify-email-error h3 {
+  margin: 0;
+  font-size: 1.3rem;
+  font-family: "Space Grotesk", "IBM Plex Sans", sans-serif;
+  letter-spacing: -0.04em;
+}
+
+.sign-up-success p,
+.verify-email-success p,
+.verify-email-error p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.6;
+  max-width: 360px;
+}
+
+.check-icon {
+  width: 52px;
+  height: 52px;
+  color: #5a5;
+  stroke-width: 2.5;
+}
+
+.error-icon {
+  width: 52px;
+  height: 52px;
+  color: #e55;
+}
+
+.verify-email-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 24px 0;
+  color: var(--muted);
+}
+
+.spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid rgba(0, 0, 0, 0.08);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Sign Up benefits ── */
+
+.sign-up-info,
+.create-profile-info {
+  padding: clamp(20px, 3vw, 32px);
+}
+
+.sign-up-info h3,
+.create-profile-info h3 {
+  margin: 0 0 14px;
+  font-family: "Space Grotesk", "IBM Plex Sans", sans-serif;
+  font-size: 1rem;
+  letter-spacing: -0.02em;
+}
+
+.sign-up-benefits,
+.password-tips {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sign-up-benefits li,
+.password-tips li {
+  font-size: 0.88rem;
+  color: var(--muted);
+  padding-left: 18px;
+  position: relative;
+  line-height: 1.5;
+}
+
+.sign-up-benefits li::before,
+.password-tips li::before {
+  content: "✓";
+  position: absolute;
+  left: 0;
+  color: var(--accent);
+  font-weight: 700;
+}
+
+/* ── Nav Sign Up CTA & user menu ── */
+
+.nav-link--cta {
+  background: var(--accent) !important;
+  color: #111317 !important;
+  font-weight: 700 !important;
+  border-color: transparent !important;
+}
+
+.nav-link--cta:hover {
+  background: #e6b800 !important;
+}
+
+.nav-user {
+  position: relative;
+}
+
+.nav-link--user {
+  background: rgba(255, 204, 0, 0.12);
+  border: 1px solid rgba(255, 204, 0, 0.22) !important;
+  color: #fffdf7;
+  font-weight: 600;
+}
+
+.user-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 140px;
+  background: #1c1f28;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 6px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+  z-index: 100;
+}
+
+.user-menu-item {
+  display: block;
+  width: 100%;
+  padding: 9px 12px;
+  border-radius: 8px;
+  font-size: 0.84rem;
+  color: rgba(255, 253, 247, 0.78);
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.user-menu-item:hover {
+  background: rgba(255, 255, 255, 0.07);
+  color: #fffdf7;
+}
+
+.user-menu-logout {
+  color: rgba(230, 80, 80, 0.8);
+}
+
+.user-menu-logout:hover {
+  background: rgba(200, 0, 0, 0.1);
+  color: #e55;
+}
+
+@media (max-width: 540px) {
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* legacy unused classes — suppress if still in DOM */
 .agents-network-strip,
 .agents-network-node,

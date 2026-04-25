@@ -6,6 +6,9 @@ import { MarketRoomPage } from "./pages/MarketRoomPage";
 import { AgentProfilesPage } from "./pages/AgentProfilesPage";
 import { AdminPage } from "./pages/AdminPage";
 import { MarketQuestionsPage } from "./pages/MarketQuestionsPage";
+import { SignUpPage } from "./pages/SignUpPage";
+import { VerifyEmailPage } from "./pages/VerifyEmailPage";
+import { CreateProfilePage } from "./pages/CreateProfilePage";
 
 const adminEnabled = import.meta.env.VITE_ENABLE_ADMIN === "true";
 
@@ -18,6 +21,9 @@ export default function App() {
         <Route path="/market-room" element={<MarketRoomPage />} />
         <Route path="/ask-market" element={<MarketQuestionsPage />} />
         <Route path="/agents" element={<AgentProfilesPage />} />
+        <Route path="/sign-up" element={<SignUpPage />} />
+        <Route path="/verify-email" element={<VerifyEmailPage />} />
+        <Route path="/create-profile" element={<CreateProfilePage />} />
         {adminEnabled ? <Route path="/admin" element={<AdminPage />} /> : null}
       </Routes>
     </AppShell>
