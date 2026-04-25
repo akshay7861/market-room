@@ -28,7 +28,7 @@ export async function sendVerificationEmail(
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        from: "Market Room <noreply@marketroom.uk>",
+        from: "Market Room <onboarding@resend.dev>",
         to: email,
         subject: "Verify your email to join Market Room",
         html: `

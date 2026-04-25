@@ -121,6 +121,22 @@ export async function signUp(
   // Check if email already registered
   const existing = await repos.users.getUserByEmail(email);
   if (existing) {
+    // If the email exists but is not verified, resend the verification email
+    // so the user isn't stuck. Silently regenerate the token.
+    if (!existing.emailVerified) {
+      const token = generateEmailVerificationToken();
+      const expiryTime = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+      try {
+        await repos.users.updateUser(existing.id, {
+          emailVerificationToken: token,
+          emailVerificationExpiry: expiryTime,
+        });
+        await sendVerificationEmail(env, email, existing.firstName, token);
+      } catch (err) {
+        console.warn("[AUTH] Re-send verification failed:", err);
+      }
+      return { ok: true, user: existing, message: "resent" };
+    }
     return { ok: false, message: "This email is already registered." };
   }
 

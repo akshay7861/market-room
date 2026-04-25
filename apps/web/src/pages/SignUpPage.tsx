@@ -46,6 +46,7 @@ export function SignUpPage() {
         return;
       }
 
+      // "resent" means the email existed but was unverified — we resent the link
       setSuccess(true);
       setEmail("");
       setFirstName("");
