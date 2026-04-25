@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import type { VerifyEmailRequest } from "@market-room/shared";
+import { API_BASE_URL } from "../lib/api";
 
 export function VerifyEmailPage() {
   const navigate = useNavigate();
@@ -22,7 +23,7 @@ export function VerifyEmailPage() {
     async function verify() {
       try {
         const payload: VerifyEmailRequest = { email: email!, token: token! };
-        const response = await fetch("/api/auth/verify-email", {
+        const response = await fetch(`${API_BASE_URL}/api/auth/verify-email`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload)

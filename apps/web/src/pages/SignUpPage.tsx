@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { SignUpRequest } from "@market-room/shared";
+import { API_BASE_URL } from "../lib/api";
 
 export function SignUpPage() {
   const navigate = useNavigate();
@@ -31,7 +32,7 @@ export function SignUpPage() {
 
     try {
       const payload: SignUpRequest = { email, firstName, lastName, password };
-      const response = await fetch("/api/auth/sign-up", {
+      const response = await fetch(`${API_BASE_URL}/api/auth/sign-up`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)

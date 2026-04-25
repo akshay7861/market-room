@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import type { LoginRequest } from "@market-room/shared";
+import { API_BASE_URL } from "../lib/api";
 
 export function CreateProfilePage() {
   const navigate = useNavigate();
@@ -49,7 +50,7 @@ export function CreateProfilePage() {
     try {
       // Log in the user with the verified email and password
       const payload: LoginRequest = { email: email!, password };
-      const response = await fetch("/api/auth/login", {
+      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)

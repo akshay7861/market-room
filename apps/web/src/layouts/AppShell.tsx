@@ -2,6 +2,7 @@ import { NavLink } from "react-router-dom";
 import { useState, useEffect } from "react";
 import type { PropsWithChildren } from "react";
 import type { User } from "@market-room/shared";
+import { API_BASE_URL } from "../lib/api";
 
 const navItems = [
   { to: "/", label: "Home" },
@@ -19,7 +20,7 @@ export function AppShell({ children }: PropsWithChildren) {
   const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
-    fetch("/api/auth/me", { credentials: "include" })
+    fetch(`${API_BASE_URL}/api/auth/me`, { credentials: "include" })
       .then((r) => r.ok ? r.json() : null)
       .then((data) => {
         if (data?.ok && data.user) setUser(data.user as User);
@@ -29,7 +30,7 @@ export function AppShell({ children }: PropsWithChildren) {
 
   async function handleLogout() {
     try {
-      await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
+      await fetch(`${API_BASE_URL}/api/auth/logout`, { method: "POST", credentials: "include" });
       setUser(null);
       window.location.href = "/";
     } catch (err) {
