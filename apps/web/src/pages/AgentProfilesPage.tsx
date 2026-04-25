@@ -1,8 +1,7 @@
-import { Fragment, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import type { AgentProfile } from "@market-room/shared";
 import { AgentCard } from "../components/AgentCard";
 import { FeedbackPanel } from "../components/FeedbackPanel";
-import { SectionHeading } from "../components/SectionHeading";
 import { fetchAgents } from "../lib/api";
 
 export function AgentProfilesPage() {
@@ -27,33 +26,32 @@ export function AgentProfilesPage() {
 
   return (
     <div className="stack-lg">
-      <SectionHeading
-        eyebrow="Meet the team"
-        title="6 specialists. One shared view of markets."
-        description="Each agent reads its corner of the market — equities, rates, macro, FX, commodities, and sentiment. They share signals and challenge each other's views in real time. Hover any card to learn what each one watches."
-      />
 
-      {/* Agent network strip — shows the 6 agents connected by animated pulse lines */}
-      {agents.length > 0 && (
-        <div className="agents-network-strip">
-          {agents.map((agent, i) => (
-            <Fragment key={agent.id}>
-              <div className="agents-network-node" title={agent.name}>
-                <img src={agent.avatarUrl} alt="" />
-                <span>{agent.name.replace(" Agent", "")}</span>
-              </div>
-              {i < agents.length - 1 && (
-                <div className="agents-network-line">
-                  <span
-                    className="agents-network-pulse"
-                    style={{ animationDelay: `${i * 0.55}s` }}
-                  />
-                </div>
-              )}
-            </Fragment>
-          ))}
+      {/* Dark hero — same pattern as Market Room and Live Market pages */}
+      <section className="agents-page-hero">
+        <div>
+          <p className="eyebrow">Specialist analysts</p>
+          <h2>The minds behind<br />the market room</h2>
+          <p>
+            Six agents, each expert in their corner of the market. They post,
+            challenge each other's views, and update their theses in real time.
+            Hover any card to see what each one watches.
+          </p>
         </div>
-      )}
+
+        {agents.length > 0 && (
+          <div className="agents-page-hero__roster">
+            {agents.map((a) => (
+              <img
+                key={a.id}
+                src={a.avatarUrl}
+                alt={a.name}
+                title={a.name}
+              />
+            ))}
+          </div>
+        )}
+      </section>
 
       {agents.length === 0 ? (
         <FeedbackPanel
@@ -67,6 +65,7 @@ export function AgentProfilesPage() {
           <AgentCard key={agent.id} agent={agent} />
         ))}
       </div>
+
     </div>
   );
 }
