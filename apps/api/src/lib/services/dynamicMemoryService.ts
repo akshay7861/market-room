@@ -111,8 +111,48 @@ export async function buildDynamicMemoryContext(
     }
   }
 
+  // D1/D3: For FX/Macro/Rates — filter theses to sector-relevant topics and cap to 1.
+  // These three agents recycle the same cross-sector thesis ("tightening regime") for weeks.
+  // Narrowing scope forces each post to use a thesis that actually belongs to the agent's domain.
+  const isTemplatedAgent = ["FX", "Macro", "Rates"].includes(agent.sector);
+  const sectorThesisKeys: Record<string, string[]> = {
+    FX: ["fx", "currency", "dollar", "dxy", "yen", "euro", "pound", "carry", "exchange rate", "usd"],
+    Macro: ["macro", "inflation", "gdp", "employment", "fed", "fomc", "cpi", "pce", "fiscal", "labor", "monetary"],
+    Rates: ["rates", "yield", "treasury", "curve", "duration", "auction", "term premium", "bond", "breakeven"],
+  };
+  let effectiveActiveTheses = activeTheses;
+  let effectiveRecentTheses = recentTheses;
+  if (isTemplatedAgent) {
+    const keys = sectorThesisKeys[agent.sector] ?? [];
+    effectiveActiveTheses = activeTheses
+      .filter(t => {
+        const topic = (t.topicPrimary || "").toLowerCase();
+        if (!topic) return true; // keep neutral topics
+        return keys.some(k => topic.includes(k));
+      })
+      .slice(0, 1); // D3: cap to 1 active thesis
+    effectiveRecentTheses = recentTheses.slice(0, 1); // D3: cap recent also
+  }
+
+  // D2: Staleness decay — if the top active thesis content appears in 3+ of the last 6 messages,
+  // prefix its summary with a STALE warning so the agent knows to refresh rather than repeat.
+  if (isTemplatedAgent && effectiveActiveTheses.length > 0) {
+    const topThesis = effectiveActiveTheses[0];
+    const claim = updateSummaryByThesisId.get(topThesis.id) || topThesis.canonicalClaim || topThesis.title || "";
+    const matchWords = claim.toLowerCase().split(/\s+/).filter(w => w.length > 5).slice(0, 3);
+    if (matchWords.length > 0) {
+      const appearCount = recentMessages.filter(m =>
+        matchWords.some(w => (m.content || "").toLowerCase().includes(w))
+      ).length;
+      if (appearCount >= 3) {
+        const existing = updateSummaryByThesisId.get(topThesis.id) || claim;
+        updateSummaryByThesisId.set(topThesis.id, `[STALE — refresh with new data this post] ${existing}`);
+      }
+    }
+  }
+
   return {
-    houseView: buildHouseView(agent.memorySummary, activeTheses, recentTheses, recentMessages, updateSummaryByThesisId),
+    houseView: buildHouseView(agent.memorySummary, effectiveActiveTheses, effectiveRecentTheses, recentMessages, updateSummaryByThesisId),
     openTheses: buildOpenThesesBlock(activeTheses),
     strongTopics: buildStrongTopicsBlock(resolvedForecasts, goodExamples, recentTheses),
     weakTopics: buildWeakTopicsBlock(resolvedForecasts, badExamples, agentState?.topicsToDeprioritize || []),

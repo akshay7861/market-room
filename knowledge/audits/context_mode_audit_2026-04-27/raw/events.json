@@ -1,0 +1,3634 @@
+[
+  {
+    "id": "a6081cfd-7f49-486c-91d9-bf14455346ab",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-04-27T21:00:27.580Z"
+  },
+  {
+    "id": "a86b2c48-7c17-47c1-875b-1706f87e2437",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-27T20:00:27.926Z"
+  },
+  {
+    "id": "acda24f4-e663-4ab2-ac27-e72ecba41676",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-27T18:00:45.566Z"
+  },
+  {
+    "id": "c9ec9156-4a60-4815-8c3c-deb4304fd8db",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-04-27T17:00:46.843Z"
+  },
+  {
+    "id": "df543fa7-ed0b-45dd-b2ef-f741a4bf0828",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-27T16:00:45.628Z"
+  },
+  {
+    "id": "ee47eee7-ef88-4be6-a7fd-ec85b2fa46d2",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-04-27T15:00:49.603Z"
+  },
+  {
+    "id": "da693c21-52fe-4c21-80aa-a867c6a0303f",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-27T12:00:52.446Z"
+  },
+  {
+    "id": "654262d2-3dd2-4ad4-a8f6-24befe6019d1",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-04-27T11:00:52.656Z"
+  },
+  {
+    "id": "35e3a2ab-97d3-4d30-a0c7-184fa8e78581",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-27T10:01:00.567Z"
+  },
+  {
+    "id": "5a7ef481-5d4b-40ee-9683-63520c15d130",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-04-27T09:01:05.234Z"
+  },
+  {
+    "id": "c621787b-6c88-4c69-92d9-065a8f6bc51c",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-27T08:01:00.210Z"
+  },
+  {
+    "id": "1530de48-b382-40fd-8951-6aa448a7c4d9",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-04-27T07:00:59.193Z"
+  },
+  {
+    "id": "892eb20c-6732-47d8-9e12-0469fabd711a",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-27T06:01:02.040Z"
+  },
+  {
+    "id": "42e36981-acfb-4d42-b396-dce21a92b0e3",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-04-27T05:00:31.728Z"
+  },
+  {
+    "id": "d84e265e-f4d8-4b5b-9fbd-f44e46570f42",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-27T04:00:32.665Z"
+  },
+  {
+    "id": "7c0d4448-e9f0-4af2-8658-8d0c8ee55aee",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "oil_geopolitics_and_inflation_pass_through",
+    "created_at": "2026-04-27T03:00:34.195Z"
+  },
+  {
+    "id": "e8f1974f-43fa-49ae-9c0f-559c135f7440",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-27T02:00:35.633Z"
+  },
+  {
+    "id": "eda31980-492c-40e0-8d3a-4a931a3401ef",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-04-27T01:00:34.936Z"
+  },
+  {
+    "id": "059a4a84-e756-45b0-9a91-769a8917c23b",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-27T00:00:35.715Z"
+  },
+  {
+    "id": "85577015-f0f0-4c9b-bccd-0ab8965df820",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-04-26T23:00:33.712Z"
+  },
+  {
+    "id": "0ad1051a-010c-468e-8f77-39d04679e0f8",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-26T22:00:33.202Z"
+  },
+  {
+    "id": "8be0a308-58dc-4e4f-a9ff-030e4e302e23",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-04-26T21:00:33.185Z"
+  },
+  {
+    "id": "87e7cb13-95ba-4638-9b65-db7936cebf83",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-26T20:00:33.907Z"
+  },
+  {
+    "id": "12821b53-b337-41a7-b636-128eabfc132c",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-04-26T19:00:32.200Z"
+  },
+  {
+    "id": "e664fedf-929f-4f62-9342-d61f135bb4d1",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-26T18:00:35.767Z"
+  },
+  {
+    "id": "e13a7b30-1a3f-497e-891f-89279e742cb4",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "oil_geopolitics_and_inflation_pass_through",
+    "created_at": "2026-04-26T17:00:32.399Z"
+  },
+  {
+    "id": "37e6ec79-9162-42c9-bfb3-0a4a9404c493",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-26T16:00:35.379Z"
+  },
+  {
+    "id": "fb236431-4dc8-4dda-a197-735295eb41ae",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-04-26T15:00:35.929Z"
+  },
+  {
+    "id": "58f27898-4c93-4221-98e8-ac15053d761c",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-26T14:00:32.185Z"
+  },
+  {
+    "id": "2a65c6b7-99f7-4574-b1ec-238cf9613462",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-04-26T13:00:31.494Z"
+  },
+  {
+    "id": "ce60294c-0c21-4e7a-850c-737eb6d13af3",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-04-26T05:00:43.253Z"
+  },
+  {
+    "id": "2ccbb330-1c4d-4469-9e7b-8af00c6ce951",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-26T04:00:58.498Z"
+  },
+  {
+    "id": "0f913f13-a4da-48b8-87d0-81f0fa7ea370",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "oil_geopolitics_and_inflation_pass_through",
+    "created_at": "2026-04-26T03:00:40.301Z"
+  },
+  {
+    "id": "0fb5ac05-f3b3-4d10-bc85-bdd4779f7333",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-26T02:00:39.527Z"
+  },
+  {
+    "id": "624d41d4-6894-40f2-b085-46c37a8913b7",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "oil_geopolitics_and_inflation_pass_through",
+    "created_at": "2026-04-26T01:00:55.009Z"
+  },
+  {
+    "id": "2d55624e-59ac-4fb4-b693-bb818d04fd20",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-26T00:01:02.841Z"
+  },
+  {
+    "id": "f2769130-5e36-434f-8f75-35508315fe05",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-04-25T23:00:52.431Z"
+  },
+  {
+    "id": "478eceba-e633-4d71-9180-74712adde2a3",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-25T22:00:48.934Z"
+  },
+  {
+    "id": "69504152-7153-4a60-8a68-4b68bff13aee",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-04-25T21:00:56.088Z"
+  },
+  {
+    "id": "287d4ba0-9168-43d7-abd2-f895a50eb524",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-25T20:00:55.871Z"
+  },
+  {
+    "id": "b072c731-3218-453c-b6a9-40870613cae3",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-04-25T19:00:54.137Z"
+  },
+  {
+    "id": "f9aa4a61-a03d-4984-8fa2-be4982545a2f",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-25T18:00:52.452Z"
+  },
+  {
+    "id": "0d633aac-d186-480c-ab36-76b815acdfcd",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-25T16:00:26.701Z"
+  },
+  {
+    "id": "75281066-ddce-4513-8928-860b021d4c04",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-04-25T15:00:26.734Z"
+  },
+  {
+    "id": "3db34d57-cf6c-491a-bf55-8b0c469d94c6",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-25T14:00:26.724Z"
+  },
+  {
+    "id": "acc57eb8-ac86-45f3-b5ca-e0dc4b388a2a",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "oil_geopolitics_and_inflation_pass_through",
+    "created_at": "2026-04-25T13:00:26.309Z"
+  },
+  {
+    "id": "bb9cc6c4-b2c0-4972-a939-a28ca7f5794a",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-25T12:00:26.587Z"
+  },
+  {
+    "id": "115d91f3-a74f-4653-905c-386eab3459ca",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-04-25T11:00:26.815Z"
+  },
+  {
+    "id": "b42f5906-32d4-4099-a954-c53434b76dc7",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-25T10:00:26.208Z"
+  },
+  {
+    "id": "2e2b7ca0-5fc9-423d-91c6-cc6fa3a86608",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-04-25T09:00:26.061Z"
+  },
+  {
+    "id": "bc0844d7-15b9-4ee2-9d09-9f214be3207b",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-25T08:00:26.234Z"
+  },
+  {
+    "id": "af5f95fd-921b-4969-91c0-045aa5de6cd5",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "rates_repricing_and_duration_pressure",
+    "created_at": "2026-04-25T07:00:26.441Z"
+  },
+  {
+    "id": "46b9497b-54f2-459c-9b45-d567266edebc",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-25T06:00:26.384Z"
+  },
+  {
+    "id": "98403b90-ac7b-479e-9bf6-c82f2336044d",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-25T04:00:20.309Z"
+  },
+  {
+    "id": "ce809438-23e8-48e5-a893-2f92beab57b0",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-04-25T03:00:19.948Z"
+  },
+  {
+    "id": "caf4d92a-0024-4f0b-a67a-bd3356f6340b",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-25T02:00:21.816Z"
+  },
+  {
+    "id": "f0971127-05b3-4d65-862b-5e2a2f0571cd",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-25T00:00:22.831Z"
+  },
+  {
+    "id": "44cc2825-2fef-46f8-844a-a4760f704ee2",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-04-24T23:00:22.215Z"
+  },
+  {
+    "id": "cd9b9809-162f-40d2-80f9-a2e93ac10683",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-24T22:00:21.730Z"
+  },
+  {
+    "id": "e7e2801a-800d-4556-b992-1d1e4cdae412",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-04-24T21:00:21.331Z"
+  },
+  {
+    "id": "9a8c7158-376c-4450-be52-e42a8db9c01e",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-24T20:00:22.428Z"
+  },
+  {
+    "id": "e77c5978-07d2-4bbe-9846-9a87e3141037",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-04-24T19:00:24.230Z"
+  },
+  {
+    "id": "d17dc4be-98ad-4454-ad52-3fd678b797db",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-24T18:00:31.731Z"
+  },
+  {
+    "id": "c85f2048-2455-4ec0-91ac-e356ffb61110",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-24T16:00:30.815Z"
+  },
+  {
+    "id": "00e0badc-221c-4a02-a31f-072ca288dde1",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-04-24T15:00:31.571Z"
+  },
+  {
+    "id": "3f7f0456-293b-483e-ba5c-7d2969edcc45",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-24T14:00:30.573Z"
+  },
+  {
+    "id": "fab8d216-cf7b-4bba-8503-f6ab19e68e45",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-24T12:00:30.592Z"
+  },
+  {
+    "id": "cc5d579d-a2a3-4368-81ba-859dba246639",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-04-24T11:00:31.186Z"
+  },
+  {
+    "id": "7da4b06d-c823-477e-b87a-966086ebc27f",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-24T10:00:30.745Z"
+  },
+  {
+    "id": "817ef522-e4f6-49c7-a48c-83672dc3aa80",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-24T08:00:30.523Z"
+  },
+  {
+    "id": "1b84a4e5-b425-46fc-a03b-360eec1ef702",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-04-24T07:00:31.180Z"
+  },
+  {
+    "id": "7a6203d3-4b2d-4092-a14f-524682e87065",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-24T06:00:31.208Z"
+  },
+  {
+    "id": "f9421ac7-d9ca-4d46-be72-ff9deea328d8",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-04-24T05:00:40.064Z"
+  },
+  {
+    "id": "f119cc1b-3092-4ae1-a192-e3f01d4a666d",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-24T04:00:40.267Z"
+  },
+  {
+    "id": "56b71060-2e35-4961-ac6e-43333dc5752a",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-04-24T03:00:42.292Z"
+  },
+  {
+    "id": "b51b19a6-abb7-47b6-8cad-4d7130c39141",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-24T02:00:43.563Z"
+  },
+  {
+    "id": "f1bcff3c-f349-432e-bc61-f14ea971879b",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-04-24T01:00:42.985Z"
+  },
+  {
+    "id": "2e0eca8d-a8b4-4bb2-b13d-a221d9c7946d",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-24T00:00:43.742Z"
+  },
+  {
+    "id": "a8740bbf-bb58-4192-82d4-91e23f3b40d2",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-04-23T23:00:40.961Z"
+  },
+  {
+    "id": "e440c50b-715f-40c1-b869-37a5d3096e67",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-23T22:00:41.161Z"
+  },
+  {
+    "id": "3eb4e750-751f-413d-8bd0-d5569bcd80de",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "oil_geopolitics_and_inflation_pass_through",
+    "created_at": "2026-04-23T21:00:40.993Z"
+  },
+  {
+    "id": "5f3291b8-ab7c-457c-8934-ec4cde44a090",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-23T20:00:44.804Z"
+  },
+  {
+    "id": "66c9fd4b-603f-4ca3-83d4-9d647ceec405",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-04-23T19:00:43.976Z"
+  },
+  {
+    "id": "c41f0e47-bc1d-4542-a7d9-f71281bf2b32",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-23T18:00:45.789Z"
+  },
+  {
+    "id": "5c534d82-d37a-4dad-9af6-afffc7ff61fd",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-04-23T17:00:40.557Z"
+  },
+  {
+    "id": "fa045cd8-7d56-4b0b-a5b4-e8d1eb88f3fa",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-23T16:25:42.035Z"
+  },
+  {
+    "id": "2410a6de-9e66-4b5b-a066-90ccc1718555",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "cross_asset_tape",
+    "created_at": "2026-04-23T16:19:17.305Z"
+  },
+  {
+    "id": "3fb6e324-8991-42bd-88a5-e56589c6b4d2",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-04-23T16:15:44.644Z"
+  },
+  {
+    "id": "f8c6f9cc-7d32-45d4-a2b1-f9abbe31a6d7",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "cross_asset_tape",
+    "created_at": "2026-04-23T16:02:32.598Z"
+  },
+  {
+    "id": "8cd4d54e-0f4e-4170-88db-a532adfbb8d7",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "cross_asset_tape",
+    "created_at": "2026-04-23T16:02:11.637Z"
+  },
+  {
+    "id": "2e71c6f6-7e3e-4df3-b955-9626d334c403",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-04-23T16:01:30.883Z"
+  },
+  {
+    "id": "ab330fb6-cdc4-4729-85d7-f94dd420c3e5",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-23T16:00:40.267Z"
+  },
+  {
+    "id": "a3c38567-6b5c-4e53-bc79-e47e570f635d",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-04-23T15:00:40.290Z"
+  },
+  {
+    "id": "2c6caa83-0776-4ab1-b560-caa1df3ad07c",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-23T14:00:40.394Z"
+  },
+  {
+    "id": "0648975b-b5fb-4a22-b7b4-6223260720ce",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "oil_geopolitics_and_inflation_pass_through",
+    "created_at": "2026-04-23T13:00:13.696Z"
+  },
+  {
+    "id": "64b83663-e432-4091-ad36-7eaa6e51de78",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-04-23T12:00:13.902Z"
+  },
+  {
+    "id": "4c8ddbcb-2a55-4f32-b6dd-7e281b7ad5ba",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-23T11:00:13.812Z"
+  },
+  {
+    "id": "07e438f0-9266-473b-9cc4-d7ebce06462d",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-04-23T10:00:14.357Z"
+  },
+  {
+    "id": "f7d33ee9-4629-4a5b-9ce8-54b8d9837171",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-23T09:00:15.612Z"
+  },
+  {
+    "id": "f488313a-0640-4b0d-a4e7-9a40e73510e2",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "oil_geopolitics_and_inflation_pass_through",
+    "created_at": "2026-04-23T08:00:15.221Z"
+  },
+  {
+    "id": "e75c01f5-6930-41fd-be1d-56a72f7b6a80",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-23T07:00:14.594Z"
+  },
+  {
+    "id": "b0eb4766-8263-4677-8a67-3de53922ef2f",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-04-23T06:00:15.653Z"
+  },
+  {
+    "id": "86bd0663-2190-42fc-a129-7b748f6c3af3",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-23T05:00:15.819Z"
+  },
+  {
+    "id": "bf4ee823-8bfd-4e5c-aa30-8fc16f3b650a",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-04-23T04:00:15.293Z"
+  },
+  {
+    "id": "cb79ed6c-63e7-4e36-9653-fd04edff3c60",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-23T03:00:16.721Z"
+  },
+  {
+    "id": "abe6940a-f5f6-4c24-a839-8d78aee006d5",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-04-23T02:00:16.633Z"
+  },
+  {
+    "id": "9ec529ba-22ca-493b-bb65-577ca13f4d19",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-04-23T01:22:21.889Z"
+  },
+  {
+    "id": "ce7450c7-f649-449d-9e3d-14e8fbc4d7aa",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-04-23T01:00:32.155Z"
+  },
+  {
+    "id": "f44c5d6c-32bf-4d75-bef7-b8f4095bf638",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-23T00:00:40.923Z"
+  },
+  {
+    "id": "6fc2d5dd-b9a8-4f0f-9865-b454554654fd",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-04-22T23:00:34.385Z"
+  },
+  {
+    "id": "bbbb2114-fe43-4aed-9bcf-d98aa715091c",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-22T22:00:40.842Z"
+  },
+  {
+    "id": "84bea628-2ac1-4e12-893d-628031c8a821",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-04-22T21:00:35.781Z"
+  },
+  {
+    "id": "95d1060a-2ffd-4ac9-8217-5bfa470e0fd7",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-22T20:00:33.212Z"
+  },
+  {
+    "id": "3b387527-6d18-4b1f-9c46-d91a614ffcfe",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-04-22T19:00:38.487Z"
+  },
+  {
+    "id": "931e84f2-f577-4d08-8788-dc922fd54422",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-22T18:00:02.626Z"
+  },
+  {
+    "id": "74537b92-3735-4a6c-a563-30bdcaf50c5d",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "company_specific_developments",
+    "created_at": "2026-04-22T17:00:02.683Z"
+  },
+  {
+    "id": "e8065074-259e-422b-9279-b497f69c85ab",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-22T16:39:41.967Z"
+  },
+  {
+    "id": "bd237216-766d-4633-87e9-43398f8f6828",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-04-22T16:11:42.654Z"
+  },
+  {
+    "id": "05002253-7fbb-41fa-840e-eb93796f2a27",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-22T16:02:10.273Z"
+  },
+  {
+    "id": "1085d461-f11f-4506-8561-c138185ebd99",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-22T16:01:04.514Z"
+  },
+  {
+    "id": "d3da65cf-5c43-43fd-865d-3cfbb2ce9ca9",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-22T15:59:24.908Z"
+  },
+  {
+    "id": "c1ae5313-844e-4f44-9c9a-7311297b96ee",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-04-22T15:57:57.570Z"
+  },
+  {
+    "id": "e87bf33d-4be0-4e4e-9d5c-a4a3a26fa6f6",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-22T15:56:16.498Z"
+  },
+  {
+    "id": "4abe29fa-ddec-49a5-8456-333a36dd4ecd",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-04-22T15:00:02.671Z"
+  },
+  {
+    "id": "5b4bd7fe-ac87-4dce-9eb9-18aed67366b2",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-04-22T14:15:44.318Z"
+  },
+  {
+    "id": "e35f02b6-de63-4d58-a5cb-a23969956d8b",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-04-22T14:15:05.587Z"
+  },
+  {
+    "id": "1a022a27-ced6-49c7-89e8-3fd505516cc8",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-04-22T14:14:54.960Z"
+  },
+  {
+    "id": "b541e2b4-e0a7-4180-b96b-bb6800d475e0",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-04-22T14:14:08.395Z"
+  },
+  {
+    "id": "56e98c8c-0375-4d21-8391-b76778702aa8",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-04-22T14:13:59.073Z"
+  },
+  {
+    "id": "d5e4fec0-d4eb-4bde-9eb6-bfcefc289ccc",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-04-22T14:12:53.693Z"
+  },
+  {
+    "id": "94aceb67-823a-450b-8e3c-496518fb2538",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-04-22T13:57:32.700Z"
+  },
+  {
+    "id": "4cd9352b-47bf-492f-ad41-f26d38ff2f9d",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-04-22T13:57:26.597Z"
+  },
+  {
+    "id": "db2da92f-f22a-448a-abe2-879f4e312d5a",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-04-22T13:55:57.038Z"
+  },
+  {
+    "id": "1304cc38-7338-48e3-a0d0-8332341e2532",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "cross_asset_tape",
+    "created_at": "2026-04-22T13:37:08.758Z"
+  },
+  {
+    "id": "b290abf7-f339-4cb7-9a97-e96c474b1a14",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "cross_asset_tape",
+    "created_at": "2026-04-22T13:19:46.084Z"
+  },
+  {
+    "id": "da70941b-21c1-4c93-b5ff-c3977a349179",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "cross_asset_tape",
+    "created_at": "2026-04-22T13:18:12.870Z"
+  },
+  {
+    "id": "c784c181-1aab-435b-b7eb-811a90db612e",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "cross_asset_tape",
+    "created_at": "2026-04-22T13:14:14.894Z"
+  },
+  {
+    "id": "8da13f83-cfc1-4f35-a2f5-af660e98801e",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "cross_asset_tape",
+    "created_at": "2026-04-22T13:01:01.903Z"
+  },
+  {
+    "id": "13df1e16-af12-4804-9c37-06167566e8b6",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-22T12:01:05.025Z"
+  },
+  {
+    "id": "f75edd77-e6d9-40b4-a168-785da1f1a668",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "cross_asset_tape",
+    "created_at": "2026-04-22T11:00:59.626Z"
+  },
+  {
+    "id": "f77f61ea-5b82-4f2b-b12c-b7147f50e632",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-22T10:00:55.046Z"
+  },
+  {
+    "id": "4cb7569c-5158-4de6-8ede-07e6b5e7405c",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "cross_asset_tape",
+    "created_at": "2026-04-22T09:00:54.041Z"
+  },
+  {
+    "id": "97b46c1a-1f86-42b7-b0da-8dd5089f26d9",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-22T08:00:53.914Z"
+  },
+  {
+    "id": "7e089dc9-0b0f-4cba-a801-8a02f8683334",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "cross_asset_tape",
+    "created_at": "2026-04-22T07:00:54.013Z"
+  },
+  {
+    "id": "81398a54-c2d4-437c-95a3-bd978f3c1f55",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "cross_asset_tape",
+    "created_at": "2026-04-22T05:56:04.749Z"
+  },
+  {
+    "id": "9ea93f60-edda-46de-9907-922fc17e8805",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-22T05:54:06.172Z"
+  },
+  {
+    "id": "4f1776fa-28a9-480d-bb70-97f574fefa5e",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-22T05:54:06.171Z"
+  },
+  {
+    "id": "b32862ab-9a15-4e62-b6ed-4efd48445909",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-22T04:48:39.654Z"
+  },
+  {
+    "id": "93e07c98-5188-4e3f-a9df-911be0ce336c",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-22T04:37:08.167Z"
+  },
+  {
+    "id": "dc44892f-b1a7-4f74-8027-933724b26361",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-22T04:25:17.803Z"
+  },
+  {
+    "id": "e1d7dec4-c11e-4393-9b8a-69a2bb7510e1",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-22T04:00:45.983Z"
+  },
+  {
+    "id": "e4c75dfa-b104-48f0-8075-e531ec5da45d",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-22T03:00:46.434Z"
+  },
+  {
+    "id": "006a1c9c-7c4d-4f83-9105-3c127dcbed34",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-22T02:00:45.966Z"
+  },
+  {
+    "id": "0c59d46e-0929-4935-811e-a1ed80e5e649",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-22T01:00:46.127Z"
+  },
+  {
+    "id": "1b95c743-48bd-43da-91c2-814ca12b2b28",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-22T00:00:46.359Z"
+  },
+  {
+    "id": "a13b46e8-8326-4457-9d2e-7f4ad57513ec",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-21T23:00:46.227Z"
+  },
+  {
+    "id": "76b38054-cfe9-4ba1-be4e-391ec790d8cf",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-21T22:00:45.995Z"
+  },
+  {
+    "id": "539f8db7-ec25-4aba-b3a5-4d3eb2367ca0",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-21T21:00:46.019Z"
+  },
+  {
+    "id": "8578c3ab-6e94-4678-a8a1-b7f68ab48c8c",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-21T20:00:46.805Z"
+  },
+  {
+    "id": "c1c8592c-5148-439f-aab6-ca02b5a922b6",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-21T19:00:46.428Z"
+  },
+  {
+    "id": "5dab537c-df70-4557-8390-e0942a0e74f6",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-21T18:00:47.241Z"
+  },
+  {
+    "id": "ad033345-d08e-4b47-bef8-a447b3a179bd",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-21T17:00:46.743Z"
+  },
+  {
+    "id": "5b4f3f03-ee16-43b9-8e36-8672e4c76860",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-21T16:00:46.845Z"
+  },
+  {
+    "id": "442b5eb6-e918-4681-b9d0-0c66d7bc618c",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-21T15:00:47.946Z"
+  },
+  {
+    "id": "b6d96f13-ab80-4cee-8756-155819ed7f80",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-21T14:00:46.964Z"
+  },
+  {
+    "id": "ab09a1b4-3b56-4499-9224-5bfe98dd7d59",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-21T13:00:46.442Z"
+  },
+  {
+    "id": "eaf6eb82-6c75-4fe1-b11e-a76038f641b3",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-21T11:00:56.575Z"
+  },
+  {
+    "id": "e0b826b0-f819-465f-8c12-c75dc60a3a6e",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-21T10:00:59.446Z"
+  },
+  {
+    "id": "6db60893-0556-4cbb-b7bc-227e01bfd25a",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-21T06:00:58.286Z"
+  },
+  {
+    "id": "eae07f4c-1d30-43d2-9c60-f3757ad43717",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-21T05:01:01.614Z"
+  },
+  {
+    "id": "26275cf2-44cb-4fb5-a7e8-d8840b63b1cf",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-21T03:00:56.949Z"
+  },
+  {
+    "id": "251cc7dd-56d2-44a7-b211-cf76b42fda6d",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-21T02:00:54.394Z"
+  },
+  {
+    "id": "20f31af4-11d5-437b-bd90-0dce3bab9b90",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-21T01:00:49.412Z"
+  },
+  {
+    "id": "7cad797b-4f52-4db5-b991-e928625fd6ac",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-21T00:00:50.882Z"
+  },
+  {
+    "id": "7c951a6c-1f02-40b1-b8e2-ceb721199a1f",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-20T23:00:50.344Z"
+  },
+  {
+    "id": "d752754f-0362-445f-9358-3399a6b4d39d",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-20T22:00:52.237Z"
+  },
+  {
+    "id": "282b4f0c-4e13-4a10-8393-c8e15e517d37",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-20T21:00:53.217Z"
+  },
+  {
+    "id": "8c4a0cd8-b211-4416-b141-886716bca315",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-20T20:00:52.316Z"
+  },
+  {
+    "id": "b9bf4b73-d0f0-4007-8231-3aaf43eccf0b",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-20T19:00:50.284Z"
+  },
+  {
+    "id": "febd7292-197b-4fd9-b2f1-61bc8ed8b55f",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-20T18:00:50.220Z"
+  },
+  {
+    "id": "ab6b5b5b-a7de-45c0-acb0-ce03555ffee0",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-20T17:00:54.096Z"
+  },
+  {
+    "id": "1686be40-f6ad-4816-96a3-727f8b89af21",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-20T16:00:51.838Z"
+  },
+  {
+    "id": "7575cd10-de6e-4d6b-929e-e1d344446074",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-20T14:23:31.229Z"
+  },
+  {
+    "id": "e399f6f9-dd19-4b63-b549-949a6761750a",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-20T14:17:26.731Z"
+  },
+  {
+    "id": "191fe174-3f7f-4289-a96d-ed27f1bc68cd",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-20T13:51:21.678Z"
+  },
+  {
+    "id": "af5e97a2-ca37-4f4a-9262-633ae8c7d424",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-20T13:00:51.554Z"
+  },
+  {
+    "id": "ec285bf8-d046-4d42-bdab-81cea4acca62",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-20T11:00:50.876Z"
+  },
+  {
+    "id": "93dda800-aaf5-45c8-9e7c-d8a9c5a25817",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-20T10:00:46.820Z"
+  },
+  {
+    "id": "90427d33-7d2a-43a4-afb1-d2b9f808a30c",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-20T09:00:44.503Z"
+  },
+  {
+    "id": "20722f97-3625-4786-ac23-0d094fcf08b6",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-20T07:39:19.610Z"
+  },
+  {
+    "id": "e49908fa-cfa9-40c3-89de-fcbe62e17708",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-20T07:36:15.525Z"
+  },
+  {
+    "id": "4bb22fe3-01e7-4cf0-b4ef-2ebcd8b2b764",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-20T07:33:20.482Z"
+  },
+  {
+    "id": "1ed4d111-62c3-46a4-bb36-dddb97dc1f79",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-20T07:29:04.583Z"
+  },
+  {
+    "id": "f54e28f5-eba5-46df-85e9-06585ee3cc63",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-20T06:43:41.264Z"
+  },
+  {
+    "id": "097eeba9-694b-48b5-b31b-4601c2017fda",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-20T06:37:07.539Z"
+  },
+  {
+    "id": "f4011884-37ef-4a25-9b1d-53cc8c9f50d7",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-20T06:31:04.736Z"
+  },
+  {
+    "id": "af8167d6-c6b1-40f1-94e6-86ea142783e6",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-20T06:22:46.561Z"
+  },
+  {
+    "id": "c6e6ff31-a2df-4eae-93cc-ec8d5450dbf7",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-20T06:00:51.591Z"
+  },
+  {
+    "id": "2a3aa696-b5bb-4610-a689-a997fe8dcf38",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-20T05:00:51.374Z"
+  },
+  {
+    "id": "8ed1bde9-fcf6-4db3-b0cd-e6873ad6df7e",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-20T04:00:47.478Z"
+  },
+  {
+    "id": "9f8f317e-9c71-4b5c-becd-e0ea46e53d5a",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-20T03:00:46.868Z"
+  },
+  {
+    "id": "a5f07146-8f49-4bcc-b1a3-7c74b6119878",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-20T01:33:26.256Z"
+  },
+  {
+    "id": "f07ca0a8-cacc-48ce-ba47-3f438d5049cf",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-20T01:27:57.352Z"
+  },
+  {
+    "id": "89397f46-522b-4763-85c3-8ac837256ee9",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-20T01:00:22.357Z"
+  },
+  {
+    "id": "a4211af1-e577-4ab1-ac5e-6a76f8602c77",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-20T00:00:27.336Z"
+  },
+  {
+    "id": "21ca0088-6610-4345-aa20-bfb6baa669cf",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-19T23:00:27.820Z"
+  },
+  {
+    "id": "61ed1fbd-6443-4a00-bf9b-1f8641cef4a2",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-19T22:00:21.582Z"
+  },
+  {
+    "id": "a41b80c8-fbfc-4b90-9768-8931eb956868",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-19T21:00:24.831Z"
+  },
+  {
+    "id": "46496e80-1c41-4eae-90ba-5f57ec66a913",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-19T20:00:28.185Z"
+  },
+  {
+    "id": "8e3bc539-a22a-4e82-936b-ede2b50df422",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-19T19:00:22.379Z"
+  },
+  {
+    "id": "1c6bfbbe-793f-4ed9-b49f-3dd181d95726",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-19T18:00:32.785Z"
+  },
+  {
+    "id": "676cef26-7939-420b-9315-cd8195962ad2",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-19T17:00:35.109Z"
+  },
+  {
+    "id": "d989274b-2d27-4b18-ade0-598903afc629",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-19T16:00:46.692Z"
+  },
+  {
+    "id": "11231d4e-62f1-43ba-bb78-ec7b7250e625",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-19T15:00:49.173Z"
+  },
+  {
+    "id": "9f582524-a622-4eee-8d47-af819272b54d",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-19T14:00:41.352Z"
+  },
+  {
+    "id": "145bbc8d-1748-4b70-b425-826b9be42bf3",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-19T13:00:39.143Z"
+  },
+  {
+    "id": "eb0e506f-2fa2-4e12-b58c-4ab3aad497b9",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-19T12:00:33.597Z"
+  },
+  {
+    "id": "685451cd-1b03-472a-bada-22700e60a162",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-19T11:00:34.107Z"
+  },
+  {
+    "id": "b6e3d478-4ced-48ce-8ba6-789b69e20ca0",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-19T06:01:02.869Z"
+  },
+  {
+    "id": "30eb417b-a5b2-4428-a838-2a092c7b7926",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-19T05:00:51.475Z"
+  },
+  {
+    "id": "e97d7cbe-9c4f-45eb-94d4-0994081c947a",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-19T04:00:51.573Z"
+  },
+  {
+    "id": "7a0bf790-74d2-4e4e-a544-23d2903ce697",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-19T03:00:46.296Z"
+  },
+  {
+    "id": "88c0d3ca-17b1-4797-b8a2-53fcc889a7bb",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-19T02:00:46.132Z"
+  },
+  {
+    "id": "e2f25181-747d-4675-a803-d18bfbcafea4",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-19T01:00:46.139Z"
+  },
+  {
+    "id": "32ac17cb-a80c-4f14-bf4b-3ca27d685bcd",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-18T23:00:43.906Z"
+  },
+  {
+    "id": "7551b9cf-2380-4238-b0f4-b72d6e319c94",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-18T22:00:48.839Z"
+  },
+  {
+    "id": "81de4563-4934-459c-8432-041a894cff04",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-18T21:00:46.450Z"
+  },
+  {
+    "id": "63d98329-010b-48a5-a305-61bd50642c63",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-18T20:00:47.013Z"
+  },
+  {
+    "id": "fac53e2c-a726-4aa0-bb5b-4ce5045f1239",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-18T18:00:46.116Z"
+  },
+  {
+    "id": "d1accded-8080-47da-b8b1-ddc6cd80b1a8",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-18T17:00:45.591Z"
+  },
+  {
+    "id": "b996680e-60dd-4c03-a0c9-65c35b553bb2",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-18T16:00:42.488Z"
+  },
+  {
+    "id": "e7df7429-230e-490e-8628-5064636e0957",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-18T09:00:43.153Z"
+  },
+  {
+    "id": "c51e5270-f398-4713-9b5d-78850c521258",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-18T08:00:42.476Z"
+  },
+  {
+    "id": "7d8e2854-1bdd-4b9f-b074-cfb0bb738f0a",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-18T07:00:41.634Z"
+  },
+  {
+    "id": "01694195-1d63-4605-8b57-a3988f7cc655",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-18T06:00:44.516Z"
+  },
+  {
+    "id": "507bbaa5-50f2-4ddb-b410-0e0646efe42c",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-18T05:00:43.121Z"
+  },
+  {
+    "id": "7e9d1617-8295-4426-bd95-d87a31173b13",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-18T04:00:31.233Z"
+  },
+  {
+    "id": "144ea6b3-6fff-40f5-933c-08d68bac7338",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-18T03:00:31.215Z"
+  },
+  {
+    "id": "a7f5a99e-8be5-4020-baa1-d25ce2bab5f1",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-18T02:00:31.049Z"
+  },
+  {
+    "id": "c109bc29-ec93-4c72-95ab-40b50ed28ea4",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-18T01:00:30.956Z"
+  },
+  {
+    "id": "c105fc16-883f-40e1-920a-296e36b08b06",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-18T00:00:31.158Z"
+  },
+  {
+    "id": "832b85ce-6711-42a0-9a19-2152e5393076",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-17T20:00:30.755Z"
+  },
+  {
+    "id": "eb3953c4-ab86-444a-8e24-30a7bc31d9e9",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-17T19:00:30.992Z"
+  },
+  {
+    "id": "7e75094f-a1d7-4174-8be8-be277897736c",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-17T18:00:31.174Z"
+  },
+  {
+    "id": "5f2e7565-bf5d-4997-9a78-90081c9cd092",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-17T17:00:30.940Z"
+  },
+  {
+    "id": "26573ecd-e5ad-4543-ac86-6afa17254136",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-17T16:00:09.978Z"
+  },
+  {
+    "id": "90838d92-d428-40ff-8508-f8fe6374f574",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-17T15:00:10.740Z"
+  },
+  {
+    "id": "2497e59c-758a-4a34-970d-11fdea8e5b45",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-17T14:00:10.195Z"
+  },
+  {
+    "id": "dd7a2673-38e7-4e0e-bcba-ed124d9d85c7",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-17T13:00:10.809Z"
+  },
+  {
+    "id": "01e99f73-2841-4281-97ad-fcb75a0fd58c",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-17T12:00:09.970Z"
+  },
+  {
+    "id": "ad9f7d10-b768-46ab-acf0-bbd6e42e8c1d",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-17T11:00:05.247Z"
+  },
+  {
+    "id": "ce919e25-3e24-4139-a5da-ede42e15c521",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-17T10:00:06.023Z"
+  },
+  {
+    "id": "15bb71c3-1e1b-4372-8dab-507cef09957c",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-17T08:00:06.314Z"
+  },
+  {
+    "id": "4da694c2-52b4-4024-ac13-1d0a3e1af289",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-17T07:00:05.486Z"
+  },
+  {
+    "id": "8024e64b-db52-4f9c-91ad-6b9bb5e0b8af",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-17T06:00:08.131Z"
+  },
+  {
+    "id": "0aec9dc2-425b-477c-b6a6-5f3bd9263087",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-17T05:00:05.445Z"
+  },
+  {
+    "id": "f4aff3ce-fe9f-4338-b3b0-e3b48bc9e715",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-17T04:00:04.201Z"
+  },
+  {
+    "id": "2e5f2010-9cd1-4e70-8e42-a91aa53deff3",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-17T03:00:04.407Z"
+  },
+  {
+    "id": "7155e86e-dfb2-434f-a987-93a3a80ecf37",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-17T02:00:04.151Z"
+  },
+  {
+    "id": "ba352135-ee24-4dce-82cd-e5f7a0ce6ce9",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-17T01:00:03.833Z"
+  },
+  {
+    "id": "71d15d38-8e86-4289-b37f-8e7569d9cf59",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-17T00:00:04.137Z"
+  },
+  {
+    "id": "b5336ed2-5b9d-4e95-9076-6d62c14e4452",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-16T23:00:12.028Z"
+  },
+  {
+    "id": "917a6b80-8324-4fa9-8128-cc78e97ca081",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-16T22:00:12.168Z"
+  },
+  {
+    "id": "6cd863c8-b718-46eb-8edb-8794e6569fe9",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-16T21:00:16.928Z"
+  },
+  {
+    "id": "379df963-cb27-4aab-b040-a0c460227b16",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-16T20:00:20.153Z"
+  },
+  {
+    "id": "d54bbab9-8797-41a4-9243-c951561eed55",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-16T19:00:54.920Z"
+  },
+  {
+    "id": "cb1cd84f-fcbe-4862-ac2c-7183f8e82627",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-16T18:00:54.938Z"
+  },
+  {
+    "id": "9defdeaf-e88e-44b4-a4a9-36d7a331448c",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-16T17:00:54.794Z"
+  },
+  {
+    "id": "e7a8a3a1-08bd-4981-8765-70698408afcf",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-16T16:00:14.852Z"
+  },
+  {
+    "id": "fac77709-a806-4acc-8c1a-3229bcbc2bbc",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-16T15:00:14.422Z"
+  },
+  {
+    "id": "11d61941-580a-4aa1-a928-afa762f9b575",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-16T14:00:15.328Z"
+  },
+  {
+    "id": "b6bdd28a-2857-492a-ba93-1224cdfb37c7",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-16T13:00:14.330Z"
+  },
+  {
+    "id": "858b3fb8-318b-4839-b022-524432f10cf0",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-16T12:00:14.311Z"
+  },
+  {
+    "id": "b00fd0a5-2e44-4f02-a2ee-ebbb0c134eae",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-16T11:00:14.003Z"
+  },
+  {
+    "id": "6dc09912-be56-489f-bc87-c6ab77a87d58",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-16T10:00:14.655Z"
+  },
+  {
+    "id": "8bb0b606-ec85-4426-855e-ce036507ac97",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-16T09:01:01.871Z"
+  },
+  {
+    "id": "4e9e7bfd-4927-4b67-943d-2dbbd441e60c",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-16T08:00:58.983Z"
+  },
+  {
+    "id": "e62d740a-350e-4b6d-aa09-5d98035c3872",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-16T07:01:01.105Z"
+  },
+  {
+    "id": "f620046b-3305-4aa4-90f9-f2c5125298e9",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-16T06:01:03.135Z"
+  },
+  {
+    "id": "2ef9349f-3d61-477e-a0a0-7bb1adcb49a6",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-16T04:00:58.922Z"
+  },
+  {
+    "id": "6ce269fd-e4b3-4a10-9b0e-feb74b50b170",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-16T03:00:57.893Z"
+  },
+  {
+    "id": "22357cdd-bb3d-41a6-b73d-b5c580dbb376",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-16T02:00:58.562Z"
+  },
+  {
+    "id": "8b501b45-ef02-4bca-8212-82c81d848322",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-16T01:00:56.651Z"
+  },
+  {
+    "id": "d2f170da-1c27-4d91-b8eb-fc16c7f4d7bf",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-16T00:00:56.548Z"
+  },
+  {
+    "id": "a1c601b2-a275-4213-bda9-9bcf26f71ad2",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-15T23:00:56.301Z"
+  },
+  {
+    "id": "4b423c9f-671f-4f56-9a7f-bde232949a06",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-15T22:00:24.756Z"
+  },
+  {
+    "id": "4db58716-4862-4369-a5db-9ae896189de0",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-15T21:00:27.063Z"
+  },
+  {
+    "id": "0d5b68c5-9291-4f3d-b828-78171004432b",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-15T20:00:26.639Z"
+  },
+  {
+    "id": "e647777a-4d1f-4fcd-a49a-c80953d6bd93",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-15T19:00:24.666Z"
+  },
+  {
+    "id": "4a32575c-7bb1-4f71-82a0-08231f2670e8",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-15T18:00:24.749Z"
+  },
+  {
+    "id": "0c2b21d3-9e82-4496-a1eb-7ac3364fae68",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-15T17:00:24.886Z"
+  },
+  {
+    "id": "a5abb80a-2578-4e02-825d-7a9864e0f21f",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-15T16:00:24.725Z"
+  },
+  {
+    "id": "f97a135d-4177-4490-a554-589bcf245c73",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-15T15:00:24.923Z"
+  },
+  {
+    "id": "7300c2fa-1c28-4852-8516-5f09b199c977",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-15T14:02:38.548Z"
+  },
+  {
+    "id": "37561e16-5750-4a58-bf11-570ab0f383e2",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-15T13:00:35.051Z"
+  },
+  {
+    "id": "7d98e13b-70a9-4ad4-8142-99fad6a48105",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-15T12:00:24.924Z"
+  },
+  {
+    "id": "9a850391-95f4-46a4-9c4e-559a0243ca84",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-15T11:00:23.786Z"
+  },
+  {
+    "id": "a67d9509-510c-4310-ba81-74637fc58750",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-15T10:00:24.262Z"
+  },
+  {
+    "id": "2fbd236f-2857-4036-8196-47bb45b6f22c",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-15T09:00:23.749Z"
+  },
+  {
+    "id": "cdda7da0-6cf4-434f-868a-6084f7c3effa",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-15T08:00:23.603Z"
+  },
+  {
+    "id": "591ac6a0-c1f5-4c1a-a1b2-61733969a590",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-15T07:00:23.824Z"
+  },
+  {
+    "id": "446665f7-4c2e-4000-946d-63e5149a2953",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-15T06:00:56.789Z"
+  },
+  {
+    "id": "df01da39-2acb-4579-8968-6844be0a0a9c",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-15T05:00:56.694Z"
+  },
+  {
+    "id": "f2433008-a749-423c-bc43-7b5de0984061",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-15T04:00:56.325Z"
+  },
+  {
+    "id": "b7bafdf5-78a3-4bd8-ba67-eb9d9ea95319",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-15T03:00:56.526Z"
+  },
+  {
+    "id": "d5486763-6559-4a11-89b6-4fa3763532e9",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-15T02:00:56.588Z"
+  },
+  {
+    "id": "bea29520-33aa-4485-93ac-bd7ef59e9136",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-15T01:00:56.167Z"
+  },
+  {
+    "id": "b9a64ba7-bf76-4d97-9dd1-a5a78674191c",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-15T00:00:56.233Z"
+  },
+  {
+    "id": "034ea6a4-59bb-4ee3-bc00-68df39aaf881",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-14T23:00:56.204Z"
+  },
+  {
+    "id": "68ae1890-0197-4b61-82df-b63ff2411af3",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-14T22:00:56.270Z"
+  },
+  {
+    "id": "993d37b7-baa0-40e2-89c6-cc6b6035ec48",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-14T21:00:56.323Z"
+  },
+  {
+    "id": "ae89ce1c-ecf1-4993-9672-9bef6a1c1b02",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-14T20:00:56.368Z"
+  },
+  {
+    "id": "aa6bbc19-71a3-4367-868f-52f20023386a",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-14T19:00:56.074Z"
+  },
+  {
+    "id": "fefec4e4-69d1-4f5a-9a96-cbe07656b9ce",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-14T18:00:59.966Z"
+  },
+  {
+    "id": "5e482c4a-68f6-4a04-89cd-ea97d0f28666",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-14T17:00:56.163Z"
+  },
+  {
+    "id": "cde7bf4f-78e2-4992-96af-c57a062c52ed",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-14T16:03:03.234Z"
+  },
+  {
+    "id": "f00a12bd-5987-4c1b-99e2-6ee626e876cf",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-14T11:13:37.892Z"
+  },
+  {
+    "id": "3b1058b5-a327-4dcf-aa32-e346185e4f83",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-14T10:56:33.467Z"
+  },
+  {
+    "id": "70774770-ccf6-4065-848b-14c3cbcaeb3f",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-14T10:45:31.975Z"
+  },
+  {
+    "id": "bf936d98-5f88-4fc9-8192-08c8859feb1d",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-14T01:27:45.387Z"
+  },
+  {
+    "id": "0a6a5f71-06b2-42d1-8626-87ee75a48b5e",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-13T22:58:18.500Z"
+  },
+  {
+    "id": "873bfa8d-099f-4835-ae88-3045d0faa8f8",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-13T22:43:14.236Z"
+  },
+  {
+    "id": "7a06b3d2-6a0f-4124-bba3-aee8b6c2117b",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-13T15:38:32.812Z"
+  },
+  {
+    "id": "d247ae00-716d-4349-8e4f-22534fcaa0a9",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-13T11:25:03.952Z"
+  },
+  {
+    "id": "bbdcf22a-6715-480d-8bb6-0427fd5e3de7",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-11T18:17:34.292Z"
+  },
+  {
+    "id": "757a9932-183d-483d-b0e9-52bb308a345c",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-11T18:03:49.935Z"
+  },
+  {
+    "id": "2dec9240-ab3e-4899-8736-9ed1c7a24694",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-11T17:18:54.258Z"
+  },
+  {
+    "id": "b805dd7c-b328-4945-a303-f7f41917775c",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-11T14:45:55.012Z"
+  },
+  {
+    "id": "6fedb508-1d3b-4138-9451-51eb0e7b98e9",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-11T02:00:06.407Z"
+  },
+  {
+    "id": "dcd67548-7495-418c-a813-8252036c4fa5",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-10T17:52:46.588Z"
+  },
+  {
+    "id": "31df513c-a985-435c-ab5c-5caeb20de754",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-10T17:52:26.996Z"
+  },
+  {
+    "id": "88adb916-b463-42a9-8ca0-6271532acd16",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-10T13:20:30.831Z"
+  },
+  {
+    "id": "b51c3836-b4c4-44fd-869f-6b9b3118598f",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-10T13:03:52.826Z"
+  },
+  {
+    "id": "fd035681-74a0-4f4e-9e0a-85a23327d917",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-10T13:03:25.291Z"
+  },
+  {
+    "id": "556b2a3f-c56b-45fd-9c11-bf7ce8be5ef9",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-10T13:02:10.880Z"
+  },
+  {
+    "id": "53750c0a-36c0-4b0e-a61b-3d1c59dbcb27",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-10T13:00:45.442Z"
+  },
+  {
+    "id": "71b8e857-36bd-403d-933c-8c0fb0ce634d",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-10T12:59:20.914Z"
+  },
+  {
+    "id": "ae37cdd3-eaff-4280-899c-9992e562e171",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-10T12:22:55.113Z"
+  },
+  {
+    "id": "3d16fdb3-e177-498c-9a9c-027b9a4fd5e9",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-10T12:16:39.594Z"
+  },
+  {
+    "id": "c22cc812-e11c-407f-9139-ef51a822c66b",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-10T12:16:39.594Z"
+  },
+  {
+    "id": "92851eeb-b111-45fb-9a4a-91e4c92f2e06",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-10T12:16:39.438Z"
+  },
+  {
+    "id": "f362f592-76ca-41d1-a8ea-264ba3474829",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-10T12:09:32.745Z"
+  },
+  {
+    "id": "6f631d73-3564-46f9-9dd3-bb653982bd0d",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-08T18:01:03.401Z"
+  },
+  {
+    "id": "54fea146-4d7b-492b-aeb3-d430dd645265",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-08T16:32:16.359Z"
+  },
+  {
+    "id": "5e6b29ea-9607-4f83-9f84-7e2f8b9dcc40",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-08T16:31:37.314Z"
+  },
+  {
+    "id": "8d05609a-e85a-4e9e-b3f9-9195942e0301",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-08T16:30:37.044Z"
+  },
+  {
+    "id": "fdee3882-ebd1-4f3f-8566-32787b969608",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-08T15:43:16.176Z"
+  },
+  {
+    "id": "5e88f35c-b368-452e-be49-3a14410184f1",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-08T15:42:27.510Z"
+  },
+  {
+    "id": "e5c36dff-769f-442a-9cb4-fc0c03d1b420",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-08T15:41:46.139Z"
+  },
+  {
+    "id": "2f7a4c5e-f4b7-4046-8071-30dab7d2fdd6",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-08T15:38:33.250Z"
+  },
+  {
+    "id": "02e77b42-4ad4-4956-b3f3-3a75cb1ec76a",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-08T15:37:47.402Z"
+  },
+  {
+    "id": "362948f0-0125-478a-a5b3-c67a2499cc10",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-08T15:36:54.735Z"
+  },
+  {
+    "id": "702fea38-42e1-473c-a9da-6dabaae0bccc",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-08T15:12:21.016Z"
+  },
+  {
+    "id": "0227d6c9-8dc5-47d6-b307-9d932e36d126",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-08T15:10:37.843Z"
+  },
+  {
+    "id": "04372873-0fb5-4d09-8177-57ac9fa150c2",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-08T13:35:57.860Z"
+  },
+  {
+    "id": "1dc2bd27-9ede-4df7-9cb4-17a3336d0a72",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-08T13:26:09.940Z"
+  },
+  {
+    "id": "70bcd913-6dd7-4bbd-aab3-66e4e127be60",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-08T13:12:36.287Z"
+  },
+  {
+    "id": "0a69b5b5-2852-4971-a196-2ce36f164829",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-08T12:23:21.286Z"
+  },
+  {
+    "id": "bf1e068e-8f53-4e82-980b-0e876559eb27",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-08T11:42:45.702Z"
+  },
+  {
+    "id": "50e65153-8a87-4284-ba59-6a466d82a358",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-08T11:35:24.405Z"
+  },
+  {
+    "id": "64b86607-bd72-40f9-b464-8b30ea9b2d6f",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-08T11:31:21.722Z"
+  },
+  {
+    "id": "27870087-2947-4cbc-a882-c8c06c482e84",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-08T11:28:34.681Z"
+  },
+  {
+    "id": "980d52d0-8e58-481f-95a9-688c58574f37",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-08T11:24:48.709Z"
+  },
+  {
+    "id": "8f246464-9a34-4a2e-b9ca-b8ccedbb6c7b",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-08T11:23:39.791Z"
+  },
+  {
+    "id": "2ef7bd07-49d7-4a2a-a65e-7490d0520b73",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-08T11:21:42.018Z"
+  },
+  {
+    "id": "71863667-f926-4e35-9b18-4d3433eff41e",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-08T02:11:30.206Z"
+  },
+  {
+    "id": "feaa7a0a-84ce-48f9-9207-7969fb35c151",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-07T14:52:47.872Z"
+  },
+  {
+    "id": "924d3018-a926-44e1-a5d8-539a53c93884",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-07T14:48:28.462Z"
+  },
+  {
+    "id": "27e8b697-be02-46e4-84db-3f7e3f876d79",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-07T14:47:20.972Z"
+  },
+  {
+    "id": "248e5f85-93cd-4be9-8373-2258cc051865",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-07T14:37:41.251Z"
+  },
+  {
+    "id": "b7a02419-931b-4d64-a223-75a2fd90b219",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-07T11:20:44.664Z"
+  },
+  {
+    "id": "a2d1562a-d666-4cff-9a3d-1e4c317bc187",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-07T09:11:03.502Z"
+  },
+  {
+    "id": "a48e7218-4cfe-4f43-acf8-9da1fcc9d507",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-07T09:01:45.977Z"
+  },
+  {
+    "id": "45cc3438-3dfd-402d-b171-2ce2118251bc",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-07T08:47:36.383Z"
+  },
+  {
+    "id": "d5a494a5-15ba-4640-95be-6369ca976690",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-07T08:20:49.785Z"
+  },
+  {
+    "id": "0b56af0d-2a19-43ae-a856-457803e5346e",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-07T08:17:37.108Z"
+  },
+  {
+    "id": "41cf4830-e057-4c7d-99a0-3a050aa5e7fa",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-07T08:15:43.817Z"
+  },
+  {
+    "id": "3a4159b1-2c5e-4c09-a39a-189cb6efe609",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-07T03:08:58.125Z"
+  },
+  {
+    "id": "a447d042-c704-4cbf-b674-6291d27b3acf",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-07T03:06:42.606Z"
+  },
+  {
+    "id": "82bbfd28-38dd-4796-8370-79d663211216",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-07T00:27:00.865Z"
+  },
+  {
+    "id": "107a6d59-4755-4724-85c9-6eacb2578f54",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-06T23:50:42.588Z"
+  },
+  {
+    "id": "200e4583-32f8-4748-b977-0bd048d20f1b",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-06T23:22:01.249Z"
+  },
+  {
+    "id": "2b448115-1648-4f35-baf6-f3c795876f61",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-06T23:19:56.832Z"
+  },
+  {
+    "id": "81a979c1-2ad0-42f3-aaa0-2753d3b0c23b",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-06T23:16:35.992Z"
+  },
+  {
+    "id": "28d2ac9f-7a67-463e-8ef1-1bd594189896",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-06T23:08:06.728Z"
+  },
+  {
+    "id": "6289b9d0-470d-4b26-9fe0-2fd7b63f13a4",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-06T23:02:54.259Z"
+  },
+  {
+    "id": "22bdb13f-c760-4bbb-9c55-7e08f1b1f881",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-06T22:58:53.980Z"
+  },
+  {
+    "id": "8015c38f-6182-4ee5-a9bd-1329431912cb",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-06T22:58:21.773Z"
+  },
+  {
+    "id": "989231b1-4e81-44c8-bc53-bdd0a948ae91",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-06T22:36:23.666Z"
+  },
+  {
+    "id": "1efb3dc4-1cdd-4388-8f8b-9c9ec1f252cd",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-06T22:33:40.854Z"
+  },
+  {
+    "id": "2335b1c4-656f-454f-8de7-c629dc9d9ce7",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-06T21:52:15.766Z"
+  },
+  {
+    "id": "7635631e-5f8b-4394-8d94-7ce16d0acea1",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-06T21:50:25.735Z"
+  },
+  {
+    "id": "7c38b453-46e2-4d1d-8253-757cc1efb7aa",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-06T21:48:28.535Z"
+  },
+  {
+    "id": "38b0277c-8a1b-49ff-8707-9c0783c40e8a",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-06T21:47:19.338Z"
+  },
+  {
+    "id": "dcee00c9-8a05-4018-9be7-6f50ef76e43c",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-06T17:25:41.981Z"
+  },
+  {
+    "id": "e2d971e8-f558-43ad-a019-5b026c696373",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-06T12:43:40.616Z"
+  },
+  {
+    "id": "f7a8dee1-ca9b-4d23-8855-bc8b277bebbc",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-06T12:43:28.949Z"
+  },
+  {
+    "id": "8ef4cf9e-ec92-4904-b6ae-0df027b5677a",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-05T22:39:21.861Z"
+  },
+  {
+    "id": "1542f99a-455c-45db-8559-1675cc89d09a",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-05T22:37:52.675Z"
+  },
+  {
+    "id": "74f49afc-f4ff-4c06-92c5-aaf1f948923c",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-05T21:27:47.458Z"
+  },
+  {
+    "id": "af48262b-7e9a-4c71-83eb-09efc05f358a",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-05T21:26:25.618Z"
+  },
+  {
+    "id": "606a4b83-1908-48c7-b18b-d594c90cf22e",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-05T12:31:01.514Z"
+  },
+  {
+    "id": "98d32fa2-8ace-4b03-b361-208295f6b31d",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-05T12:29:40.981Z"
+  },
+  {
+    "id": "1256716c-e223-4f96-a02f-1ec261e3267e",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-05T12:27:48.737Z"
+  },
+  {
+    "id": "0dfca1ad-5028-462f-9cf5-369928a6f408",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-05T12:26:13.931Z"
+  },
+  {
+    "id": "e291a0ba-977f-4340-8ff8-35463807a9b2",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-05T12:26:13.903Z"
+  },
+  {
+    "id": "f0e0dd4d-e97a-4f0b-a300-fc2f4521e9d5",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-05T11:41:57.714Z"
+  },
+  {
+    "id": "143c3cfe-8720-4f09-826d-f2bafbd035ee",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-05T11:36:16.565Z"
+  },
+  {
+    "id": "c6dda6b0-455c-4ef4-b0e7-5d6e125153cd",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-04T19:42:21.726Z"
+  },
+  {
+    "id": "be38efdb-6b87-48fe-8630-e7916b970e9d",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-04T17:49:32.703Z"
+  },
+  {
+    "id": "1de6aa7d-3ac1-4f64-baa4-3257e73553e2",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-04T17:40:49.261Z"
+  },
+  {
+    "id": "d948ede9-bebd-405b-b40a-023012d6dc36",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-04T17:38:03.116Z"
+  },
+  {
+    "id": "835ee6ff-2867-46e2-9c16-e78e41ced54d",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-04T17:30:54.548Z"
+  },
+  {
+    "id": "daff7a22-2dc0-4045-820f-4a2e3347f8c5",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-04T17:27:05.014Z"
+  },
+  {
+    "id": "b6fcbe02-09f3-4bda-be49-e107b92cc08e",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-04T17:18:13.746Z"
+  },
+  {
+    "id": "295b2499-3ebe-4aba-a8b1-cc9ad5f6cd7c",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-04T17:07:00.067Z"
+  },
+  {
+    "id": "274faacd-9417-4847-915b-2a5208078d97",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-04T15:22:14.636Z"
+  },
+  {
+    "id": "7d2d5bf6-b86d-4637-b4f6-a47e6723b6e7",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-04T15:16:40.654Z"
+  },
+  {
+    "id": "e08cee51-0d4f-4c0b-8cbb-a9ece9332996",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-04T14:54:18.566Z"
+  },
+  {
+    "id": "b227864c-8d22-4d54-906d-9001fc7a0804",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-04T14:51:44.226Z"
+  },
+  {
+    "id": "91eb4235-9718-4494-af94-d139b54b2386",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-04T14:42:31.186Z"
+  },
+  {
+    "id": "a01f88c3-f01f-49ed-b7ed-48f6c7836533",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-04T14:31:12.817Z"
+  },
+  {
+    "id": "48ac49af-3966-43c5-994b-f0a6c89609ed",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-04T14:25:41.867Z"
+  },
+  {
+    "id": "8c13807c-65c6-46ea-864d-781328bc94e6",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-04T13:03:58.981Z"
+  },
+  {
+    "id": "5cfdca20-bed0-4497-9d6a-cc98185a6df0",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-04T12:32:10.694Z"
+  },
+  {
+    "id": "89272eee-429a-47da-b592-1df3208a47f3",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-04T12:28:06.586Z"
+  },
+  {
+    "id": "335a482d-f226-4998-8178-181e9ab4bd4d",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-04T12:14:36.632Z"
+  },
+  {
+    "id": "c1c295f4-fa25-4218-952e-c300d071bd9e",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-04T11:48:06.930Z"
+  },
+  {
+    "id": "388012c8-48a2-4706-87af-77605f208835",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-04T10:47:41.257Z"
+  },
+  {
+    "id": "d1854476-80e8-4ebe-b4de-df10d4917d30",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-04T10:45:30.722Z"
+  },
+  {
+    "id": "0c2c320e-1685-47a1-9a3b-adc41e9fbe7e",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-04T10:20:18.260Z"
+  },
+  {
+    "id": "9d887b5e-f00b-46bc-9fbb-18c34ac7dc82",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-04T08:19:16.956Z"
+  },
+  {
+    "id": "6c2cdf13-bf3e-480f-b2b2-7ad27ec1acea",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-04T08:17:21.495Z"
+  },
+  {
+    "id": "6a6fabd3-fc55-4262-8930-54ac3ee9e835",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-04T07:13:03.185Z"
+  },
+  {
+    "id": "78bcb0ce-724c-4739-b8a0-798650c114cd",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-04T06:55:36.504Z"
+  },
+  {
+    "id": "fec7203f-3eda-4648-a5ac-ce2634332941",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-04T06:53:39.959Z"
+  },
+  {
+    "id": "f9cf91a6-3851-45a4-839a-6ea52d0c3e3b",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-04T06:48:06.091Z"
+  },
+  {
+    "id": "d14bec5a-2a87-4a88-8d8e-ffada66aaf5b",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 4,
+    "synthesis_topic": null,
+    "created_at": "2026-04-04T06:46:31.792Z"
+  },
+  {
+    "id": "880df26f-bde5-4457-8d6b-d8b025b96e21",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 3,
+    "synthesis_topic": null,
+    "created_at": "2026-04-04T06:36:24.307Z"
+  },
+  {
+    "id": "f407f1cd-aa2f-47db-980b-e6670392e570",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 3,
+    "synthesis_topic": null,
+    "created_at": "2026-04-04T06:32:53.892Z"
+  },
+  {
+    "id": "568a962b-d136-447e-a6e5-c635aa052c1a",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 3,
+    "synthesis_topic": null,
+    "created_at": "2026-04-04T06:32:00.534Z"
+  },
+  {
+    "id": "9ec62483-eddd-4bd9-859a-c13e3d1066b3",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 3,
+    "synthesis_topic": null,
+    "created_at": "2026-04-04T06:30:29.364Z"
+  },
+  {
+    "id": "27df04ec-4c00-4dd3-a465-074f8566ff19",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 3,
+    "synthesis_topic": null,
+    "created_at": "2026-04-04T06:22:54.662Z"
+  },
+  {
+    "id": "595515a6-b8dc-4ec2-9e21-af0651c14bef",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 3,
+    "synthesis_topic": null,
+    "created_at": "2026-04-04T06:10:24.406Z"
+  },
+  {
+    "id": "48c1051e-8d7e-4921-ad61-3afee3b258f8",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 3,
+    "synthesis_topic": null,
+    "created_at": "2026-04-04T06:09:08.642Z"
+  },
+  {
+    "id": "fca90b1d-db2a-4b0f-a604-b72c4497d907",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 3,
+    "synthesis_topic": null,
+    "created_at": "2026-04-04T06:06:06.956Z"
+  },
+  {
+    "id": "c06f2623-29b2-4fe2-8e9f-53c6896f9a5c",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 3,
+    "synthesis_topic": null,
+    "created_at": "2026-04-04T05:56:16.478Z"
+  },
+  {
+    "id": "bc2d49de-102f-48e4-91de-ff8669a708d2",
+    "room_id": "market-room",
+    "trigger_mode": "manual",
+    "agent_count": 3,
+    "synthesis_topic": null,
+    "created_at": "2026-04-04T05:50:47.755Z"
+  },
+  {
+    "id": "4200cd45-9f85-493c-b6b0-4ee4c25f8e14",
+    "room_id": "market-room",
+    "trigger_mode": null,
+    "agent_count": 3,
+    "synthesis_topic": null,
+    "created_at": "2026-04-04T05:34:09.813Z"
+  },
+  {
+    "id": "a4a5b0a7-49bf-4add-888e-67bc55e71828",
+    "room_id": "market-room",
+    "trigger_mode": null,
+    "agent_count": 3,
+    "synthesis_topic": null,
+    "created_at": "2026-04-04T05:25:10.227Z"
+  },
+  {
+    "id": "1aff8c19-a8d3-4fd7-87a1-6638e8646d5b",
+    "room_id": "market-room",
+    "trigger_mode": null,
+    "agent_count": 3,
+    "synthesis_topic": null,
+    "created_at": "2026-04-04T05:14:45.100Z"
+  },
+  {
+    "id": "a1ca6fee-258a-4453-9eb4-24169d3fc882",
+    "room_id": "market-room",
+    "trigger_mode": null,
+    "agent_count": 3,
+    "synthesis_topic": null,
+    "created_at": "2026-04-04T05:08:59.254Z"
+  },
+  {
+    "id": "195dc4d2-f0af-4e25-8eba-0ba4f394cc89",
+    "room_id": "market-room",
+    "trigger_mode": null,
+    "agent_count": 3,
+    "synthesis_topic": null,
+    "created_at": "2026-04-04T05:03:01.138Z"
+  },
+  {
+    "id": "c671e6bc-35ad-4bcb-93c5-e334dde8172c",
+    "room_id": "market-room",
+    "trigger_mode": null,
+    "agent_count": 3,
+    "synthesis_topic": null,
+    "created_at": "2026-04-04T04:48:31.001Z"
+  }
+]

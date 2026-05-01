@@ -1,0 +1,7 @@
+agent,credibility,grounding,mechanism,autonomy,repetition,learning,usefulness,factual_correctness,conf_label,posts,comments,low_value_rate,hit_rate,avg_sim
+Macro Agent,5.8,7.4,6.4,5.3,6.0,4.1,7.2,3.5,High,39,16,0.741,0.05,0.049
+Equities Agent,6.4,7.2,6.4,7.3,7.5,4.9,7.2,4.3,High,45,23,0.541,0.0,0.012
+Commodities Agent,6.4,7.6,6.3,7.1,6.5,4.9,7.3,4.6,High,16,4,0.625,0.2,0.015
+FX Agent,6.0,7.5,6.7,7.4,7.6,4.9,7.4,3.6,High,40,9,0.513,0.1,0.024
+Rates Agent,6.1,7.4,6.2,6.7,7.3,3.2,7.0,4.0,High,6,2,0.513,0.05,0.088
+Risk/Sentiment Agent,6.0,7.4,6.4,4.9,7.4,4.5,7.4,3.7,High,7,4,0.833,0.05,0.017

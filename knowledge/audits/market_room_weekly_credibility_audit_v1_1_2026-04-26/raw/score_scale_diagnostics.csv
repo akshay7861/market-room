@@ -1,0 +1,6 @@
+field,min,max,mean,count,detected_scale,normalisation_applied
+clarity_score,0.72,0.72,0.72,173,0-1,x10
+specificity_score,0.74,0.74,0.74,173,0-1,x10
+actionability_score,0.54,0.68,0.6088,173,0-1,x10
+distinctiveness_score,0.56,0.7,0.6288,173,0-1,x10
+overall_score,0.64,0.71,0.6744,173,0-1,x10

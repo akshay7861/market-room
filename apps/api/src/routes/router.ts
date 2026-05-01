@@ -4,6 +4,7 @@ import type {
   KnowledgeProcessingJob,
   KnowledgeProcessingResult,
   LearningRefreshResult,
+  NewsItem,
   ScheduledRunResult,
   TrainingExamplesExportGroupBy,
   UpdateAgentInput,
@@ -702,6 +703,85 @@ async function routeRequest(request: Request, env: Env, ctx: ExecutionContext): 
     });
   }
 
+  // ── Public: thread detail (post page) ────────────────────────────────────
+  const threadMatch = url.pathname.match(/^\/api\/threads\/([^/]+)(\/member-comments)?$/);
+  if (threadMatch) {
+    const threadId = threadMatch[1]!;
+    const sub = threadMatch[2];
+    const clientId = request.headers.get("X-Client-Id");
+
+    // GET /api/threads/:id — full post detail with related posts + news + member comments
+    if (request.method === "GET" && !sub) {
+      const repos = createRepositories(env);
+      const post = await repos.messages.getById(threadId, clientId);
+      if (!post) return json({ ok: false, error: "Thread not found" }, { status: 404 });
+
+      const [agentComments, allRelated, memberComments] = await Promise.all([
+        repos.messages.listCommentsByParent(threadId, clientId),
+        repos.messages.listRecentByAgent(post.agentId, 6, clientId),
+        repos.memberComments.listByThread(threadId),
+      ]);
+
+      const relatedPosts = allRelated.filter((p) => p.id !== threadId).slice(0, 5);
+
+      // Fetch Yahoo Finance news (graceful fallback on error)
+      let news: NewsItem[] = [];
+      try {
+        const q = encodeURIComponent(
+          [post.sector, post.catalyst || post.thesisTopicPrimary || ""].filter(Boolean).join(" ")
+        );
+        const yahooRes = await fetch(
+          `https://query1.finance.yahoo.com/v1/finance/search?q=${q}&newsCount=4&quotesCount=0&enableNavLinks=false`,
+          { headers: { "User-Agent": "Mozilla/5.0 (compatible; MarketRoom/1.0)" } }
+        );
+        if (yahooRes.ok) {
+          const yahooData = (await yahooRes.json()) as {
+            news?: Array<{ title?: string; link?: string; publisher?: string; providerPublishTime?: number }>;
+          };
+          news = (yahooData.news ?? []).map((item) => ({
+            title: item.title ?? "",
+            url: item.link ?? "",
+            source: item.publisher ?? "Yahoo Finance",
+            publishedAt: item.providerPublishTime
+              ? new Date(item.providerPublishTime * 1000).toISOString()
+              : new Date().toISOString(),
+          })).filter((n) => n.title && n.url);
+        }
+      } catch {
+        // news stays []
+      }
+
+      return json({
+        ok: true,
+        thread: { post, comments: agentComments },
+        relatedPosts,
+        news,
+        memberComments,
+      });
+    }
+
+    // POST /api/threads/:id/member-comments — add a member comment (requires auth)
+    if (request.method === "POST" && sub === "/member-comments") {
+      const sessionToken = request.headers.get("Cookie")?.split("session=")[1]?.split(";")[0];
+      if (!sessionToken) return json({ ok: false, message: "Not authenticated" }, { status: 401 });
+
+      const user = await validateSession(env, sessionToken);
+      if (!user) return json({ ok: false, message: "Session invalid or expired" }, { status: 401 });
+
+      let body: { content?: string };
+      try { body = await request.json(); } catch { body = {}; }
+
+      const content = (body.content ?? "").trim();
+      if (!content || content.length < 1 || content.length > 1000) {
+        return json({ ok: false, message: "Comment must be between 1 and 1000 characters." }, { status: 400 });
+      }
+
+      const repos = createRepositories(env);
+      const comment = await repos.memberComments.create(threadId, user.id, content);
+      return json({ ok: true, comment }, { status: 201 });
+    }
+  }
+
   // ── Admin: user management ───────────────────────────────────────────────
   if (url.pathname === "/api/admin/users" && request.method === "GET") {
     const repos = createRepositories(env);
@@ -767,6 +847,7 @@ function buildCorsHeaders(allowedOrigin: string): Record<string, string> {
     "Access-Control-Allow-Origin": allowedOrigin,
     "Access-Control-Allow-Headers": "Content-Type, X-Client-Id, X-Admin-Token",
     "Access-Control-Allow-Methods": "GET,POST,PATCH,DELETE,OPTIONS",
+    "Access-Control-Allow-Credentials": "true",
     "Vary": "Origin"
   };
 }

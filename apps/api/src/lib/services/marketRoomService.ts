@@ -34,7 +34,7 @@ import { listRelevantMarketCasesForAgent } from "./marketCaseService";
 import { findRelevantKnowledgeSnippets, type LocalKnowledgeSnippet } from "./knowledgeSnippetService";
 import { recordDiscussionLearning } from "./learningService";
 import { fetchOfficialCatalystLayer, isDataLakeOnlyHeadline, fetchRecentTreasuryAuctionData, formatAuctionDataBlock } from "./officialCatalystService";
-import { buildHistoricalDataPromptBlock, buildAnalogContextBlock, type SnapshotSignal } from "./historicalDataContextService";
+import { buildHistoricalDataPromptBlock, buildAnalogContextBlock, getFxCorrelationMetadata, buildMacroEventCalendarBlock, type SnapshotSignal, type FxCorrelationMetadata } from "./historicalDataContextService";
 import { fetchYahooFinanceBriefing } from "./yahooFinanceNewsService";
 import { fetchMarketauxBriefing } from "./marketauxNewsService";
 import { fetchFinnhubBriefing } from "./finnhubNewsService";
@@ -1526,17 +1526,35 @@ async function generateAgentForumPosts({
 
     const weakDomainAdjustedDecision = applyNoFreshWeakDomainDecisionGate(macroSingleNameAdjustedDecision);
 
-    const ratesTemplateAdjustedDecision = applyRatesTemplateDecisionGate({
+    // FX/Macro/Rates only: suppress posts where the catalyst has zero sector-keyword
+    // overlap. Eliminates the "Macro forced to write about Smith Micro earnings"
+    // pattern from the v1.1 Opus qualitative review. Pass-through for other 3 sectors.
+    const sectorRelevanceAdjustedDecision = applyCatalystRelevanceGate({
       agent,
       postingDecision: weakDomainAdjustedDecision,
+      headlineAnalysis
+    });
+
+    const ratesTemplateAdjustedDecision = applyRatesTemplateDecisionGate({
+      agent,
+      postingDecision: sectorRelevanceAdjustedDecision,
       headlineAnalysis,
       topicPlan,
       recentPosts
     });
 
-    const repetitionAdjustedDecision = applyRepeatedCatalystDecisionGate({
+    const conceptualRepetitionAdjustedDecision = applyConceptualRepetitionGate({
       agent,
       postingDecision: ratesTemplateAdjustedDecision,
+      agentState,
+      topicPlan,
+      recentPosts,
+      headlineAnalysis
+    });
+
+    const repetitionAdjustedDecision = applyRepeatedCatalystDecisionGate({
+      agent,
+      postingDecision: conceptualRepetitionAdjustedDecision,
       headlineAnalysis,
       topHeadline: ownershipHeadlineForGates,
       topicPlan,
@@ -1661,6 +1679,9 @@ async function generateAgentForumPosts({
           ])
         : null;
     const historicalContext = buildMarketRoomHistoricalContext(agent, generalHeadlines, sectorHeadlines);
+    // Typed FX correlation metadata — derived directly from the computed data rather than
+    // re-parsing the historicalContext string (avoids fragile regex on generated text).
+    const fxCorrelationMetadata = getFxCorrelationMetadata();
     if (agent.sector === "Equities") {
       console.log(
         `[equities-standalone] fundamentals_result injected=${Boolean(equityFundamentalsContext?.promptBlock)} tier=${equityFundamentalsContext?.dataTier || "none"} classification=${equityFundamentalsContext?.resolution.classification || "none"}`
@@ -1790,7 +1811,7 @@ async function generateAgentForumPosts({
       agent,
       content: resolvedContent,
       headlineAnalysis,
-      historicalContext
+      fxCorrelationMetadata
     });
     resolvedContent = fxCorrelationEnforcement.content;
     postQualityFlags = uniqueQualityFlags([
@@ -1800,7 +1821,7 @@ async function generateAgentForumPosts({
         content: resolvedContent,
         headlineAnalysis,
         recentPosts,
-        historicalContext
+        fxCorrelationMetadata
       })
     ]);
 
@@ -4286,6 +4307,9 @@ async function requestStructuredForumPost({
       console.log(`[rates-auction] injected=${Boolean(auctionBlock && !auctionBlock.startsWith("AUCTION DATA UNAVAILABLE"))} length=${auctionBlock.length}`);
     }
 
+    // Macro Event Calendar — inject FRED print history for Macro agent only
+    const macroEventCalendar = agent.sector === "Macro" ? buildMacroEventCalendarBlock() : "";
+
     // Build the prompt once — used by both passes
     const postPrompt =
       triggerMode === "synthesis"
@@ -4303,6 +4327,7 @@ async function requestStructuredForumPost({
             roomCoverage,
             historicalContext,
             analogBlock,
+            macroEventCalendar,
             peerThesisView,
             verifiedMetrics,
             stanceChallenge,
@@ -4343,6 +4368,7 @@ async function requestStructuredForumPost({
             verifiedMetrics,
             stanceChallenge,
             auctionBlock,
+            macroEventCalendar,
             mechanismSelection
           );
 
@@ -4728,6 +4754,7 @@ type SynthesisPromptArgs = {
   roomCoverage: RoomCoverageState | null;
   historicalContext: string;
   analogBlock: string;
+  macroEventCalendar: string;
   peerThesisView: string;
   verifiedMetrics: VerifiedMarketMetricsContext;
   stanceChallenge: StanceLockChallenge | null;
@@ -4756,6 +4783,7 @@ function buildSynthesisPrompt(args: SynthesisPromptArgs): string {
     roomCoverage,
     historicalContext,
     analogBlock,
+    macroEventCalendar,
     peerThesisView,
     verifiedMetrics,
     stanceChallenge,
@@ -4811,6 +4839,7 @@ function buildSynthesisPrompt(args: SynthesisPromptArgs): string {
     ...(peerThesisView ? [peerThesisView] : []),
     ...(historicalContext ? [historicalContext] : []),
     ...(analogBlock ? [analogBlock] : []),
+    ...(macroEventCalendar ? [macroEventCalendar] : []),
     ...(stanceChallenge?.block ? [stanceChallenge.block] : []),
     ...(synthesisRepetitionChallenge ? [synthesisRepetitionChallenge] : []),
     buildSharedPostSpecPromptBlock({
@@ -4868,6 +4897,7 @@ function buildForumPostPrompt(
   verifiedMetrics: VerifiedMarketMetricsContext = EMPTY_VERIFIED_MARKET_METRICS_CONTEXT,
   stanceChallenge: StanceLockChallenge | null = null,
   auctionBlock: string = "",
+  macroEventCalendar: string = "",
   mechanismSelection: MechanismSelection
 ): string {
   const availableInstruments = relevantInstrumentsForAgent(agent, marketSnapshot);
@@ -5008,6 +5038,7 @@ function buildForumPostPrompt(
     ...(analogBlock ? [analogBlock] : []),
     ...(equityFundamentals ? [equityFundamentals] : []),
     ...(auctionBlock ? [auctionBlock] : []),
+    ...(macroEventCalendar ? [macroEventCalendar] : []),
     knowledgeSnippets.length > 0 ? "Supporting context snippets (backend-selected; do not cite these as 'house views'):" : "No supporting knowledge snippets were retrieved for this post.",
     ...knowledgeSnippets.map(
       (snippet, index) => `${index + 1}. ${snippet.title} [${snippet.category}] ${snippet.excerpt}`
@@ -6679,47 +6710,105 @@ function ensureStanceLockReviewIfRequired({
   return repaired;
 }
 
-function convictionRepairSentence(agent: Agent, catalyst: string, mechanismFamily?: MechanismFamily): string {
-  return convictionRepairSentenceBySector(catalyst, agent.sector, mechanismFamily);
+/** Deterministic but varied hash for selecting conviction sentence variant. */
+function convictionHash(str: string): number {
+  let h = 0;
+  for (let i = 0; i < str.length; i++) {
+    h = (Math.imul(31, h) + str.charCodeAt(i)) | 0;
+  }
+  return Math.abs(h);
+}
+
+function convictionRepairSentence(agent: Agent, catalyst: string, mechanismFamily?: MechanismFamily, postId?: string): string {
+  return convictionRepairSentenceBySector(catalyst, agent.sector, mechanismFamily, postId);
 }
 
 function convictionRepairSentenceBySector(
   catalyst: string,
   sector: Agent["sector"],
-  mechanismFamily?: MechanismFamily
+  mechanismFamily?: MechanismFamily,
+  postId?: string
 ): string {
+  // Use postId (or fallback to catalyst) to pick a variant — deterministic, never random
+  const seed = postId ?? catalyst;
+  const pick = (variants: string[]): string => variants[convictionHash(seed) % variants.length];
+
   if (mechanismFamily === "labor_inflation_persistence" || mechanismFamily === "fed_easing_timing") {
-    return "This view changes if monthly payroll momentum and core PCE both move decisively against the stated policy path within the next two releases.";
+    return pick([
+      "This view changes if monthly payroll momentum and core PCE both move decisively against the stated policy path within the next two releases.",
+      "Falsifier: core PCE prints below 2.5% YoY AND NFP comes in below 100K in the same month.",
+      "Reverse this if the Fed's dot plot median shifts down by 25bps or more at the next FOMC meeting.",
+    ]);
   }
   if (mechanismFamily === "term_premium_repricing") {
-    return "This view changes if the US 10Y yield and curve slope move more than 20bps against the stated term-premium direction within the next five sessions.";
+    return pick([
+      "This view changes if the US 10Y yield and curve slope move more than 20bps against the stated term-premium direction within the next five sessions.",
+      "Falsifier: the 10Y term premium retraces 15bps with a stable 2Y over the next two auctions.",
+      "Reverse this if indirect bidder share recovers above 60% on the next 10Y auction with a tail under 1bp.",
+    ]);
   }
   if (mechanismFamily === "credit_stress") {
-    return "This view changes if HY OAS and equity volatility both reverse more than 5% against this credit-stress signal within the next three sessions.";
+    return pick([
+      "This view changes if HY OAS and equity volatility both reverse more than 5% against this credit-stress signal within the next three sessions.",
+      "Falsifier: HY OAS tightens below 270bps for two consecutive sessions with equity vol sub-18.",
+      "Reverse this if the investment-grade/HY spread ratio compresses for two consecutive trading days while equity futures hold positive.",
+    ]);
   }
   if (mechanismFamily === "commodity_pass_through") {
-    return "This view changes if benchmark energy prices and inventory prints move against this pass-through channel for two consecutive updates.";
+    return pick([
+      "This view changes if benchmark energy prices and inventory prints move against this pass-through channel for two consecutive updates.",
+      "Falsifier: WTI drops below $75 AND EIA crude inventories build by more than 4mb for two consecutive weeks.",
+      "Reverse this if the rig count rises by more than 15 over the next four weeks while product crack spreads compress below $15.",
+    ]);
   }
   if (mechanismFamily === "earnings_fundamentals_deterioration" || mechanismFamily === "revisions_breadth_sector_weakness") {
-    return "This view changes if company guidance and sector breadth both improve materially against the stated weakness over the next two reporting checkpoints.";
+    return pick([
+      "This view changes if company guidance and sector breadth both improve materially against the stated weakness over the next two reporting checkpoints.",
+      "Falsifier: the next two earnings prints in this sector beat consensus EPS by more than 5% and raise full-year guidance.",
+      "Reverse this if the sector earnings revision breadth (% raising) flips above 50% in the next monthly reading.",
+    ]);
   }
   const catalystText = catalyst.toLowerCase();
   if (sector === "Commodities" || /\boil|wti|brent|crude|gas|opec|eia|inventory|strait\b/.test(catalystText)) {
-    return "This view changes if EIA crude inventories print two consecutive moves above 3mb against the current supply signal within the next two weekly reports.";
+    return pick([
+      "This view changes if EIA crude inventories print two consecutive moves above 3mb against the current supply signal within the next two weekly reports.",
+      "Falsifier: WTI closes above $90 for three consecutive sessions with EIA builds instead of draws.",
+      "Reverse this if OPEC+ announces production cuts exceeding 500kbd within the next two weeks while EIA demand revisions turn positive.",
+    ]);
   }
   if (sector === "Rates" || /\byield|treasury|fed|fomc|curve|duration|auction\b/.test(catalystText)) {
-    return "This view changes if the US 10Y yield moves more than 25bps against the stated direction within the next five sessions.";
+    return pick([
+      "This view changes if the US 10Y yield moves more than 25bps against the stated direction within the next five sessions.",
+      "Falsifier: the 2s10s spread moves more than 15bps in the opposite direction over the next three sessions.",
+      "Reverse this if the next 10Y auction prints a tail above 2bps with indirect bidder share below 55%.",
+    ]);
   }
   if (sector === "FX" || /\bdollar|dxy|usd|jpy|eur|carry|currency|fx\b/.test(catalystText)) {
-    return "This view changes if DXY reverses by more than 1% while the 10Y yield confirms the opposite direction within the next five sessions.";
+    return pick([
+      "This view changes if DXY reverses by more than 1% while the 10Y yield confirms the opposite direction within the next five sessions.",
+      "Falsifier: the named FX cross moves more than 80bps against the stated direction for two consecutive sessions.",
+      "Reverse this if the Fed's real rate (10Y TIPS) declines by more than 15bps within two weeks while risk appetite stabilises.",
+    ]);
   }
   if (sector === "Equities" || /\bstock|equity|shares|earnings|nasdaq|s&p|spy|xlf|iwm\b/.test(catalystText)) {
-    return "This view changes if sector breadth or earnings guidance moves more than 2% against the stated thesis within the next two weeks.";
+    return pick([
+      "This view changes if sector breadth or earnings guidance moves more than 2% against the stated thesis within the next two weeks.",
+      "Falsifier: the next two earnings prints in this sector beat consensus EPS by more than 5% and raise full-year guidance.",
+      "Reverse this if the stock closes above its 50-day MA with sector breadth (advance-decline) turning positive for three consecutive sessions.",
+    ]);
   }
   if (sector === "Risk/Sentiment" || /\bvix|credit|spread|risk|sentiment|volatility|crowding\b/.test(catalystText)) {
-    return "This view changes if VIX and HY OAS both move more than 5% against the stated risk signal within the next three sessions.";
+    return pick([
+      "This view changes if VIX and HY OAS both move more than 5% against the stated risk signal within the next three sessions.",
+      "Falsifier: HY OAS tightens below 280bps while VIX falls below 17 for two consecutive sessions.",
+      "Reverse this if the put-to-call ratio drops below 0.7 and IG spreads tighten by more than 5bps within the next week.",
+    ]);
   }
-  return "This view changes if the named catalyst is contradicted by a fresh market print moving more than 2% within the next two weeks.";
+  return pick([
+    "This view changes if the named catalyst is contradicted by a fresh market print moving more than 2% within the next two weeks.",
+    "Falsifier: two consecutive data releases move materially against the stated mechanism within the next month.",
+    "Reverse this if the primary driver cited here reverses by more than one standard deviation versus the trailing 30-day range.",
+  ]);
 }
 
 function resolveForumPostTitle({
@@ -6841,6 +6930,28 @@ function collectPostQualityFlags({
     }
   }
 
+  // Detect nominal-as-real yield conflation (Rates + Macro only).
+  // "real yield" / "real rate" without a TIPS or breakeven citation → agent is implicitly
+  // treating a nominal rate as a real one. Suppressed downstream by shouldSuppressUnsafeMetricPost.
+  if (["Rates", "Macro"].includes(agent.sector)) {
+    const hasRealYieldClaim = /\breal\s+(?:yield|rate|return)s?\b/i.test(content);
+    const hasTipsOrBreakeven = /\b(?:TIPS|breakeven|inflation[- ]adjusted|10Y TIPS|real yield from)\b/i.test(content);
+    if (hasRealYieldClaim && !hasTipsOrBreakeven) {
+      flags.add("nominal_yield_cited_as_real");
+    }
+  }
+
+  // Detect unsupported HY OAS threshold claims (all sectors; informational — not suppressing).
+  // Fires when an agent says OAS is "elevated" or "stress" without citing a quantitative baseline.
+  // The verified metrics block now includes 90d mean + full-series percentile for agents to use.
+  const hasOasClaim = /\b(?:HY OAS|credit spread|OAS)\b/i.test(content);
+  const hasOasThresholdWord = /\b(?:elevated|stress|historical(?:ly)?|high for|risk-off level)\b/i.test(content);
+  const hasOasQuantitativeBaseline =
+    /\b(?:90[- ]?d(?:ay)?|average|mean|\d{2,3}(?:st|nd|rd|th)\s*percentile|vs\s+\d{2,4}|above\s+\d{2,4})\b/i.test(content);
+  if (hasOasClaim && hasOasThresholdWord && !hasOasQuantitativeBaseline) {
+    flags.add("hy_oas_threshold_unsupported");
+  }
+
   return [...flags];
 }
 
@@ -6922,19 +7033,19 @@ function evaluateFxCorrelationGrounding({
   content,
   headlineAnalysis,
   recentPosts,
-  historicalContext
+  fxCorrelationMetadata
 }: {
   agent: Agent;
   content: string;
   headlineAnalysis: HeadlineAnalysis | null;
   recentPosts: AgentMessage[];
-  historicalContext: string;
+  fxCorrelationMetadata: FxCorrelationMetadata;
 }): PostQualityFlag[] {
   if (agent.sector !== "FX") {
     return [];
   }
 
-  const fxCorrelationContext = parseFxCorrelationContext(historicalContext);
+  const fxCorrelationContext = fxCorrelationMetadata;
   const catalystText = [headlineAnalysis?.headline_title, headlineAnalysis?.primary_mechanism].filter(Boolean).join(" ");
   const relevant = /\b(oil|wti|brent|commodity fx|aud|cad|nok|broad dollar)\b/i.test(catalystText);
   const citedValueMatch =
@@ -6985,18 +7096,18 @@ function enforceFxCorrelationQuality({
   agent,
   content,
   headlineAnalysis,
-  historicalContext
+  fxCorrelationMetadata
 }: {
   agent: Agent;
   content: string;
   headlineAnalysis: HeadlineAnalysis | null;
-  historicalContext: string;
+  fxCorrelationMetadata: FxCorrelationMetadata;
 }): { content: string; shouldSuppress: boolean; reason?: string } {
   if (agent.sector !== "FX") {
     return { content, shouldSuppress: false };
   }
 
-  const fxCorrelationContext = parseFxCorrelationContext(historicalContext);
+  const fxCorrelationContext = fxCorrelationMetadata;
   const relevant = /\b(oil|wti|brent|commodity fx|aud|cad|nok|broad dollar)\b/i.test(
     [headlineAnalysis?.headline_title, headlineAnalysis?.primary_mechanism].filter(Boolean).join(" ")
   );
@@ -7023,16 +7134,6 @@ function enforceFxCorrelationQuality({
   }
 
   return { content, shouldSuppress: false };
-}
-
-function parseFxCorrelationContext(historicalContext: string): { present: boolean; value: string | null } {
-  const match = historicalContext.match(
-    /Broad Dollar YoY% vs WTI YoY% correlation:\s*([+-]?\d+(?:\.\d+)?)/i
-  );
-  return {
-    present: Boolean(match),
-    value: match?.[1] || null
-  };
 }
 
 function shouldSuppressWeakEquityCompanyPost(
@@ -7116,14 +7217,139 @@ function hasSubstantiveCompanyEventLanguage(content: string, catalyst: string): 
 }
 
 function shouldSuppressUnsafeMetricPost(agent: Agent, flags: PostQualityFlag[]): boolean {
-  if (!flags.includes("unverified_metric_claim")) {
-    return false;
-  }
-
   // Keep the high-risk numeric disciplines strict: these agents routinely cite
   // HY OAS, yields, WTI, DXY, VIX, and SPY levels. A bad number is worse than
   // silence in Market Room.
-  return ["Macro", "Rates", "FX", "Risk/Sentiment", "Commodities"].includes(agent.sector);
+  if (
+    flags.includes("unverified_metric_claim") &&
+    ["Macro", "Rates", "FX", "Risk/Sentiment", "Commodities"].includes(agent.sector)
+  ) {
+    return true;
+  }
+
+  // Suppress Rates and Macro posts that treat nominal Treasury yields as real yields
+  // without citing TIPS or breakeven data. These posts contain a material factual error
+  // (confusing ~4% nominal yields with much lower/negative real yields historically).
+  if (
+    flags.includes("nominal_yield_cited_as_real") &&
+    ["Rates", "Macro"].includes(agent.sector)
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Sector-specific catalyst keyword vocabularies. Used by the catalyst-relevance gate
+ * below to skip posts where the agent has been routed an off-sector catalyst (e.g.
+ * Macro receiving a single-stock earnings catalyst, Rates receiving a dividend
+ * announcement). Only enforced for FX/Macro/Rates — these three agents repeatedly
+ * forced off-topic catalysts into templated regime narratives in the v1.1 audit.
+ *
+ * Equities/Commodities/Risk-Sentiment are intentionally absent: their existing data
+ * paths and prompts already produce well-grounded posts on a wider catalyst surface.
+ */
+const SECTOR_CATALYST_KEYWORDS: Record<string, string[]> = {
+  Macro: [
+    "fed", "fomc", "powell", "cpi", "pce", "ppi", "payroll", "nonfarm", "unemployment",
+    "jobless", "ecb", "boj", "boe", "lagarde", "ueda", "bailey", "rate decision",
+    "inflation", "gdp", "retail sales", "industrial production", "consumer confidence",
+    "ism", "pmi", "housing", "mortgage rates", "central bank", "interest rate", "rate cut",
+    "rate hike", "monetary policy", "fiscal policy", "deficit", "debt ceiling", "tariff",
+    "trade war", "geopolitical", "oil shock", "energy shock", "recession", "stagflation",
+    "labor market", "wage growth", "money supply", "m1", "m2"
+  ],
+  Rates: [
+    "treasury", "auction", "refunding", "yield", "10y", "2y", "30y", "curve", "term premium",
+    "duration", "fed funds", "fomc", "breakeven", "tips", "real yield", "carry trade",
+    "jgb", "bund", "gilt", "rate cut", "rate hike", "policy rate", "discount rate",
+    "bid-to-cover", "indirect bidder", "dealer takedown", "bond market", "fixed income",
+    "convexity", "swap spread", "ois", "sofr", "repo", "qt", "qe", "balance sheet"
+  ],
+  FX: [
+    "dxy", "dollar", "euro", "yen", "pound", "sterling", "yuan", "peso", "rupee", "real",
+    "aud", "cad", "nzd", "chf", "krw", "brl", "mxn", "inr", "fx", "currency", "cross-rate",
+    "carry", "funding stress", "intervention", "reserve diversification", "exchange rate",
+    "eur/usd", "usd/jpy", "gbp/usd", "usd/cad", "aud/usd", "usd/cnh", "ecb", "boj", "boe",
+    "snb", "rba", "rbnz", "boc", "pboc", "central bank", "currency war", "devaluation"
+  ]
+  // Equities, Commodities, Risk/Sentiment intentionally omitted — pass-through (no gating).
+};
+
+type CatalystRelevanceScore = { score: number; matchedKeywords: string[] };
+
+function scoreCatalystRelevance(agent: Agent, catalyst: string): CatalystRelevanceScore {
+  const keywords = SECTOR_CATALYST_KEYWORDS[agent.sector];
+  if (!keywords || keywords.length === 0) {
+    // Pass-through for sectors without a vocabulary — counts as fully relevant.
+    return { score: 1, matchedKeywords: [] };
+  }
+  const lower = (catalyst || "").toLowerCase();
+  const matched = keywords.filter((k) => lower.includes(k));
+  // Score = matches / (vocab/4) so even a couple of keyword hits yields a meaningful score.
+  return { score: matched.length / Math.max(1, keywords.length / 4), matchedKeywords: matched };
+}
+
+/**
+ * Decision-level gate that suppresses off-sector catalysts for FX/Macro/Rates only.
+ * If the catalyst headline has zero overlap with the agent's sector vocabulary, the
+ * post is silenced with reason code "off_sector_catalyst_skipped".
+ *
+ * Rationale: the v1.1 Opus qualitative review found Macro receiving micro-cap earnings
+ * catalysts (Smith Micro, Nayax, JinkoSolar — 84.6% of Macro catalysts last week were
+ * earnings/other) and Rates receiving dividend/tariff catalysts (50% of Rates posts).
+ * The agents force-fitted these into templated regime narratives, hurting quality.
+ *
+ * Equities/Commodities/Risk-Sentiment are pass-through (no vocabulary defined).
+ */
+function applyCatalystRelevanceGate({
+  agent,
+  postingDecision,
+  headlineAnalysis
+}: {
+  agent: Agent;
+  postingDecision: PostingDecision;
+  headlineAnalysis: HeadlineAnalysis | null;
+}): PostingDecision {
+  if (
+    postingDecision.actionType === "stay_silent" ||
+    postingDecision.actionType === "comment_only"
+  ) {
+    return postingDecision;
+  }
+  if (!["Macro", "Rates", "FX"].includes(agent.sector)) {
+    return postingDecision;
+  }
+
+  // Concatenate every catalyst-bearing field so we don't false-suppress when one is empty.
+  const catalystText = [
+    postingDecision.suggestedTopic?.catalyst,
+    postingDecision.suggestedTopic?.label,
+    postingDecision.suggestedTopic?.themeKey,
+    headlineAnalysis?.headline_title,
+    headlineAnalysis?.what_changed
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  const relevance = scoreCatalystRelevance(agent, catalystText);
+  if (relevance.matchedKeywords.length > 0) {
+    return postingDecision;
+  }
+
+  console.log(
+    `[catalyst-relevance-gate:${agent.name}] suppressed off-topic catalyst="${truncateText(catalystText, 110)}"`
+  );
+
+  return {
+    ...postingDecision,
+    actionType: "stay_silent",
+    reasonCodes: uniqueReasonCodes([
+      ...postingDecision.reasonCodes,
+      "off_sector_catalyst_skipped"
+    ])
+  };
 }
 
 function applyRatesTemplateDecisionGate({
@@ -7178,6 +7404,96 @@ function applyRatesTemplateDecisionGate({
       "rates_template_repetition",
       "no_fresh_signal"
     ])
+  };
+}
+
+/**
+ * Decision-level gate that suppresses conceptual template repetition — cases where an agent
+ * is about to produce a post that is thematically and directionally identical to its recent
+ * output, even if the surface text differs (which 3-gram Jaccard similarity would miss).
+ *
+ * Uses a multi-signal score (threshold ≥ 3) so that no single signal alone suppresses.
+ * A fresh catalyst on a known theme with new data and a different stance is not suppressed.
+ *
+ * Follows the exact pattern of applyRatesTemplateDecisionGate().
+ */
+function applyConceptualRepetitionGate({
+  agent,
+  postingDecision,
+  agentState,
+  topicPlan,
+  recentPosts,
+  headlineAnalysis
+}: {
+  agent: Agent;
+  postingDecision: PostingDecision;
+  agentState: AgentBehavioralSummary | null;
+  topicPlan: AgentTopicPlan;
+  recentPosts: AgentMessage[];
+  headlineAnalysis: HeadlineAnalysis | null;
+}): PostingDecision {
+  if (postingDecision.actionType === "stay_silent") return postingDecision;
+
+  let score = 0;
+  const signals: string[] = [];
+
+  // Signal 1 (+2): same themeKey as one of last 3 agent posts.
+  // Uses thesisTopicPrimary — the persisted theme key field on AgentMessage.
+  const candidateThemeKey = postingDecision.suggestedTopic?.themeKey;
+  if (candidateThemeKey) {
+    const recentThemeKeys = recentPosts.slice(0, 3).map((p) => p.thesisTopicPrimary).filter(Boolean);
+    if (recentThemeKeys.includes(candidateThemeKey)) {
+      score += 2;
+      signals.push("same_theme_key");
+    }
+  }
+
+  // Signal 2 (+1): same stance for all of last 3 posts (monotone directional lock).
+  const recentStances = recentPosts.slice(0, 3).map((p) => p.stance).filter(Boolean);
+  if (recentStances.length >= 3 && new Set(recentStances).size === 1) {
+    score += 1;
+    signals.push("same_stance_streak");
+  }
+
+  // Signal 3 (+2): candidate topic text contains a frame the agent has recently overused.
+  // Uses agentState.recentlyOverusedFrames — the native array field, not a JSON string.
+  const overusedFrames = agentState?.recentlyOverusedFrames ?? [];
+  const candidateText = [
+    postingDecision.suggestedTopic?.themeKey,
+    postingDecision.suggestedTopic?.catalyst,
+    postingDecision.suggestedTopic?.label
+  ].filter(Boolean).join(" ").toLowerCase();
+  if (overusedFrames.some((f) => candidateText.includes(f.toLowerCase()))) {
+    score += 2;
+    signals.push("overused_frame_in_candidate");
+  }
+
+  // Signal 4 (+1): targeting the same thesis as the previous post (update loop risk).
+  if (postingDecision.targetThesisId && recentPosts[0]?.thesisId === postingDecision.targetThesisId) {
+    score += 1;
+    signals.push("same_thesis_update_loop");
+  }
+
+  // Signal 5 (+1): no material numeric delta in headline (only scores if score > 0 —
+  // does not independently suppress; data-less headline amplifies other signals).
+  if (score > 0) {
+    const headlineDelta = headlineAnalysis?.what_changed ?? "";
+    if (!/\b\d+(?:\.\d+)?\s?(?:%|bps|bp|\$|k|K|m|bn)\b/.test(headlineDelta)) {
+      score += 1;
+      signals.push("no_new_data_anchor_in_headline");
+    }
+  }
+
+  if (score < 3) return postingDecision;
+
+  console.log(
+    `[conceptual-repetition-gate:${agent.name}] suppressed score=${score} signals=[${signals.join(",")}]`
+  );
+  return {
+    ...postingDecision,
+    actionType: "stay_silent",
+    reasonCodes: uniqueReasonCodes([...postingDecision.reasonCodes, "conceptual_repetition_suppressed"]),
+    qualityFlags: uniqueQualityFlags([...(postingDecision.qualityFlags ?? [])])
   };
 }
 
@@ -7437,6 +7753,16 @@ function buildRoomConsensusBlock(
 
 function buildSectorSpecificInstructions(agent: Agent): string | null {
   switch (agent.sector) {
+    case "Macro":
+      return [
+        "MACRO PRECISION (mandatory):",
+        "- Every post must cite ONE specific macro print as its numeric anchor: a named central bank decision (Fed/ECB/BoJ/BoE) with prior vs current rate, OR a labor print (NFP MoM delta / unemployment / jobless claims) with prior/current numbers, OR an inflation print (CPI/PCE/core) with prior/current YoY.",
+        "- The MACRO EVENT CALENDAR block in your context contains the last three prints of NFP, CPI, core PCE, fed funds, and unemployment. Lead with one of these when the catalyst is macro-relevant.",
+        "- The catalyst must drive the regime call. If the catalyst is a single-company earnings story (Smith Micro, Nayax, JinkoSolar, etc.), the relevance gate should have already silenced you — if you reached this prompt with a stock catalyst, narrow the scope to ONE testable macro implication for that sector and skip the broad regime restatement.",
+        "- Do not lead with HY OAS or 10Y yield unless the catalyst itself is a credit or rates event. They are confirmation tools, not framing tools.",
+        "- ANTI-TEMPLATE RULE: do not use the same regime label ('tightening regime', 'growth softness vs multiple risk') as the lead in two consecutive posts. Vary the framing — supply-chain pass-through, fiscal impulse, term premium, real-yield channel, FX-driven inflation pass-through, productivity divergence, energy-input shock, etc.",
+        "- Do not recycle the SAME numeric triplet (10Y at X%, 2Y at Y%, HY OAS Z bps) across posts. Pick the one number that actually moved this catalyst and lead with it.",
+      ].join("\n");
     case "Risk/Sentiment":
       return [
         "REGIME CALL REQUIRED: Your primary job is to call the current risk regime — not describe it.",
@@ -7467,6 +7793,10 @@ function buildSectorSpecificInstructions(agent: Agent): string | null {
         "  • High US yields do NOT compress carry by themselves — they expand the US-side of the spread. Compression only occurs when the EM yield fails to keep up or when risk sentiment forces carry unwind.",
         "  • If you are bearish EM FX, state it as: 'bearish EM FX / USD bullish' — not as 'bearish USD carry' (which would mean bearish on holding USD).",
         "  • Avoid saying yields 'compress carry' without specifying the EM side of the spread. State the mechanism precisely.",
+        "",
+        "FX CROSS PRECISION: Every post must name at least one specific FX cross (EUR/USD, USD/JPY, GBP/USD, AUD/USD, USD/CAD) and state its directional move vs the prior session. DXY alone is not sufficient — name the cross.",
+        "CORRELATION RATE LIMIT: Do not cite the same correlation coefficient (e.g., the Broad Dollar vs WTI correlation) in more than 1-of-3 consecutive posts. If your last two posts cited it, use a different metric instead: rate differential, real-yield spread, central-bank policy gap, or trade-balance data.",
+        "ANTI-FABRICATION: Never add window qualifiers ('during crisis periods', '2007-2009 stress window') to the stored correlation unless the historical context block explicitly states that window. The computed value is unconditional across all periods.",
       ].join("\n");
     case "Rates":
       return [
@@ -7478,6 +7808,14 @@ function buildSectorSpecificInstructions(agent: Agent): string | null {
         "If the catalyst is Treasury auction/refunding/supply, cite an auction-specific number: bid-to-cover, tail/no-tail size, indirect bidder share, dealer takedown, auction size, coupon supply, or 2s10s/10Y-2Y move.",
         "If you cannot name the fresh curve/auction datapoint, do not publish another bear-steepener post; say the catalyst is not a rates catalyst or stay silent.",
         "A Rates post that does not cite a stored figure from the historical context block has failed the data grounding standard.",
+        "",
+        "RATES MECHANISM MENU: When the catalyst is not an auction/supply event, choose from these alternative framings instead of defaulting to bear steepener:",
+        "  • Bull flattener: Fed dovish surprise — front-end rates drop faster than back-end (cite the 2Y move)",
+        "  • Real-yield squeeze: TIPS rallying faster than nominals (cite TIPS yield or breakeven level)",
+        "  • Carry compression: US-EM yield spread narrowing — specify which EM currency and which side is moving",
+        "  • Post-inversion re-steepening: 2s10s flipping after prolonged inversion (cite the 2s10s level)",
+        "  • Volatility regime: MOVE index inflection as the primary signal (cite the MOVE level)",
+        "Match the mechanism to what the catalyst describes. Do not default.",
       ].join("\n");
     default:
       return null;
@@ -7501,10 +7839,50 @@ function buildAgentInstructions(agent: Agent): string {
     "Do not open with labels like 'Hypothesis', 'Base case', 'Trade implication', 'Biggest driver', 'Main risk', or 'One thing to watch'.",
     "Do not write in numbered memo format unless explicitly asked.",
     "Prefer natural sentences over templated framing. Sound like a sharp human analyst posting in real time.",
-    "Avoid repeating points already made unless you are refining, disagreeing with, or translating them."
+    "Avoid repeating points already made unless you are refining, disagreeing with, or translating them.",
+    sectorPrecisionRulesFor(agent)
   ]
     .filter(Boolean)
     .join("\n");
+}
+
+/**
+ * Returns sector-specific data-precision rules injected as hard constraints into agent
+ * instructions. Each rule targets a known hallucination or conflation pattern identified
+ * in the v1.1 credibility audit.
+ */
+function sectorPrecisionRulesFor(agent: Agent): string | null {
+  const rules: string[] = [];
+
+  // Nominal-vs-real yield: Rates and Macro agents conflate nominal Treasury yields with real yields.
+  if (["Rates", "Macro"].includes(agent.sector)) {
+    rules.push(
+      "YIELD PRECISION: If you write \"real yield\" or \"real rate\", you must cite TIPS yields or inflation breakevens explicitly. " +
+      "If that data is not in your context, refer to nominal yields and label them as nominal."
+    );
+  }
+
+  // HY OAS threshold language: Risk/Sentiment and Macro agents use "elevated" / "stress" without
+  // quantitative baseline. The verified metrics block now includes 90d mean + full-series percentile.
+  if (["Risk/Sentiment", "Macro"].includes(agent.sector)) {
+    rules.push(
+      "HY OAS PRECISION: Your data context includes HY OAS current level, 90-day mean, and full-series percentile. " +
+      "Use these to substantiate threshold claims: cite the 90d mean when claiming \"above recent average\"; " +
+      "cite the full-series percentile when claiming \"historically elevated\" or \"stress territory\". " +
+      "Do not use threshold language without referencing whichever baseline applies."
+    );
+  }
+
+  // FX correlation: FX agents sometimes cite static or hallucinated correlation coefficients.
+  if (agent.sector === "FX") {
+    rules.push(
+      "CORRELATION PRECISION: You may describe directional relationships without citing coefficients. " +
+      "If you state a specific correlation value (e.g. \"-0.55\" or \"X% correlated\"), it must exactly match " +
+      "the computed value in your data context. If the computed value is absent, describe the mechanism directionally only."
+    );
+  }
+
+  return rules.length > 0 ? rules.join("\n") : null;
 }
 
 function sectorFocusFor(agent: Agent): string {

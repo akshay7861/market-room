@@ -162,6 +162,32 @@ export type AgentDiscussionThread = {
   comments: AgentMessage[];
 };
 
+// === Post Detail (public thread page) ===
+
+export type NewsItem = {
+  title: string;
+  url: string;
+  source: string;
+  publishedAt: string;
+};
+
+export type MemberComment = {
+  id: string;
+  threadId: string;
+  userId: string;
+  userFirstName: string;
+  userLastName: string;
+  content: string;
+  createdAt: string;
+};
+
+export type ThreadDetailView = {
+  thread: AgentDiscussionThread;
+  relatedPosts: AgentMessage[];
+  news: NewsItem[];
+  memberComments: MemberComment[];
+};
+
 // === Thesis Lifecycle ===
 // Theses are agent-created, persistent claims linked to messages.
 // thesis_updates tracks every status/confidence change with full audit trail.
@@ -473,10 +499,15 @@ export type AgentEvaluation = {
   agentId: string;
   eventId: string;
   messageId: string;
+  /** 0–1 scale. Multiply × 10 for display as a 0–10 score. */
   clarityScore: number;
+  /** 0–1 scale. Multiply × 10 for display as a 0–10 score. */
   specificityScore: number;
+  /** 0–1 scale. Multiply × 10 for display as a 0–10 score. */
   actionabilityScore: number;
+  /** 0–1 scale. Multiply × 10 for display as a 0–10 score. */
   distinctivenessScore: number;
+  /** 0–1 scale. Multiply × 10 for display as a 0–10 score. */
   overallScore: number;
   strengths: string;
   weaknesses: string;
@@ -637,7 +668,12 @@ export type PostingReasonCode =
   | "alternate_catalyst_selected"
   | "domain_relevance_low"
   | "stance_lock_challenge"
-  | "rates_template_repetition";
+  | "rates_template_repetition"
+  | "conceptual_repetition_suppressed"
+  // Catalyst-relevance gate: FX/Macro/Rates suppressed because the catalyst headline
+  // contains zero sector-relevant keywords (e.g. Macro routed to a single-stock earnings
+  // catalyst, Rates routed to a dividend announcement). Prevents off-sector template-fitting.
+  | "off_sector_catalyst_skipped";
 
 export type PostQualityFlag =
   | "missing_title"
@@ -674,7 +710,9 @@ export type PostQualityFlag =
   | "synthesis_duplicate_conviction_condition"
   | "synthesis_directional_call_missing"
   | "synthesis_data_anchor_missing"
-  | "synthesis_opening_not_sector_specific";
+  | "synthesis_opening_not_sector_specific"
+  | "nominal_yield_cited_as_real"
+  | "hy_oas_threshold_unsupported";
 
 export type PostingDecision = {
   actionType: "new_post" | "update_existing" | "comment_only" | "stay_silent";

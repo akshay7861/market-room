@@ -51,17 +51,28 @@ export function buildVerifiedMarketMetricsContext(snapshot: MarketSnapshotPayloa
   addStoredMetric(metrics, missingKeys, "vix", "VIX", fredVix as HistoricalSeries, "", "data lake: FRED VIX");
   addStoredMetric(metrics, missingKeys, "unemployment", "Unemployment rate", fredUnemployment as HistoricalSeries, "%", "data lake: FRED unemployment");
 
-  const block = [
+  const blockLines = [
     "VERIFIED MARKET METRICS:",
     "Use this as the only source for live/current market numbers. You may also cite numbers from article text, historical-data blocks, analog blocks, chart data, or explicitly labelled stored correlations.",
     "Do NOT invent or approximate HY OAS, 2Y, 10Y, Fed Funds, WTI, DXY, SPY/S&P, VIX, gold, or unemployment if the value is unavailable below.",
     ...metrics.map((metric) => `- ${metric.label}: ${metric.valueText} [${metric.source}, ${metric.dateLabel}]`),
     missingKeys.length > 0 ? `Unavailable verified metrics: ${missingKeys.join(", ")}.` : "Unavailable verified metrics: none.",
     "Citation rule: if a metric is listed as unavailable, discuss the mechanism qualitatively and do not attach a precise number."
-  ].join("\n");
+  ];
+
+  // Append HY OAS context: 90-day mean (local/recent baseline) + full-series percentile
+  // (required for "historically elevated" or "stress territory" language).
+  const hyOasCtx = computeHyOasContext(fredHighYieldSpread as HistoricalSeries);
+  if (hyOasCtx) {
+    blockLines.push(
+      `HY OAS context: current ${Math.round(hyOasCtx.current)}bps | 90d mean ${hyOasCtx.recent90dMean}bps | full-series percentile ${hyOasCtx.historicalPercentile}th (n=${hyOasCtx.observationCount} monthly obs). Use 90d mean when claiming "above recent average"; cite percentile when claiming "historically elevated" or "stress territory".`
+    );
+  }
+
+  const block = blockLines.join("\n");
 
   console.log(
-    `[verified-metrics] built keys=${metrics.map((metric) => metric.key).join(",") || "none"} missing=${missingKeys.join(",") || "none"} stale=none`
+    `[verified-metrics] built keys=${metrics.map((metric) => metric.key).join(",") || "none"} missing=${missingKeys.join(",") || "none"} stale=none hy_oas_percentile=${hyOasCtx ? `${hyOasCtx.historicalPercentile}th` : "unavailable"}`
   );
 
   return { block, metrics, missingKeys };
@@ -79,25 +90,79 @@ export function hasMissingMetricClaim(content: string, context: VerifiedMarketMe
   return context.missingKeys.some((key) => metricMentionPattern(key).test(lower) && metricValueNearMention(lower, metricMentionPattern(key)));
 }
 
+type WatchedPattern = {
+  /** Matches the VerifiedMetric.key for the instrument this watches */
+  key: string;
+  /** Regex that matches a mention of this metric followed by a number in the post content */
+  pattern: RegExp;
+  /** Returns true if the extracted numeric value is plausible for this instrument.
+   *  Implausible numbers (e.g. a year "2024" found near "DXY") are ignored to avoid
+   *  false positives. Ranges are conservative to avoid both over- and under-detection. */
+  plausible: (value: number) => boolean;
+};
+
+const WATCHED_PATTERNS: WatchedPattern[] = [
+  {
+    key: "hy_oas",
+    // HY OAS is expressed in bps (e.g. 450bps) — realistic range 100–2500
+    pattern: /\b(?:hy oas|high[-\s]?yield(?:\s+oas|\s+spread)?|credit spread)\b[^.\n]{0,60}?\b\d+(?:\.\d+)?\s?(?:bps|bp|%)\b/gi,
+    plausible: (v) => v >= 100 && v <= 2500
+  },
+  {
+    key: "us2y",
+    // 2Y Treasury yield in % — realistic range 0–10
+    pattern: /\b(?:2y|2-year|2 year|two-year treasury|us 2y)\b[^.\n]{0,60}?\b\d+(?:\.\d+)?\s?%\b/gi,
+    plausible: (v) => v >= 0 && v <= 10
+  },
+  {
+    key: "us10y",
+    // 10Y Treasury yield in % — realistic range 0–10
+    pattern: /\b(?:10y|10-year|10 year|us 10y|treasury yield)\b[^.\n]{0,60}?\b\d+(?:\.\d+)?\s?%\b/gi,
+    plausible: (v) => v >= 0 && v <= 10
+  },
+  {
+    key: "fedfunds",
+    // Fed Funds rate in % — realistic range 0–25
+    pattern: /\b(?:fed funds|federal funds|policy rate)\b[^.\n]{0,60}?\b\d+(?:\.\d+)?\s?%\b/gi,
+    plausible: (v) => v >= 0 && v <= 25
+  },
+  {
+    key: "wti",
+    // WTI crude in $/bbl — realistic range >0 to 250
+    pattern: /\b(?:wti|crude)\b[^.\n]{0,60}?\$?\d+(?:\.\d+)?\b/gi,
+    plausible: (v) => v > 0 && v <= 250
+  },
+  {
+    key: "dxy",
+    // DXY dollar index level — realistic range 50–150
+    pattern: /\b(?:dxy|dollar index)\b[^.\n]{0,60}?\b\d+(?:\.\d+)?\b/gi,
+    plausible: (v) => v >= 50 && v <= 150
+  },
+  {
+    key: "vix",
+    // VIX volatility index — realistic range 5–90
+    pattern: /\b(?:vix)\b[^.\n]{0,60}?\b\d+(?:\.\d+)?\b/gi,
+    plausible: (v) => v >= 5 && v <= 90
+  }
+];
+
 export function hasUnverifiedMetricClaim(content: string, context: VerifiedMarketMetricsContext): boolean {
   const lower = content.toLowerCase();
   const allowed = new Set(context.metrics.flatMap((metric) => metric.citationValues.map(normalizeNumberText)));
-  const watchedPatterns = [
-    /\b(?:hy oas|high[-\s]?yield(?:\s+oas|\s+spread)?|credit spread)\b[^.\n]{0,60}?\b\d+(?:\.\d+)?\s?(?:bps|bp|%)\b/gi,
-    /\b(?:2y|2-year|2 year|two-year treasury|us 2y)\b[^.\n]{0,60}?\b\d+(?:\.\d+)?\s?%\b/gi,
-    /\b(?:10y|10-year|10 year|us 10y|treasury yield)\b[^.\n]{0,60}?\b\d+(?:\.\d+)?\s?%\b/gi,
-    /\b(?:fed funds|federal funds|policy rate)\b[^.\n]{0,60}?\b\d+(?:\.\d+)?\s?%\b/gi,
-    /\b(?:wti|crude)\b[^.\n]{0,60}?\$?\d+(?:\.\d+)?\b/gi,
-    /\b(?:dxy|dollar index)\b[^.\n]{0,60}?\b\d+(?:\.\d+)?\b/gi,
-    /\b(?:vix)\b[^.\n]{0,60}?\b\d+(?:\.\d+)?\b/gi
-  ];
 
-  for (const pattern of watchedPatterns) {
-    for (const match of lower.matchAll(pattern)) {
+  for (const wp of WATCHED_PATTERNS) {
+    // Re-create regex each iteration so lastIndex is reset (the pattern source flags are "gi")
+    const regex = new RegExp(wp.pattern.source, "gi");
+    for (const match of lower.matchAll(regex)) {
       const numbers = match[0].match(/\d+(?:\.\d+)?/g) || [];
-      const hasAllowedNumber = numbers.some((number) => allowed.has(normalizeNumberText(number)));
-      if (!hasAllowedNumber) {
-        return true;
+      for (const num of numbers) {
+        const n = parseFloat(num);
+        // Flag if: (a) this number is not in the allowed citation set AND
+        //          (b) it is numerically plausible for this instrument
+        // (implausible numbers are likely incidental — e.g. "since 2024" near "DXY")
+        if (!allowed.has(normalizeNumberText(num)) && wp.plausible(n)) {
+          return true;
+        }
       }
     }
   }
@@ -158,6 +223,40 @@ function latestObservation(series: HistoricalSeries): { date: string; value: num
     }
   }
   return null;
+}
+
+/**
+ * Computes HY OAS context values from the full FRED high-yield-spread series.
+ * All returned values are in basis points (bps), consistent with the ×100 transform
+ * already applied in addStoredMetric for hy_oas.
+ *
+ * Returns null if there are fewer than 4 valid observations (insufficient for 90d mean).
+ */
+function computeHyOasContext(series: HistoricalSeries): {
+  current: number;
+  recent90dMean: number;
+  historicalPercentile: number;
+  observationCount: number;
+} | null {
+  const latest = latestObservation(series);
+  if (!latest) return null;
+  // FRED stores HY OAS in percentage points; ×100 converts to bps
+  const current = latest.value * 100;
+
+  const validObs = series.observations
+    .filter((o) => typeof o.value === "number" && Number.isFinite(o.value as number))
+    .map((o) => (o.value as number) * 100);  // convert to bps
+  if (validObs.length < 4) return null;
+
+  // 90-day mean ≈ last 3 monthly observations (FRED series is monthly)
+  const last3 = validObs.slice(-3);
+  const recent90dMean = Math.round(last3.reduce((a, b) => a + b, 0) / last3.length);
+
+  // Full-series percentile rank: what fraction of historical obs are below current level?
+  const below = validObs.filter((v) => v < current).length;
+  const historicalPercentile = Math.round((below / validObs.length) * 100);
+
+  return { current, recent90dMean, historicalPercentile, observationCount: validObs.length };
 }
 
 function formatMetricValue(value: number, unit: string): string {

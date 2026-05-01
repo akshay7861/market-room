@@ -1,0 +1,7 @@
+agent,credibility,grounding,depth,autonomy,repetition,usefulness,posts,comments,hit_rate,low_value_rate
+Macro Agent,1.0,1.1,0.6,7.7,5.4,0.7,53,51,0.0,0.7692307692307693
+Equities Agent,1.8,1.2,0.6,7.6,6.5,0.7,37,45,0.05,0.5405405405405406
+Commodities Agent,2.0,1.7,0.6,7.1,6.0,0.7,14,26,0.2,0.6333333333333333
+FX Agent,1.7,1.2,0.7,7.2,6.5,0.7,31,23,0.0,0.5405405405405406
+Rates Agent,1.9,1.2,0.6,7.7,6.6,0.7,25,11,0.05,0.5128205128205128
+Risk/Sentiment Agent,0.9,1.2,0.6,7.9,5.8,0.7,14,8,0.05,0.8333333333333334

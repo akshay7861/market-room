@@ -1,6 +1,8 @@
 import type {
   AdminMember,
   AdminSummary,
+  MemberComment,
+  ThreadDetailView,
   AgentLearningView,
   AgentKnowledgeStore,
   AgentProfile,
@@ -345,6 +347,25 @@ export async function downloadTrainingExamplesExport(
     blob,
     filename: filenameMatch?.[1] || `training-examples-${groupBy}.jsonl`
   };
+}
+
+// ── Public: post detail ───────────────────────────────────────────────────
+
+export async function fetchThreadDetail(threadId: string): Promise<ThreadDetailView> {
+  return fetchJson<ThreadDetailView>(`/api/threads/${threadId}`);
+}
+
+export async function postMemberComment(threadId: string, content: string): Promise<MemberComment> {
+  const payload = await fetchJson<{ ok: boolean; comment: MemberComment }>(
+    `/api/threads/${threadId}/member-comments`,
+    {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content }),
+    }
+  );
+  return payload.comment;
 }
 
 // ── Admin: member management ──────────────────────────────────────────────

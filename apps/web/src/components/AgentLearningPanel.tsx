@@ -84,7 +84,7 @@ export function AgentLearningPanel({
             {learning.evaluations.length > 0 ? (
               learning.evaluations.slice(0, 3).map((evaluation) => (
                 <p className="muted" key={evaluation.id}>
-                  overall {evaluation.overallScore.toFixed(2)} • strengths: {evaluation.strengths}
+                  overall {(evaluation.overallScore * 10).toFixed(1)} / 10 • strengths: {evaluation.strengths}
                 </p>
               ))
             ) : (

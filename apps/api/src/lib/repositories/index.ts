@@ -19,6 +19,7 @@ import { createTrainingExamplesRepository } from "./trainingExamplesRepository";
 import { createDecisionLogRepository } from "./decisionLogRepository";
 import { createFetchedNewsRepository } from "./fetchedNewsRepository";
 import { createUsersRepository } from "./usersRepository";
+import { createMemberCommentsRepository } from "./memberCommentsRepository";
 
 export function createRepositories(env: Env) {
   return {
@@ -41,6 +42,7 @@ export function createRepositories(env: Env) {
     roomCoverage: createRoomCoverageRepository(env),
     memoryUpdates: createMemoryUpdatesRepository(env),
     trainingExamples: createTrainingExamplesRepository(env),
-    users: createUsersRepository(env)
+    users: createUsersRepository(env),
+    memberComments: createMemberCommentsRepository(env)
   };
 }

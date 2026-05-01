@@ -567,6 +567,117 @@ function formatCorrelation(value: number): string {
   return `${sign}${value.toFixed(2)}`;
 }
 
+/**
+ * Typed metadata for the Broad Dollar YoY% vs WTI YoY% computed correlation.
+ * Used by FX correlation enforcement functions in marketRoomService.ts as the
+ * authoritative source — avoids re-parsing the historical context string.
+ */
+export type FxCorrelationMetadata = { present: boolean; value: string | null };
+
+/**
+ * Returns the Broad Dollar YoY% vs WTI YoY% correlation as typed metadata.
+ * Computes the same value that buildHistoricalDataPromptBlock() embeds in the
+ * historical context string (full overlapping monthly sample, no crisis window).
+ *
+ * Call this at the point where historicalContext is built and pass the result
+ * explicitly to evaluateFxCorrelationGrounding() and enforceFxCorrelationQuality().
+ */
+export function getFxCorrelationMetadata(): FxCorrelationMetadata {
+  const fxStats = computeDollarWtiStats();
+  if (!fxStats) return { present: false, value: null };
+  return { present: true, value: formatCorrelation(fxStats.dollarYoYVsWtiYoYCorrelation) };
+}
+
+// ── Macro Event Calendar Block (Macro agent exclusive) ────────────────────
+// Provides Macro agents with the LAST THREE PRINTS of the canonical macro series
+// (NFP, core PCE YoY, headline CPI YoY, fed funds, unemployment). Forces the agent
+// off generic "tightening regime" framing by giving them concrete trend deltas to
+// cite. Replaces the v1.1 pattern where Macro recycled the same HY OAS / 10Y / 2Y
+// triplet across every catalyst.
+
+type MacroSeriesEntry = { date: string; value: number };
+
+function lastThreeNonNull(observations: Array<{ date: string; value: number | null }>): MacroSeriesEntry[] {
+  const valid = observations
+    .filter((o): o is MacroSeriesEntry => typeof o.value === "number" && o.value !== null)
+    .slice(-3);
+  return valid;
+}
+
+function formatNfpDeltaSeries(entries: MacroSeriesEntry[]): string {
+  // NFP raw series is total nonfarm employment in thousands. The reported "NFP print"
+  // is the month-over-month delta. Compute the 3 most recent MoM deltas from the
+  // last 4 absolute values.
+  if (entries.length < 2) return "";
+  const deltas: string[] = [];
+  for (let i = 1; i < entries.length; i += 1) {
+    const delta = Math.round(entries[i].value - entries[i - 1].value);
+    const sign = delta >= 0 ? "+" : "";
+    deltas.push(`${sign}${delta}K (${entries[i].date.slice(0, 7)})`);
+  }
+  return deltas.join(" → ");
+}
+
+function formatYoYSeries(entries: MacroSeriesEntry[]): string {
+  // For series like CPI/PCE that we want as YoY %, compute YoY against entries 12 months prior.
+  // For brevity here we just print the raw last-3 if no prior basis is available, since the
+  // FRED YoY computation lives elsewhere — we ship the 3 most recent absolute values and let
+  // the agent contextualize. This is acceptable: the goal is to PROVIDE deltas, not to replace
+  // the entire FRED block.
+  if (entries.length === 0) return "";
+  return entries.map((e) => `${e.value.toFixed(1)} (${e.date.slice(0, 7)})`).join(" → ");
+}
+
+/**
+ * Builds the Macro-exclusive event calendar / recent prints block. Injected only
+ * when agent.sector === "Macro". Provides the LAST THREE prints of NFP, core PCE,
+ * headline CPI, fed funds target, and unemployment rate — forcing Macro agents to
+ * lead with a concrete macro trend rather than recycled regime labels.
+ *
+ * Source: same FRED data lake already imported. No new fetch, no DB call.
+ */
+export function buildMacroEventCalendarBlock(): string {
+  const nfpLast4 = (fredNonfarmPayrolls.observations as Array<{ date: string; value: number | null }>)
+    .filter((o): o is MacroSeriesEntry => typeof o.value === "number" && o.value !== null)
+    .slice(-4);
+  const nfpDelta = formatNfpDeltaSeries(nfpLast4);
+
+  const ccpi = lastThreeNonNull(fredPceCore.observations as Array<{ date: string; value: number | null }>);
+  const headlineCpi = lastThreeNonNull(fredCpiHeadline.observations as Array<{ date: string; value: number | null }>);
+  const fedFunds = lastThreeNonNull(fredFedFunds.observations as Array<{ date: string; value: number | null }>);
+  const unemployment = lastThreeNonNull(fredUnemployment.observations as Array<{ date: string; value: number | null }>);
+
+  const lines: string[] = ["MACRO EVENT CALENDAR — recent prints from FRED data lake (cite at least one):"];
+
+  if (nfpDelta) {
+    lines.push(`- NFP MoM delta last 3: ${nfpDelta}`);
+  }
+  if (headlineCpi.length >= 3) {
+    lines.push(`- Headline CPI index last 3: ${formatYoYSeries(headlineCpi)} (compute YoY% if needed)`);
+  }
+  if (ccpi.length >= 3) {
+    lines.push(`- Core PCE index last 3: ${formatYoYSeries(ccpi)} (compute YoY% if needed)`);
+  }
+  if (fedFunds.length >= 1) {
+    const latest = fedFunds[fedFunds.length - 1];
+    lines.push(`- Fed funds effective rate (latest): ${latest.value.toFixed(2)}% (${latest.date.slice(0, 7)})`);
+  }
+  if (unemployment.length >= 3) {
+    lines.push(`- Unemployment rate last 3: ${formatYoYSeries(unemployment)}%`);
+  }
+
+  if (lines.length === 1) {
+    // No data at all — return empty so we don't inject an orphaned header.
+    return "";
+  }
+
+  lines.push(
+    "Use one of these prints as your numeric anchor when the catalyst is macro-relevant. " +
+    "Do not lead with HY OAS or 10Y level unless the catalyst itself is a credit/rates event."
+  );
+  return lines.join("\n");
+}
+
 // ── Analog Engine ─────────────────────────────────────────────────────────────
 // Given a current indicator value (e.g. CPI at 3.8%), find historical periods
 // where it was at a similar level, then compute how other assets responded in the

@@ -15,7 +15,6 @@ export function MarketRoomPage() {
   const [isLoadingMoreThreads, setIsLoadingMoreThreads] = useState(false);
   const [hasMoreThreads, setHasMoreThreads] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const feedPaneRef = useRef<HTMLDivElement | null>(null);
   const loadedThreadCountRef = useRef(0);
 
   useEffect(() => {
@@ -37,31 +36,22 @@ export function MarketRoomPage() {
   }, [marketRoom]);
 
   useEffect(() => {
-    const pane = feedPaneRef.current;
-
-    if (!pane) {
-      return;
-    }
-
     let isTicking = false;
     const handleScroll = () => {
-      if (isTicking) {
-        return;
-      }
-
+      if (isTicking) return;
       isTicking = true;
       window.requestAnimationFrame(() => {
         isTicking = false;
-        const remainingScroll = pane.scrollHeight - pane.scrollTop - pane.clientHeight;
-
-        if (remainingScroll < MARKET_ROOM_SCROLL_THRESHOLD_PX) {
+        const scrolled = window.scrollY + window.innerHeight;
+        const total = document.documentElement.scrollHeight;
+        if (total - scrolled < MARKET_ROOM_SCROLL_THRESHOLD_PX) {
           void loadMoreThreads();
         }
       });
     };
 
-    pane.addEventListener("scroll", handleScroll, { passive: true });
-    return () => pane.removeEventListener("scroll", handleScroll);
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
   }, [hasMoreThreads, isLoading, isLoadingMoreThreads]);
 
   async function loadMarketRoom(options: { keepExistingView?: boolean } = {}) {
@@ -195,7 +185,7 @@ export function MarketRoomPage() {
       {error ? <FeedbackPanel title="Something went wrong" description={error} tone="error" /> : null}
 
       <div className="market-room-layout">
-        <div className="stack-lg market-room-feed-pane" ref={feedPaneRef}>
+        <div className="stack-lg market-room-feed-pane">
           <section className="stack-md">
             <div className="section-heading">
               <p className="eyebrow">Persistent thread feed</p>

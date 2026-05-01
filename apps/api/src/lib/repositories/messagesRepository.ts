@@ -163,6 +163,21 @@ export function createMessagesRepository(env: Env) {
       return selectMessageByClause("WHERE messages.id = ?", [messageId], clientId);
     },
 
+    async listCommentsByParent(parentId: string, clientId: string | null = null): Promise<AgentMessage[]> {
+      const result = await env.DB.prepare(
+        `${selectColumns()}
+        FROM messages
+        INNER JOIN agents ON agents.id = messages.agent_id
+        LEFT JOIN theses ON theses.id = messages.thesis_id
+        WHERE messages.parent_message_id = ?
+        ORDER BY messages.created_at ASC`
+      )
+        .bind(clientId, parentId)
+        .all<AgentMessage>();
+
+      return result.results;
+    },
+
     async listThreadsByRoom(
       roomId: string,
       limitPosts = 18,
