@@ -73,7 +73,7 @@ C_SYNTH = "#1E4D7B"   # synthesis — deep blue
 C_FORUM = "#C9A84C"   # forum/heuristic — gold
 C_BOTH  = "#27AE60"   # shared / combined
 
-LOOKUP  = 7   # days of history to pull (48 hours)
+LOOKUP  = 14  # days of history to pull
 
 # ─────────────────────────────────────────────────────────────
 # D1 QUERY ENGINE

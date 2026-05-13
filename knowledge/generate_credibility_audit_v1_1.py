@@ -133,7 +133,7 @@ def query_d1(sql: str) -> list[dict]:
 print("[1/12] agents...")
 agents_rows = query_d1("SELECT id, name, sector, active FROM agents WHERE active=1")
 
-print("[2/12] messages (last 7 days)...")
+print("[2/12] messages (last 14 days)...")
 messages_rows = query_d1("""
     SELECT m.id, m.agent_id, a.name AS agent_name, a.sector,
            m.content, m.title, m.catalyst, m.stance, m.confidence,
@@ -141,22 +141,22 @@ messages_rows = query_d1("""
            m.novelty_assessment_json, m.posting_decision_json, m.thesis_id
     FROM messages m
     JOIN agents a ON a.id = m.agent_id
-    WHERE m.created_at >= datetime('now','-7 days')
+    WHERE m.created_at >= datetime('now','-14 days')
     ORDER BY m.created_at DESC
 """)
 
-print("[3/12] decision_event_log (last 7 days)...")
+print("[3/12] decision_event_log (last 14 days)...")
 decisions_rows = query_d1("""
     SELECT d.agent_id, a.name AS agent_name,
            d.action_type, d.reason_codes_json, d.novelty_score,
            d.candidate_theme_key, d.message_id, d.decided_at
     FROM decision_event_log d
     JOIN agents a ON a.id = d.agent_id
-    WHERE d.decided_at >= datetime('now','-7 days')
+    WHERE d.decided_at >= datetime('now','-14 days')
     ORDER BY d.decided_at DESC
 """)
 
-print("[4/12] agent_evaluations (last 7 days) — with message_id...")
+print("[4/12] agent_evaluations (last 14 days) — with message_id...")
 evals_rows = query_d1("""
     SELECT e.agent_id, a.name AS agent_name,
            e.message_id,
@@ -165,7 +165,7 @@ evals_rows = query_d1("""
            e.strengths, e.weaknesses, e.created_at
     FROM agent_evaluations e
     JOIN agents a ON a.id = e.agent_id
-    WHERE e.created_at >= datetime('now','-7 days')
+    WHERE e.created_at >= datetime('now','-14 days')
 """)
 
 print("[5/12] agent_state_features...")
@@ -187,37 +187,37 @@ theses_rows = query_d1("""
            t.confidence_current, t.created_at, t.last_updated_at
     FROM theses t
     JOIN agents a ON a.id = t.owner_agent_id
-    WHERE t.last_updated_at >= datetime('now','-7 days')
+    WHERE t.last_updated_at >= datetime('now','-14 days')
        OR t.status IN ('open','developing')
 """)
 
-print("[7/12] thesis_updates (last 7 days)...")
+print("[7/12] thesis_updates (last 14 days)...")
 thesis_updates_rows = query_d1("""
     SELECT tu.thesis_id, tu.agent_id, a.name AS agent_name,
            tu.update_type, tu.status_before, tu.status_after,
            tu.confidence_before, tu.confidence_after, tu.created_at
     FROM thesis_updates tu
     JOIN agents a ON a.id = tu.agent_id
-    WHERE tu.created_at >= datetime('now','-7 days')
+    WHERE tu.created_at >= datetime('now','-14 days')
 """)
 
-print("[8/12] memory_updates (last 7 days)...")
+print("[8/12] memory_updates (last 14 days)...")
 memory_rows = query_d1("""
     SELECT mu.agent_id, a.name AS agent_name,
            mu.old_summary, mu.new_summary, mu.created_at
     FROM memory_updates mu
     JOIN agents a ON a.id = mu.agent_id
-    WHERE mu.created_at >= datetime('now','-7 days')
+    WHERE mu.created_at >= datetime('now','-14 days')
 """)
 
 print("[9/12] room_coverage_state...")
 coverage_rows = query_d1("SELECT * FROM room_coverage_state LIMIT 1")
 
-print("[10/12] fetched_news_items (last 7 days, by provider)...")
+print("[10/12] fetched_news_items (last 14 days, by provider)...")
 news_rows = query_d1("""
     SELECT provider, selection_outcome, COUNT(*) AS cnt
     FROM fetched_news_items
-    WHERE fetched_at >= datetime('now','-7 days')
+    WHERE fetched_at >= datetime('now','-14 days')
     GROUP BY provider, selection_outcome
 """)
 
@@ -229,11 +229,11 @@ snapshots_rows = query_d1("""
     LIMIT 10
 """)
 
-print("[12/12] fetched_news_items titles (last 7 days, for claim cross-check)...")
+print("[12/12] fetched_news_items titles (last 14 days, for claim cross-check)...")
 news_titles_rows = query_d1("""
     SELECT title, provider, fetched_at
     FROM fetched_news_items
-    WHERE fetched_at >= datetime('now','-7 days')
+    WHERE fetched_at >= datetime('now','-14 days')
     ORDER BY fetched_at DESC
     LIMIT 200
 """)
@@ -305,9 +305,9 @@ def save_csv(df, name):
     if not df.empty:
         df.to_csv(RAW_DIR / name, index=False)
 
-save_csv(df_msgs,   "posts_last_7_days.csv")
-save_csv(df_dec,    "decision_logs_last_48h.csv")
-save_csv(df_evals,  "agent_evaluations_last_48h.csv")
+save_csv(df_msgs,   "posts_last_14_days.csv")
+save_csv(df_dec,    "decision_logs_last_14_days.csv")
+save_csv(df_evals,  "agent_evaluations_last_14_days.csv")
 save_csv(df_state,  "agent_state_features.csv")
 save_csv(df_theses, "theses_active.csv")
 
@@ -464,9 +464,9 @@ if not df_tu.empty:
         thesis_update_counts[name] = int((df_tu["agent_name"] == name).sum())
 
 # ─────────────────────────────────────────────────────────────
-# 12. CONTENT SAMPLING — 24+ POSTS
+# 12. FULL-CORPUS AUDIT — EVERY POST (last 14 days)
 # ─────────────────────────────────────────────────────────────
-print("\n[Content sampling] Building enlarged sample (24+ posts)...")
+print("\n[Content audit] Processing ALL posts (last 14 days — full corpus, no sampling)...")
 
 all_sample_posts = []
 sample_debug_rows = []
@@ -482,37 +482,15 @@ for agent in agent_names:
     if not df_evals.empty:
         agent_evals_ag = df_evals[df_evals["agent_name"] == agent].copy()
 
-    # newest 9
-    newest = agent_posts.sort_values("created_at", ascending=False).head(9) if not agent_posts.empty else pd.DataFrame()
-
-    # eval-matched best + worst
-    best_eval = pd.DataFrame()
-    worst_eval = pd.DataFrame()
     eval_matched_count = 0
+    # For eval merge: attach eval scores to posts where available (not used for sampling — for scoring)
     if not agent_evals_ag.empty and not agent_posts.empty and "message_id" in agent_evals_ag.columns:
-        merged_ev = agent_evals_ag.merge(
-            agent_posts[["id", "content", "catalyst", "stance", "confidence", "created_at"]],
-            left_on="message_id", right_on="id", how="inner", suffixes=("", "_msg")
-        )
-        eval_matched_count = len(merged_ev)
-        if not merged_ev.empty:
-            best_eval  = merged_ev.nlargest(3, "overall_score")
-            worst_eval = merged_ev.nsmallest(3, "overall_score")
+        eval_matched_count = len(agent_evals_ag.merge(
+            agent_posts[["id"]], left_on="message_id", right_on="id", how="inner"
+        ))
 
-    # combine + dedup
-    frames = [f for f in [newest, best_eval, worst_eval] if not f.empty]
-    if frames:
-        combined = pd.concat(frames, ignore_index=True)
-        if "id" in combined.columns:
-            combined = combined.drop_duplicates(subset="id")
-        else:
-            combined = combined.drop_duplicates()
-    else:
-        combined = pd.DataFrame()
-
-    # fallback: just take all posts if < 2
-    if len(combined) < 2 and not agent_posts.empty:
-        combined = agent_posts.head(15)
+    # ALL posts — no sampling cap
+    combined = agent_posts.sort_values("created_at", ascending=False).copy() if not agent_posts.empty else pd.DataFrame()
 
     # annotate + add to sample
     for _, row in combined.iterrows():
@@ -609,9 +587,9 @@ for agent in agent_names:
     })
 
 df_sample = pd.DataFrame(all_sample_posts)
-df_sample.to_csv(RAW_DIR / "claim_verification_sample.csv", index=False)
+df_sample.to_csv(RAW_DIR / "claim_verification_full_corpus.csv", index=False)
 
-print(f"  Total posts sampled: {len(df_sample)} across {len(agent_names)} agents")
+print(f"  Total posts audited: {len(df_sample)} across {len(agent_names)} agents (full corpus)")
 print()
 print(f"  {'Agent':<30} {'Posts':>6} {'Eval-matched':>12} {'Conf':>8}")
 print(f"  {'-'*30} {'-'*6} {'-'*12} {'-'*8}")
@@ -1028,7 +1006,7 @@ ax.set_ylabel("Post count", color=M_CREAM, fontsize=8)
 ax.tick_params(colors=M_CREAM, labelsize=8)
 ax.spines[:].set_color(M_NAVY)
 ax.legend(facecolor=M_NAVY, edgecolor=M_GOLD, labelcolor=M_CREAM, fontsize=7, loc="upper right")
-ax.set_title("Stance Distribution by Agent (last 7 days)", color=M_CREAM, fontsize=10, fontweight="bold", pad=8)
+ax.set_title("Stance Distribution by Agent (last 14 days)", color=M_CREAM, fontsize=10, fontweight="bold", pad=8)
 plt.tight_layout()
 plt.savefig(CHARTS_DIR / "stance_distribution.png", dpi=200, facecolor=M_NAVY, bbox_inches="tight")
 plt.close()
@@ -1062,6 +1040,82 @@ else:
     ax.set_axis_off()
     plt.savefig(CHARTS_DIR / "governance_reason_codes.png", dpi=200, facecolor=M_NAVY)
     plt.close()
+
+# ── Chart 9: Hourly posting frequency ───────────────────────
+print("  Building hourly posting frequency chart...")
+hourly_chart_path = None
+if not df_msgs.empty and "created_at" in df_msgs.columns:
+    df_posts_only = df_msgs[df_msgs["message_type"] == "post"].copy()
+    if not df_posts_only.empty:
+        df_posts_only["created_at_dt"] = pd.to_datetime(df_posts_only["created_at"], utc=True, errors="coerce")
+        df_posts_only = df_posts_only.dropna(subset=["created_at_dt"])
+        df_posts_only["hour_of_day"] = df_posts_only["created_at_dt"].dt.hour  # 0–23 UTC
+        df_posts_only["day_bin"] = df_posts_only["created_at_dt"].dt.floor("D")
+
+        # Total posts per hour across all 14 days
+        hourly_total = df_posts_only.groupby("hour_of_day").size().reindex(range(24), fill_value=0)
+
+        # Per-agent hourly breakdown
+        agent_palette = ["#FFCC00","#E74C3C","#2ECC71","#3498DB","#9B59B6","#E67E22","#1ABC9C","#E91E63"]
+        fig, axes = plt.subplots(2, 1, figsize=(11, 7), gridspec_kw={"height_ratios": [2, 1.3]})
+        fig.patch.set_facecolor(M_NAVY)
+
+        # Top: stacked bar by agent
+        ax1 = axes[0]
+        ax1.set_facecolor(M_NAVY)
+        hours = np.arange(24)
+        bottoms = np.zeros(24)
+        for idx, name in enumerate(agent_names):
+            ag_df = df_posts_only[df_posts_only["agent_name"] == name]
+            h_counts = ag_df.groupby("hour_of_day").size().reindex(range(24), fill_value=0).values
+            col = agent_palette[idx % len(agent_palette)]
+            ax1.bar(hours, h_counts, bottom=bottoms, color=col, label=name.split()[0], width=0.85)
+            bottoms += h_counts.astype(float)
+        ax1.set_xticks(hours)
+        ax1.set_xticklabels([f"{h:02d}" for h in hours], color=M_CREAM, fontsize=7)
+        ax1.set_ylabel("Posts published", color=M_CREAM, fontsize=9)
+        ax1.tick_params(colors=M_CREAM, labelsize=7)
+        ax1.spines[:].set_color(M_NAVY)
+        ax1.legend(facecolor=M_NAVY, edgecolor=M_GOLD, labelcolor=M_CREAM, fontsize=7,
+                   loc="upper right", ncol=3)
+        ax1.set_title("Hourly Posting Frequency — All Agents (last 14 days, UTC)", color=M_CREAM,
+                      fontsize=11, fontweight="bold", pad=8)
+
+        # Bottom: posts per day trend
+        ax2 = axes[1]
+        ax2.set_facecolor(M_NAVY)
+        daily_counts = df_posts_only.groupby("day_bin").size().sort_index()
+        if not daily_counts.empty:
+            ax2.fill_between(range(len(daily_counts)), daily_counts.values, alpha=0.35, color=M_GOLD)
+            ax2.plot(range(len(daily_counts)), daily_counts.values, color=M_GOLD, linewidth=1.8, marker="o",
+                     markersize=4)
+            daily_mean = daily_counts.mean()
+            ax2.axhline(daily_mean, color=M_GREEN, linestyle="--", linewidth=1.2, alpha=0.8,
+                        label=f"14d avg: {daily_mean:.1f}/day")
+            ax2.set_xticks(range(len(daily_counts)))
+            ax2.set_xticklabels([str(d.date()) for d in daily_counts.index], color=M_CREAM, fontsize=6,
+                                 rotation=45, ha="right")
+            ax2.set_ylabel("Posts / day", color=M_CREAM, fontsize=9)
+            ax2.tick_params(colors=M_CREAM, labelsize=7)
+            ax2.spines[:].set_color(M_NAVY)
+            ax2.legend(facecolor=M_NAVY, edgecolor=M_GOLD, labelcolor=M_CREAM, fontsize=8)
+            ax2.set_title("Daily Post Volume Trend", color=M_CREAM, fontsize=9, fontweight="bold", pad=4)
+
+        plt.tight_layout(pad=1.5)
+        hourly_path = CHARTS_DIR / "hourly_posting_frequency.png"
+        plt.savefig(hourly_path, dpi=200, facecolor=M_NAVY, bbox_inches="tight")
+        plt.close()
+        hourly_chart_path = str(hourly_path)
+        print(f"    hourly frequency chart → {hourly_path.name}")
+
+        # Print quick stats
+        peak_hour = int(hourly_total.idxmax())
+        quiet_hour = int(hourly_total.idxmin())
+        print(f"    Peak hour (UTC): {peak_hour:02d}:00  ({int(hourly_total[peak_hour])} posts over 14d)")
+        print(f"    Quietest hour:   {quiet_hour:02d}:00  ({int(hourly_total[quiet_hour])} posts over 14d)")
+        if not daily_counts.empty:
+            print(f"    Daily avg: {daily_counts.mean():.1f} posts/day  |  "
+                  f"Peak day: {daily_counts.max()} posts  |  Min day: {daily_counts.min()} posts")
 
 print(f"  Charts saved → {CHARTS_DIR}")
 
@@ -1191,6 +1245,7 @@ C5 = CHARTS_DIR / "repetition_risk_by_agent.png"
 C6 = CHARTS_DIR / "quality_tier_distribution.png"
 C7 = CHARTS_DIR / "stance_distribution.png"
 C8 = CHARTS_DIR / "governance_reason_codes.png"
+C9 = CHARTS_DIR / "hourly_posting_frequency.png"
 
 def build_page1() -> list:
     story = []
@@ -1628,6 +1683,20 @@ def build_page6() -> list:
     story.append(h3("Stance Distribution"))
     story.append(img(C7, BODY_W, 90))
     story.append(PageBreak())
+
+    # Hourly posting frequency
+    story += section_header("POSTING FREQUENCY ANALYSIS", "Hourly & Daily Volume — last 14 days")
+    story.append(body(
+        "Shows when agents are posting (UTC hours) and daily volume trend. "
+        "A reduction in daily volume may indicate the new catalyst-relevance gate or "
+        "repetition gate is correctly suppressing low-signal posts."
+    ))
+    story.append(vsp(6))
+    if C9.exists():
+        story.append(img(C9, BODY_W, 200))
+    else:
+        story.append(body("Hourly frequency chart not generated (no post data)."))
+    story.append(PageBreak())
     return story
 
 
@@ -1855,8 +1924,8 @@ def write_markdown():
         "## Raw Data Files",
         "",
     ]
-    for f in ["posts_last_7_days.csv", "decision_logs_last_48h.csv",
-              "agent_evaluations_last_48h.csv", "agent_scores_corrected.csv",
+    for f in ["posts_last_14_days.csv", "decision_logs_last_14_days.csv",
+              "agent_evaluations_last_14_days.csv", "agent_scores_corrected.csv",
               "claim_verification_sample.csv", "score_scale_diagnostics.csv"]:
         lines.append(f"- [raw/{f}](raw/{f})")
     lines += [

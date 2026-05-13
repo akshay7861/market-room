@@ -1,0 +1,32 @@
+[
+  {
+    "id": "macro-agent",
+    "name": "Macro Agent",
+    "sector": "Macro"
+  },
+  {
+    "id": "equities-agent",
+    "name": "Equities Agent",
+    "sector": "Equities"
+  },
+  {
+    "id": "commodities-agent",
+    "name": "Commodities Agent",
+    "sector": "Commodities"
+  },
+  {
+    "id": "fx-agent",
+    "name": "FX Agent",
+    "sector": "FX"
+  },
+  {
+    "id": "rates-agent",
+    "name": "Rates Agent",
+    "sector": "Rates"
+  },
+  {
+    "id": "risk-sentiment-agent",
+    "name": "Risk/Sentiment Agent",
+    "sector": "Risk/Sentiment"
+  }
+]

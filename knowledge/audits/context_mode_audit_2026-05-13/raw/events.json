@@ -1,0 +1,1930 @@
+[
+  {
+    "id": "05840b21-ad1f-4ef2-9904-51b37d06dbe7",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-13T05:00:20.715Z"
+  },
+  {
+    "id": "02e5a420-4811-4e04-bbdb-152c7cf173a0",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-13T04:00:29.117Z"
+  },
+  {
+    "id": "2dcd8ce3-3570-4bc8-9678-c58c07d07672",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-13T03:00:25.636Z"
+  },
+  {
+    "id": "f6659dc4-ccd3-45ea-8fb8-d9779e093242",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-13T02:00:22.186Z"
+  },
+  {
+    "id": "bd57e0b4-8566-4304-b8fb-4142073713a1",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-13T01:00:17.435Z"
+  },
+  {
+    "id": "8c34f768-6eb5-4401-ae85-2df0c75abc8d",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-13T00:00:17.159Z"
+  },
+  {
+    "id": "331f488d-f702-4e4e-8981-4733826bbeab",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-12T21:00:15.978Z"
+  },
+  {
+    "id": "98783c28-4511-407c-9282-288654ed48a3",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-12T20:00:16.584Z"
+  },
+  {
+    "id": "333baddc-adf6-4998-9ed7-93eb052d7cd5",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-12T19:00:17.016Z"
+  },
+  {
+    "id": "342663f6-9051-4a10-8002-51def8ce7ca4",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "oil_geopolitics_and_inflation_pass_through",
+    "created_at": "2026-05-12T18:00:19.525Z"
+  },
+  {
+    "id": "3399e64b-f404-4804-9fcf-42d8dc60b98a",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-12T17:00:24.272Z"
+  },
+  {
+    "id": "62bef9fc-5782-4fbd-9eb4-305927de7517",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-12T16:00:22.120Z"
+  },
+  {
+    "id": "1a35190c-554e-4828-bf40-fcb95dbdf679",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-12T15:00:16.240Z"
+  },
+  {
+    "id": "6e935892-8036-4ada-8ff7-620e757b60a3",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-12T14:00:17.051Z"
+  },
+  {
+    "id": "8cc15aa7-34e5-4c33-960e-e431a8ecdaca",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-12T13:01:07.280Z"
+  },
+  {
+    "id": "27bbbd80-7412-459a-9e00-d54ac382cadb",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-12T12:01:08.215Z"
+  },
+  {
+    "id": "3b81a623-646a-418b-9b5f-eebfa9f93002",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-12T11:01:06.100Z"
+  },
+  {
+    "id": "59cb011f-6831-47ef-a99b-bee24f7cd12a",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-12T10:01:12.270Z"
+  },
+  {
+    "id": "053683ae-1728-4f34-ba66-3226c6699d4c",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-12T09:01:17.349Z"
+  },
+  {
+    "id": "d581653e-ebc4-4bc1-819a-cc704d1e9de9",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-12T08:01:05.884Z"
+  },
+  {
+    "id": "113595fb-f63b-475e-9bdb-0d3c31c79944",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-12T07:01:16.919Z"
+  },
+  {
+    "id": "6721960e-5b7e-4173-81be-6c09b81a4a44",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-12T06:01:16.229Z"
+  },
+  {
+    "id": "2131602c-092c-41d8-bbc1-b74be7e929ba",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-12T05:01:07.507Z"
+  },
+  {
+    "id": "8534c70d-292b-41bf-b194-1ba7f09b1429",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-12T04:01:09.727Z"
+  },
+  {
+    "id": "34fddae4-7132-4880-b90c-536cfa2d9936",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-12T03:01:07.184Z"
+  },
+  {
+    "id": "938ffa6a-ffd2-49d2-bb33-44b2ca537583",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-12T02:01:05.635Z"
+  },
+  {
+    "id": "6d6eaf45-5db2-4464-a84e-e6ae7820641b",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-12T01:01:03.770Z"
+  },
+  {
+    "id": "edf1eea3-321a-475a-b98c-44b296a2f732",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-12T00:01:01.660Z"
+  },
+  {
+    "id": "89efb412-06b3-4f45-8c3b-c3f798bcc63f",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-11T23:01:00.045Z"
+  },
+  {
+    "id": "6163936c-2d71-4d0d-b42e-9d3b67580610",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "oil_geopolitics_and_inflation_pass_through",
+    "created_at": "2026-05-11T18:00:12.603Z"
+  },
+  {
+    "id": "b1cdd47e-ca87-4ba2-bc84-50ecd1740f38",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-11T17:00:09.023Z"
+  },
+  {
+    "id": "43f227b2-51d8-4503-a705-c9acf8002090",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-11T12:00:08.983Z"
+  },
+  {
+    "id": "2d1d193d-7f81-498a-b47f-321fb34a22af",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-11T11:00:07.464Z"
+  },
+  {
+    "id": "d33ce21b-6a5c-4e1b-92e1-3c8ed86a1362",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "oil_geopolitics_and_inflation_pass_through",
+    "created_at": "2026-05-11T08:00:06.233Z"
+  },
+  {
+    "id": "20512bbc-416b-4c6f-9301-a53cd6977f41",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-11T07:00:05.680Z"
+  },
+  {
+    "id": "f19e1e65-ee8f-40ee-bc6c-933fe05a6415",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "oil_geopolitics_and_inflation_pass_through",
+    "created_at": "2026-05-10T22:00:22.999Z"
+  },
+  {
+    "id": "03377561-3cb7-4be8-a9c3-59570529bd63",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-10T21:00:22.714Z"
+  },
+  {
+    "id": "67207cb0-d535-4a27-bd2b-9b519c94ddb9",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-10T20:00:23.616Z"
+  },
+  {
+    "id": "2c610bdb-3983-487c-8245-a6cf299e663f",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-10T19:00:22.653Z"
+  },
+  {
+    "id": "c61af948-d5a8-4c77-959f-defe05b2ff66",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-10T18:00:21.161Z"
+  },
+  {
+    "id": "24629e46-724e-42a5-be53-f0415f94ef99",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-10T06:00:31.938Z"
+  },
+  {
+    "id": "2d887a95-51e4-41a0-bdac-818d97a1f7fc",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-10T05:00:20.049Z"
+  },
+  {
+    "id": "b54e81b6-a38b-4113-9c29-c10c5f158e6d",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-10T04:00:22.356Z"
+  },
+  {
+    "id": "1955aaac-4d71-4e2d-89c8-8fef31a3e381",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-10T03:00:18.264Z"
+  },
+  {
+    "id": "b343e280-62c9-470a-9d3c-637f72bce837",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "oil_geopolitics_and_inflation_pass_through",
+    "created_at": "2026-05-10T02:00:16.305Z"
+  },
+  {
+    "id": "a4eb1799-74b7-4d54-8018-103905ee50d5",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-10T01:00:16.957Z"
+  },
+  {
+    "id": "4da32033-58de-4479-9f9e-5364ad3ca5cc",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-10T00:00:20.937Z"
+  },
+  {
+    "id": "5740aaa5-1012-4cfa-9fac-fa37dfd91266",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-09T23:00:16.361Z"
+  },
+  {
+    "id": "84b41ab0-6758-410e-a04c-035217f23274",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-09T22:00:19.001Z"
+  },
+  {
+    "id": "86a463f6-0c59-48fc-b039-6321f9d1fba4",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-09T21:00:23.012Z"
+  },
+  {
+    "id": "666e61f4-6bf1-4c5a-a366-756986fece13",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-09T20:00:15.946Z"
+  },
+  {
+    "id": "4659427f-023d-4c3e-8e4c-3c67379f1bde",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-09T19:00:16.754Z"
+  },
+  {
+    "id": "67f607f6-6c74-435d-8edf-dcebd7da94ef",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-09T18:00:16.593Z"
+  },
+  {
+    "id": "bef6f875-66c2-4c95-8e50-7610a8af8505",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-09T17:00:22.129Z"
+  },
+  {
+    "id": "da64d7ac-5515-4c20-9bb2-bc5dc16202eb",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-09T16:00:18.551Z"
+  },
+  {
+    "id": "c0bf1331-c003-4894-b54a-e3607046b731",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-09T15:00:15.056Z"
+  },
+  {
+    "id": "edcc2a55-70f2-4d7b-8651-353789806ee2",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-09T14:00:11.879Z"
+  },
+  {
+    "id": "132b0b55-7b3b-4123-87cd-c7fd554a871d",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-09T13:01:01.609Z"
+  },
+  {
+    "id": "a3c9b593-943f-4c90-bb42-46caadf7568b",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-09T12:01:03.840Z"
+  },
+  {
+    "id": "724c759f-4eb1-404e-a378-7af609345e3c",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-09T10:01:02.209Z"
+  },
+  {
+    "id": "ac9b9bd5-a106-4458-8d78-a1fa08b601c0",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-09T09:01:06.156Z"
+  },
+  {
+    "id": "2fa92f43-5f7e-40dc-bb11-0ae651fcb884",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-09T08:01:06.964Z"
+  },
+  {
+    "id": "7ebb7f62-f669-466d-a756-d3c330429a95",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-09T06:01:08.792Z"
+  },
+  {
+    "id": "ba7d7bd7-1e6a-4dc6-a278-357d6dd8c3f4",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-09T05:01:02.766Z"
+  },
+  {
+    "id": "6150cbab-6ac2-46c6-9394-db07dddc42ab",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "company_specific_developments",
+    "created_at": "2026-05-09T04:01:05.077Z"
+  },
+  {
+    "id": "3a6a504a-81d2-4c49-90f9-1f4660520866",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-09T02:01:03.372Z"
+  },
+  {
+    "id": "2ebf0f9c-8188-4542-91c5-bf7e1d331abf",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-09T01:01:03.031Z"
+  },
+  {
+    "id": "66c06b7f-e987-4275-a060-bc94e5bb78fa",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "company_specific_developments",
+    "created_at": "2026-05-09T00:01:02.098Z"
+  },
+  {
+    "id": "e9ada397-252a-4cc1-9539-1aef007bd153",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-08T23:00:14.034Z"
+  },
+  {
+    "id": "1053cf86-b034-4f7f-8370-ab5f63b2ed25",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-08T22:00:15.575Z"
+  },
+  {
+    "id": "1c823d14-0758-4d6a-96e1-b144344f6bdb",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-08T21:00:15.356Z"
+  },
+  {
+    "id": "f1cdd5b4-8ae6-4de7-a7a2-d91195417350",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-08T17:00:14.951Z"
+  },
+  {
+    "id": "847252f0-7e0b-47e6-bc2e-399748259bf8",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-08T16:00:21.011Z"
+  },
+  {
+    "id": "01365d31-6540-48ab-b206-8c51284f043c",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-08T15:00:19.674Z"
+  },
+  {
+    "id": "b71aab5d-c19c-4e01-a464-33bc69762678",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-08T14:00:14.718Z"
+  },
+  {
+    "id": "f656d887-1b95-4dfd-b007-3f0f46851606",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-08T13:00:16.186Z"
+  },
+  {
+    "id": "51071d31-978e-4ad8-a805-5b7c65cc784f",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-08T12:00:16.521Z"
+  },
+  {
+    "id": "0604886f-18e4-4740-9905-e629b394c57b",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-08T11:00:17.779Z"
+  },
+  {
+    "id": "6dfd3db3-b843-40bd-b82a-58066a74a62e",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "oil_geopolitics_and_inflation_pass_through",
+    "created_at": "2026-05-08T10:00:13.390Z"
+  },
+  {
+    "id": "5f9f2593-9093-42c2-af5c-01b69f3eefb9",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-08T08:00:13.531Z"
+  },
+  {
+    "id": "b06b4dc5-5b69-4a23-ac87-883715ff4a61",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-08T07:00:14.372Z"
+  },
+  {
+    "id": "104710b3-a09e-4506-ab1f-c0762ded5c10",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-08T04:00:13.904Z"
+  },
+  {
+    "id": "a987d057-eddc-4eec-bb2c-ba952ceb6018",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-08T03:00:14.528Z"
+  },
+  {
+    "id": "676856f3-19b8-4d5c-85c3-6ff43f5d176d",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-08T00:00:15.285Z"
+  },
+  {
+    "id": "dd875681-b668-4437-ac9c-a9d945310cfb",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-07T23:00:13.759Z"
+  },
+  {
+    "id": "b6c7d726-4eef-411b-9b71-3272cfe6d56c",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "oil_geopolitics_and_inflation_pass_through",
+    "created_at": "2026-05-07T22:00:13.673Z"
+  },
+  {
+    "id": "db2c660d-0f6f-42aa-bed6-5dba7782b6e2",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-07T21:00:13.611Z"
+  },
+  {
+    "id": "161bb345-649b-4dcb-bfdf-6da486aa8c85",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-07T20:00:13.983Z"
+  },
+  {
+    "id": "ca234313-c21d-423a-9387-136ca580e266",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-07T12:00:45.576Z"
+  },
+  {
+    "id": "1f621aee-2688-421a-82cf-a0359d38add7",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-07T11:00:43.206Z"
+  },
+  {
+    "id": "a73afbf4-8d01-46a2-a8b9-5dbdff0f0e37",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-07T06:00:57.750Z"
+  },
+  {
+    "id": "40bd373d-0524-456e-a42d-07ded1470169",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-07T05:00:51.744Z"
+  },
+  {
+    "id": "7d4c2396-cd5b-4eaa-89b9-c2672365c03a",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-07T04:01:18.845Z"
+  },
+  {
+    "id": "91a78266-bd2e-4d58-9f84-14f5994e7463",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-07T03:01:26.815Z"
+  },
+  {
+    "id": "bc0886ff-ffae-4cc9-bdfc-5e12dc47c663",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-07T02:01:22.979Z"
+  },
+  {
+    "id": "e241a6e7-8fe3-41f5-a39e-d8ccf24ed388",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-07T01:01:18.490Z"
+  },
+  {
+    "id": "a5b6f379-d34a-4775-87d5-cce45605b7d2",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-07T00:01:11.819Z"
+  },
+  {
+    "id": "7ceb1c18-1f9e-477f-a08b-887f2c2d675e",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-06T23:01:07.728Z"
+  },
+  {
+    "id": "94e33fbe-fb22-4283-97ae-b7e84bbe01b1",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-06T22:01:08.553Z"
+  },
+  {
+    "id": "f930f574-b69e-485d-9e4f-bc395366f1e7",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-06T21:01:09.370Z"
+  },
+  {
+    "id": "06c3c6e0-6d66-4166-a69a-1f3ca67c451e",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-06T20:01:11.327Z"
+  },
+  {
+    "id": "c824514d-e224-4c5a-b6de-8670e3da8fc1",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-06T19:01:09.685Z"
+  },
+  {
+    "id": "9be5d8cf-7125-4a1c-92c1-502b3f4bf605",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-06T18:01:12.412Z"
+  },
+  {
+    "id": "b78a511c-445e-4a0a-8141-2b92c481d24e",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-06T17:01:11.363Z"
+  },
+  {
+    "id": "897e0588-22e4-43fb-ad30-876792204d2e",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-06T16:01:28.800Z"
+  },
+  {
+    "id": "2b63ebbd-d3dc-42aa-b80e-68900a6a2310",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-06T15:01:25.146Z"
+  },
+  {
+    "id": "7bf0a0eb-e623-4515-9a13-1191111abb8a",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-06T14:01:21.095Z"
+  },
+  {
+    "id": "f8a3967d-d4ed-464f-9075-590ca4ff0191",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-06T13:00:12.524Z"
+  },
+  {
+    "id": "67aed22a-a110-45ec-9d3c-332199aef9f4",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-06T12:00:12.028Z"
+  },
+  {
+    "id": "1a15e0b4-e78b-4302-a2c2-40633c419b95",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-06T09:00:12.872Z"
+  },
+  {
+    "id": "bad1a526-f814-4d51-86a7-ce3d895d30ea",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "oil_geopolitics_and_inflation_pass_through",
+    "created_at": "2026-05-06T08:00:11.945Z"
+  },
+  {
+    "id": "5e488800-1d3c-449e-9781-0940d39b140f",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "company_specific_developments",
+    "created_at": "2026-05-06T06:00:11.364Z"
+  },
+  {
+    "id": "b1317a8c-310b-49a3-9a3c-10d04d28390a",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-06T05:00:11.609Z"
+  },
+  {
+    "id": "babeba22-870b-418f-8fe1-930630bce103",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-06T03:00:11.422Z"
+  },
+  {
+    "id": "d740c438-4879-41e8-b478-4c2e24d72a63",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-06T02:00:11.309Z"
+  },
+  {
+    "id": "68ecffd2-3cf4-482b-949e-cd5f38196797",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-06T01:00:12.406Z"
+  },
+  {
+    "id": "3cd9fbc4-3113-49f0-8d1b-13a5f68dccac",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-06T00:00:11.487Z"
+  },
+  {
+    "id": "fc32f5dc-4a1c-4958-b5c9-de1af9725aa6",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-05T23:00:54.956Z"
+  },
+  {
+    "id": "7cd0f526-308d-4887-ace4-d9021f79c4f2",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-05T22:00:56.679Z"
+  },
+  {
+    "id": "7d9c259a-d3d7-4a21-84e8-73031cb4b05a",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-05T15:00:59.484Z"
+  },
+  {
+    "id": "7ef126e3-cd9a-4825-bbfb-e2c52d501c9f",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-05T14:01:00.161Z"
+  },
+  {
+    "id": "80ab69f9-9417-4d04-974e-8d2f232a56fb",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-05T12:00:58.402Z"
+  },
+  {
+    "id": "6908adbd-9f56-495b-b29f-15097155d060",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-05T11:00:56.368Z"
+  },
+  {
+    "id": "d49da0b2-0997-4b1d-9a3e-eba59c0ae01a",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-05T10:00:56.175Z"
+  },
+  {
+    "id": "106e260b-1ffb-45b7-b205-9758ea86f4f3",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-05T09:00:54.558Z"
+  },
+  {
+    "id": "80282c12-96c0-493f-90bc-6c211a244126",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-05T08:00:54.720Z"
+  },
+  {
+    "id": "150e485f-93a3-44f9-a02b-688fc5d8310b",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-05T07:00:55.089Z"
+  },
+  {
+    "id": "6a96b6ff-2f06-4510-8884-106ddb8ec723",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-05T06:00:56.096Z"
+  },
+  {
+    "id": "448d504a-0377-44de-bf3f-707df4f45324",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-05T05:00:56.236Z"
+  },
+  {
+    "id": "1a823094-1b33-4d2d-9a7a-64c79a2fd957",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-05T04:00:57.739Z"
+  },
+  {
+    "id": "026abdc5-cccf-4fc9-90ec-15283b815ef6",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "oil_geopolitics_and_inflation_pass_through",
+    "created_at": "2026-05-05T03:00:57.983Z"
+  },
+  {
+    "id": "e1671eec-9660-41ce-82cc-180a67d44653",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-05T02:00:58.278Z"
+  },
+  {
+    "id": "3e773bf1-f2d9-484c-a7f5-7d5b9f259a23",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-05T01:00:58.021Z"
+  },
+  {
+    "id": "146e2ef9-f9c3-44ae-ad9f-9bb04b2deb00",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-05T00:00:56.489Z"
+  },
+  {
+    "id": "d600c0a9-d69d-4a43-8eb2-b0beee8c2cfa",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-04T23:00:55.511Z"
+  },
+  {
+    "id": "c814f9ea-46d7-4fa2-986f-9b8c5ff85250",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-04T22:00:56.285Z"
+  },
+  {
+    "id": "0752da7e-6de7-44dc-a0aa-d2feb29f3104",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-04T21:00:55.403Z"
+  },
+  {
+    "id": "ddbc91f5-f433-4a13-a645-d2d68953f6ce",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-04T20:00:57.916Z"
+  },
+  {
+    "id": "745cbe06-7423-465f-ac5d-5e1edb9239ec",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-04T19:00:56.631Z"
+  },
+  {
+    "id": "fb074626-bebb-4a97-9524-da193b44a42f",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-04T18:01:00.196Z"
+  },
+  {
+    "id": "bf5c9929-6c1d-40cb-b4ae-851a7d0c6d7a",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-04T17:00:55.996Z"
+  },
+  {
+    "id": "862fee3d-3ae3-489a-9ca8-ea11935b591e",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-04T16:01:01.099Z"
+  },
+  {
+    "id": "2b62b58f-82eb-4754-b4f6-d48b98b82f61",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-04T15:00:56.661Z"
+  },
+  {
+    "id": "ec4985a5-857d-4e4b-9f1c-f6706fff5420",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-04T14:00:58.588Z"
+  },
+  {
+    "id": "ed342fd2-7ab5-4fa5-9dd6-cb51c99cea18",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "company_specific_developments",
+    "created_at": "2026-05-04T13:00:55.999Z"
+  },
+  {
+    "id": "32268f2b-f0f3-4528-81f1-3063eb8a0967",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-04T12:00:59.136Z"
+  },
+  {
+    "id": "409f3249-1b2c-4a49-84da-107591953738",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-04T11:00:56.382Z"
+  },
+  {
+    "id": "1c5fc2d9-09c6-45cb-b3d1-365334878c5c",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-04T10:00:57.372Z"
+  },
+  {
+    "id": "20920d40-e2a0-48f9-b295-4899912f5378",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "oil_geopolitics_and_inflation_pass_through",
+    "created_at": "2026-05-04T09:00:55.705Z"
+  },
+  {
+    "id": "60bf313f-b35d-4058-b325-28d97b64391e",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-04T08:00:55.450Z"
+  },
+  {
+    "id": "5f24641b-26df-4406-aba9-5a5cebd51088",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-04T07:00:54.649Z"
+  },
+  {
+    "id": "f5deee11-2d56-4f30-96b6-e94096c56b5e",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-04T06:00:55.297Z"
+  },
+  {
+    "id": "a7e1b291-96a1-4f17-8e08-3cff70337d46",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-03T22:01:06.023Z"
+  },
+  {
+    "id": "e75fa759-2f46-462d-8431-9b943f8bd0fa",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-03T21:01:00.822Z"
+  },
+  {
+    "id": "a439c7ff-2a06-49f3-8792-64cdec25d161",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-03T20:01:02.629Z"
+  },
+  {
+    "id": "7e809fee-8710-40ea-8c04-30e7fa50e0cf",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-03T19:01:01.898Z"
+  },
+  {
+    "id": "ed709d59-ccc3-4eb9-94ae-70c5fb1d4e1e",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-03T18:01:00.292Z"
+  },
+  {
+    "id": "88281b00-8eef-4976-9ca1-b3a934e91f8c",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-03T08:01:21.430Z"
+  },
+  {
+    "id": "a9cd2aa9-9d5a-488c-8c96-db7598f82624",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-03T07:01:08.021Z"
+  },
+  {
+    "id": "474ffc1f-e841-47ce-8aa3-dd918fea4115",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-03T06:01:05.181Z"
+  },
+  {
+    "id": "2b56e771-5500-42cc-9658-5fd2f51a54e8",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-03T05:01:12.686Z"
+  },
+  {
+    "id": "71a63fa9-ba71-4482-9b56-b51884f49106",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-03T04:00:57.523Z"
+  },
+  {
+    "id": "842a5c71-9f3b-422b-987d-228338353572",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-03T03:00:55.921Z"
+  },
+  {
+    "id": "eee66139-f2e8-4960-b79c-df3209d63d1c",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-03T02:00:58.793Z"
+  },
+  {
+    "id": "90be1a13-3559-45b8-84e8-f8f672a70e3a",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-03T01:00:56.819Z"
+  },
+  {
+    "id": "0123b8f3-e228-43b4-966d-f8004458d938",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-03T00:00:56.943Z"
+  },
+  {
+    "id": "0b36549f-8b13-4960-a563-b4e590335c90",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "oil_geopolitics_and_inflation_pass_through",
+    "created_at": "2026-05-02T23:00:55.941Z"
+  },
+  {
+    "id": "4bab2cb6-b7e8-4b7b-8fa1-629d431f998b",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-02T22:00:55.562Z"
+  },
+  {
+    "id": "145a0e62-2c04-4ec2-a598-c3b65c36d671",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "oil_geopolitics_and_inflation_pass_through",
+    "created_at": "2026-05-02T21:00:56.434Z"
+  },
+  {
+    "id": "1964eae5-6209-43a0-ba2a-1548e843e1e7",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-02T20:00:56.543Z"
+  },
+  {
+    "id": "8ce38190-5f5c-4ae4-bc59-f20ba5d22646",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-02T19:00:56.724Z"
+  },
+  {
+    "id": "6caef1dd-7106-40d5-8b16-c7ef7dab7104",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-02T18:00:59.531Z"
+  },
+  {
+    "id": "d9fcd49c-0cc5-4e37-8d8d-59658ee6e403",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-02T17:00:57.666Z"
+  },
+  {
+    "id": "065ca148-d339-4a0e-8d79-018f2c4ec5c2",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-02T16:00:55.791Z"
+  },
+  {
+    "id": "e1e2897b-420f-4fc0-890b-720b3fcd1d04",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-02T15:00:59.547Z"
+  },
+  {
+    "id": "b5a000d8-ae47-4b91-8c51-c5a405d6bc70",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-02T14:01:00.833Z"
+  },
+  {
+    "id": "2bdf48c1-b52c-4d78-87ff-b73a52f45e00",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "oil_geopolitics_and_inflation_pass_through",
+    "created_at": "2026-05-02T13:01:01.397Z"
+  },
+  {
+    "id": "77b863cc-b329-410d-bc33-2b00e821c226",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-02T11:01:10.670Z"
+  },
+  {
+    "id": "25c05d6f-6d57-4b72-9045-ea4a98221405",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-02T10:01:11.056Z"
+  },
+  {
+    "id": "5948d472-74e2-4d1a-baad-e557f105713c",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "oil_geopolitics_and_inflation_pass_through",
+    "created_at": "2026-05-02T09:01:13.151Z"
+  },
+  {
+    "id": "e8ec22b3-71bb-44b6-8c20-e4c48838e1f3",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "oil_geopolitics_and_inflation_pass_through",
+    "created_at": "2026-05-02T07:01:18.338Z"
+  },
+  {
+    "id": "81e13db8-af0a-4c3a-87d6-7931ba4642cd",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-02T06:01:20.350Z"
+  },
+  {
+    "id": "25183784-4886-44f4-8503-ac17cda3fa3e",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "oil_geopolitics_and_inflation_pass_through",
+    "created_at": "2026-05-02T05:01:14.254Z"
+  },
+  {
+    "id": "0f9e2ccd-8c39-48f9-8a51-7b39d1ac7a87",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-02T04:01:06.551Z"
+  },
+  {
+    "id": "a28b162b-09d5-4da1-9de8-cefe765d5249",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-02T03:00:34.804Z"
+  },
+  {
+    "id": "85c67edb-b9c2-45ec-a697-aa8d248ffa3a",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-02T02:00:37.587Z"
+  },
+  {
+    "id": "dff3e255-55e3-41b0-bb50-1de9cf31af06",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-01T23:00:36.709Z"
+  },
+  {
+    "id": "f4b2f7c8-6901-4be5-814c-5ccf3323d2e0",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-01T22:00:35.396Z"
+  },
+  {
+    "id": "ea5d1e17-13ed-4468-a392-ea7b20746a42",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-01T21:00:35.969Z"
+  },
+  {
+    "id": "3134c4f1-ee4c-4a63-ab8a-8ceefabc7005",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-01T16:00:37.230Z"
+  },
+  {
+    "id": "7403e5f9-1771-483c-931b-059a708215e9",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-01T15:00:34.972Z"
+  },
+  {
+    "id": "1ade2252-280e-4f65-ad2e-0313d4604940",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-01T14:00:29.843Z"
+  },
+  {
+    "id": "ddb63e91-3281-4be7-8f7f-35fba80123dc",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-01T13:00:30.159Z"
+  },
+  {
+    "id": "b618faae-ae2b-4b54-ba7c-ca25d8260277",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-01T11:00:33.926Z"
+  },
+  {
+    "id": "d986a76c-fad4-49b0-80f9-26ceebe24d55",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-01T10:00:34.283Z"
+  },
+  {
+    "id": "2ccf71bd-93d5-438c-990e-7da8091a0bd1",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-01T09:00:35.688Z"
+  },
+  {
+    "id": "d7bb3b39-0da1-4a17-ad1d-3aae6f97e8f6",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-01T07:00:32.108Z"
+  },
+  {
+    "id": "4b54b212-d6b1-472a-98d0-4e5a6951219d",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-01T06:00:32.783Z"
+  },
+  {
+    "id": "c3d39c4f-7805-47ac-b6fe-fd40582015a5",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-01T05:00:34.831Z"
+  },
+  {
+    "id": "d0f5e748-8ce4-44bd-b971-c1a3ffa43627",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-01T04:00:35.077Z"
+  },
+  {
+    "id": "175c9f41-b72a-43a5-abdb-ba6dae19e3e1",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-01T03:00:32.603Z"
+  },
+  {
+    "id": "5cac40a4-3965-42b3-86d5-4c88cac5f90f",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-01T02:00:30.987Z"
+  },
+  {
+    "id": "636ae0bd-6fb0-4108-baea-0d5370566a8c",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-05-01T01:00:30.098Z"
+  },
+  {
+    "id": "5470001a-c14f-4266-8219-cb1c7aec6f15",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-05-01T00:00:30.450Z"
+  },
+  {
+    "id": "a85cb449-5fae-4e3f-bc5d-c7243f9cc84f",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-04-30T23:00:29.948Z"
+  },
+  {
+    "id": "649bf800-8e46-403b-916b-8b05d8b7ba31",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-30T20:00:29.755Z"
+  },
+  {
+    "id": "e0bad32e-b315-47ca-bfd4-7aca683e613b",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-04-30T19:00:29.634Z"
+  },
+  {
+    "id": "77979038-1b64-4c2a-83ac-ee57225da816",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-30T18:00:29.397Z"
+  },
+  {
+    "id": "68fd617b-ff43-45b2-8ff1-82c171507eb4",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-04-30T17:00:30.355Z"
+  },
+  {
+    "id": "830037a9-f51f-4811-bb4f-0692e309585a",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-30T16:00:29.906Z"
+  },
+  {
+    "id": "6cb52a18-e4f3-4c8b-a31c-80e35b86c8c8",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-04-30T15:00:29.875Z"
+  },
+  {
+    "id": "feff7817-e4b8-49f3-b26b-cd6427de79dc",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-30T14:01:33.193Z"
+  },
+  {
+    "id": "50e0c570-895d-4599-8a6b-093ec7482e28",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-30T13:00:30.314Z"
+  },
+  {
+    "id": "bc0a65cf-8f5d-438e-93cf-ff9d42b26574",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-04-30T12:00:11.260Z"
+  },
+  {
+    "id": "1bfdac50-6581-45b5-a768-798e8fbb6399",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-30T11:00:11.933Z"
+  },
+  {
+    "id": "f149dab8-a667-4e36-88af-d6bbc844aca3",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "company_specific_developments",
+    "created_at": "2026-04-30T10:00:12.415Z"
+  },
+  {
+    "id": "f322f0c0-ccb9-4520-8d5a-a4f79d6878c2",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-30T09:00:12.061Z"
+  },
+  {
+    "id": "b79fec27-adae-4898-baa7-d44b6c1fa9c9",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-04-30T08:00:12.300Z"
+  },
+  {
+    "id": "b190ff3f-6d40-4796-8b4c-94279cfafac1",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-30T07:00:12.587Z"
+  },
+  {
+    "id": "d126dfa5-ebf9-4766-99d8-d5fa8d1caffe",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-30T05:00:11.776Z"
+  },
+  {
+    "id": "7c591bc6-b616-47a2-a019-d664741323b5",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-04-30T04:00:12.483Z"
+  },
+  {
+    "id": "d6dcacd3-a8a3-4f87-8a7d-2ba45ecc2cc8",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-30T03:00:12.224Z"
+  },
+  {
+    "id": "1c8343e6-70cd-40f5-9feb-01d8a4f1424a",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-04-30T02:00:13.672Z"
+  },
+  {
+    "id": "861a31a1-a422-47eb-ac52-6cb089e769d7",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-30T01:00:12.596Z"
+  },
+  {
+    "id": "d27cce44-b2d5-44e7-ac81-f54e73b98c1e",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-04-30T00:00:42.818Z"
+  },
+  {
+    "id": "801aea32-788a-4788-8ae1-520fc6842fd1",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-29T23:00:43.234Z"
+  },
+  {
+    "id": "32019196-a7e5-4451-916c-6631f075cc4b",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-29T19:00:43.890Z"
+  },
+  {
+    "id": "0c4326ec-dd52-404d-a34b-dd8b3d197a5a",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-04-29T18:00:44.402Z"
+  },
+  {
+    "id": "1420b14e-a69e-4c0a-8c42-c05d4ed83842",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-29T15:00:45.041Z"
+  },
+  {
+    "id": "36ec0742-3a15-4ac0-b683-6d1874b95ed6",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "company_specific_developments",
+    "created_at": "2026-04-29T14:00:45.627Z"
+  },
+  {
+    "id": "c467da91-f119-4f59-9051-11fb729c8b79",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-04-29T12:00:43.392Z"
+  },
+  {
+    "id": "3167a97d-4ea2-4b1c-a9e4-63e4a1001b36",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-29T11:00:43.373Z"
+  },
+  {
+    "id": "cb316fda-599a-4a57-a0b0-ca15b7412541",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-29T09:00:10.314Z"
+  },
+  {
+    "id": "3d56ada8-d144-4e66-9984-960e59a57b5b",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "oil_geopolitics_and_inflation_pass_through",
+    "created_at": "2026-04-29T08:00:10.305Z"
+  },
+  {
+    "id": "7b947f12-4897-4f9b-b562-fa296076bd04",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-29T07:00:08.808Z"
+  },
+  {
+    "id": "a6ad5d82-e25f-4991-b5bf-4a59e189f6d1",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-04-29T06:00:11.234Z"
+  },
+  {
+    "id": "f5d722bf-9665-4ebf-89aa-927be7343668",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-29T05:00:09.731Z"
+  },
+  {
+    "id": "883db31c-2667-4044-ba34-558e2cf75b12",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-04-29T04:00:07.979Z"
+  },
+  {
+    "id": "0dd05cab-fbc8-4902-813e-a0a45141f066",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-04-29T02:00:07.918Z"
+  },
+  {
+    "id": "8c2d8fb5-a1ac-4a42-a98a-dfe12f46f7f6",
+    "room_id": "market-room",
+    "trigger_mode": "scheduled",
+    "agent_count": 4,
+    "synthesis_topic": "reactive_mode",
+    "created_at": "2026-04-29T01:00:06.973Z"
+  },
+  {
+    "id": "5dedb4c7-e90d-467c-a107-5f01e6fdc4fa",
+    "room_id": "market-room",
+    "trigger_mode": "synthesis",
+    "agent_count": 6,
+    "synthesis_topic": "growth_softness_vs_multiple_risk",
+    "created_at": "2026-04-29T00:00:08.625Z"
+  }
+]
