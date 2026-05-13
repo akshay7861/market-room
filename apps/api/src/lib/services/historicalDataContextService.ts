@@ -229,7 +229,8 @@ function availableSeriesLine(series: HistoricalSeries): string {
 }
 
 function wtiMonthlySeries(): HistoricalSeries {
-  return eiaWtiMonthly as HistoricalSeries;
+  // Uses FRED MCOILWTICO monthly series when live — falls back to EIA embedded file.
+  return liveSeries("fred_wti_monthly", eiaWtiMonthly);
 }
 
 function cpiHeadlineSeries(): HistoricalSeries {
@@ -249,8 +250,8 @@ function broadDollarSeries(): HistoricalSeries {
 }
 
 function spyMonthlySeries(): HistoricalSeries {
-  // SPY is not a FRED series — always use the embedded Alpha Vantage file.
-  return avSpyMonthly as unknown as HistoricalSeries;
+  // Uses FRED SP500 monthly series when live — falls back to Alpha Vantage embedded file.
+  return liveSeries("fred_sp500_monthly", avSpyMonthly);
 }
 
 function vixSeries(): HistoricalSeries {

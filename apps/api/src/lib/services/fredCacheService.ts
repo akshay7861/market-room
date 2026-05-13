@@ -52,28 +52,33 @@ const FRED_START_DATE = "1990-01-01";
 
 /**
  * Maps our internal series IDs → FRED API series codes.
- * Only the 18 series actively imported by historicalDataContextService and
- * verifiedMarketMetricsService are listed here.
+ * All 20 series actively used by historicalDataContextService and
+ * verifiedMarketMetricsService, including WTI monthly (replaces static EIA file)
+ * and S&P 500 monthly (replaces static Alpha Vantage file).
  */
 const FRED_SERIES_CATALOG: Record<string, { fredCode: string; label: string; frequency: string }> = {
-  fred_nonfarm_payrolls:         { fredCode: "PAYEMS",     label: "Nonfarm payrolls",              frequency: "monthly"  },
-  fred_unemployment:             { fredCode: "UNRATE",     label: "Unemployment rate",             frequency: "monthly"  },
-  fred_pce_core:                 { fredCode: "PCEPILFE",   label: "Core PCE index",                frequency: "monthly"  },
-  fred_pce_headline:             { fredCode: "PCEPI",      label: "Headline PCE index",            frequency: "monthly"  },
-  fred_cpi_headline:             { fredCode: "CPIAUCSL",   label: "Headline CPI index",            frequency: "monthly"  },
-  fred_fedfunds:                 { fredCode: "FEDFUNDS",   label: "Fed funds effective rate",      frequency: "monthly"  },
-  fred_high_yield_spread:        { fredCode: "BAMLH0A0HYM2", label: "HY OAS",                     frequency: "daily"    },
-  fred_us2y:                     { fredCode: "DGS2",       label: "US 2Y Treasury yield",          frequency: "daily"    },
-  fred_us10y:                    { fredCode: "DGS10",      label: "US 10Y Treasury yield",         frequency: "daily"    },
-  fred_curve_10y2y:              { fredCode: "T10Y2Y",     label: "10Y-2Y yield curve",            frequency: "daily"    },
-  fred_breakeven_10y:            { fredCode: "T10YIE",     label: "10Y breakeven inflation",       frequency: "daily"    },
-  fred_vix:                      { fredCode: "VIXCLS",     label: "VIX",                           frequency: "daily"    },
-  fred_retail_sales:             { fredCode: "RSAFS",      label: "Retail and food services sales",frequency: "monthly"  },
-  fred_industrial_production:    { fredCode: "INDPRO",     label: "Industrial production index",   frequency: "monthly"  },
-  fred_manufacturing_employment: { fredCode: "MANEMP",     label: "Manufacturing employment",      frequency: "monthly"  },
-  fred_broad_dollar:             { fredCode: "DTWEXBGS",   label: "Broad dollar index",            frequency: "daily"    },
-  fred_m1_monthly:               { fredCode: "M1SL",       label: "M1 money supply",               frequency: "monthly"  },
-  fred_m2_monthly:               { fredCode: "M2SL",       label: "M2 money supply",               frequency: "monthly"  },
+  fred_nonfarm_payrolls:         { fredCode: "PAYEMS",       label: "Nonfarm payrolls",              frequency: "monthly"  },
+  fred_unemployment:             { fredCode: "UNRATE",       label: "Unemployment rate",             frequency: "monthly"  },
+  fred_pce_core:                 { fredCode: "PCEPILFE",     label: "Core PCE index",                frequency: "monthly"  },
+  fred_pce_headline:             { fredCode: "PCEPI",        label: "Headline PCE index",            frequency: "monthly"  },
+  fred_cpi_headline:             { fredCode: "CPIAUCSL",     label: "Headline CPI index",            frequency: "monthly"  },
+  fred_fedfunds:                 { fredCode: "FEDFUNDS",     label: "Fed funds effective rate",      frequency: "monthly"  },
+  fred_high_yield_spread:        { fredCode: "BAMLH0A0HYM2", label: "HY OAS",                       frequency: "daily"    },
+  fred_us2y:                     { fredCode: "DGS2",         label: "US 2Y Treasury yield",          frequency: "daily"    },
+  fred_us10y:                    { fredCode: "DGS10",        label: "US 10Y Treasury yield",         frequency: "daily"    },
+  fred_curve_10y2y:              { fredCode: "T10Y2Y",       label: "10Y-2Y yield curve",            frequency: "daily"    },
+  fred_breakeven_10y:            { fredCode: "T10YIE",       label: "10Y breakeven inflation",       frequency: "daily"    },
+  fred_vix:                      { fredCode: "VIXCLS",       label: "VIX",                           frequency: "daily"    },
+  fred_retail_sales:             { fredCode: "RSAFS",        label: "Retail and food services sales",frequency: "monthly"  },
+  fred_industrial_production:    { fredCode: "INDPRO",       label: "Industrial production index",   frequency: "monthly"  },
+  fred_manufacturing_employment: { fredCode: "MANEMP",       label: "Manufacturing employment",      frequency: "monthly"  },
+  fred_broad_dollar:             { fredCode: "DTWEXBGS",     label: "Broad dollar index",            frequency: "daily"    },
+  fred_m1_monthly:               { fredCode: "M1SL",         label: "M1 money supply",               frequency: "monthly"  },
+  fred_m2_monthly:               { fredCode: "M2SL",         label: "M2 money supply",               frequency: "monthly"  },
+  // Replaces static EIA WTI monthly file — same data, no separate API key needed.
+  fred_wti_monthly:              { fredCode: "MCOILWTICO",   label: "WTI crude oil (monthly avg)",   frequency: "monthly"  },
+  // Replaces static Alpha Vantage SPY file — FRED SP500 is free, no call limit.
+  fred_sp500_monthly:            { fredCode: "SP500",        label: "S&P 500 index (monthly)",       frequency: "monthly"  },
 };
 
 const ALL_SERIES_IDS = Object.keys(FRED_SERIES_CATALOG);

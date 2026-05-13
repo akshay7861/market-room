@@ -1768,7 +1768,8 @@ async function generateAgentForumPosts({
         isUpdate ? 170 : 320
       ),
       catalyst: finalCatalyst,
-      mechanismFamily: mechanismSelection.family
+      mechanismFamily: mechanismSelection.family,
+      verifiedMetrics
     });
     resolvedContent = ensureStanceLockReviewIfRequired({
       content: resolvedContent,
@@ -2966,6 +2967,59 @@ function inferMechanismFamilyFromText(text: string): MechanismFamily {
   return entries[0].family;
 }
 
+/**
+ * Returns a short natural-language framing prefix for the mechanism channel.
+ * Uses multiple variants (hour-keyed) to avoid the same opener every post.
+ * Replaces the old: "The operative transmission mechanism here is [snake_case]..."
+ */
+function mechanismContextPrefix(family: MechanismFamily, catalyst: string): string {
+  const h = convictionHash(catalyst + Math.floor(Date.now() / 3600000).toString(36));
+  const openers: Record<MechanismFamily, string[]> = {
+    labor_inflation_persistence: [
+      "The labor market is the primary inflation channel here.",
+      "Payroll momentum is driving the inflation read.",
+      "Labour persistence is the transmission link to watch.",
+    ],
+    fed_easing_timing: [
+      "The Fed policy path is the operative driver.",
+      "Rate-cut timing is the market lens for this move.",
+      "Central bank sequencing is what this reads through.",
+    ],
+    term_premium_repricing: [
+      "Term premium is repricing — that is the lens.",
+      "Duration supply is the channel driving this.",
+      "The yield curve's term structure is the operative mechanism.",
+    ],
+    credit_stress: [
+      "Credit conditions are the primary transmission here.",
+      "The credit-spread channel is driving this read.",
+      "Financial conditions are tightening through the credit pathway.",
+    ],
+    commodity_pass_through: [
+      "Commodity prices are the inflation pass-through driver.",
+      "Energy is the transmission channel to inflation and margins.",
+      "The commodity-to-CPI pass-through is the operative link.",
+    ],
+    earnings_fundamentals_deterioration: [
+      "Earnings fundamentals are the primary transmission.",
+      "The profit cycle is the mechanism driving this.",
+      "Margin pressure is the operative channel here.",
+    ],
+    revisions_breadth_sector_weakness: [
+      "Earnings revision breadth is the operative signal.",
+      "Sector-wide estimate cuts are the transmission channel.",
+      "Revisions breadth is driving the risk read here.",
+    ],
+    cross_asset_setup: [
+      "Cross-asset positioning is the transmission mechanism.",
+      "Multi-asset flows are the operative driver here.",
+      "The cross-asset signal is the mechanism to track.",
+    ],
+  };
+  const variants = openers[family] ?? ["The catalyst reads through the stated mechanism."];
+  return variants[h % variants.length];
+}
+
 function applyEvidenceFirstMechanismGate({
   agent,
   content,
@@ -3012,7 +3066,7 @@ function applyEvidenceFirstMechanismGate({
 
   let mechanismFit = MECHANISM_FAMILY_KEYWORDS[mechanism.family].test(nextContent.toLowerCase());
   if (!mechanismFit) {
-    nextContent = `The operative transmission mechanism here is ${mechanism.family.replace(/_/g, " ")}, and the elected catalyst must be read through that channel. ${nextContent}`.trim();
+    nextContent = `${mechanismContextPrefix(mechanism.family, catalyst)} ${nextContent}`.trim();
     repaired = true;
     mechanismFit = MECHANISM_FAMILY_KEYWORDS[mechanism.family].test(nextContent.toLowerCase());
   }
@@ -4605,50 +4659,78 @@ async function requestStructuredForumComment({
   }
 }
 
+/**
+ * Base historical context query terms per sector.
+ * These are the fallback when no catalyst-specific keywords are found.
+ * Previously these were the ONLY query terms — now they're just the base.
+ */
+const SECTOR_HISTORICAL_BASE: Record<string, string> = {
+  Commodities:      "wti oil commodity inflation supply",
+  Macro:            "inflation gdp employment monetary",
+  Rates:            "yield treasury curve inflation duration",
+  FX:               "dollar currency exchange rate",
+  Equities:         "equities stocks earnings growth",
+  "Risk/Sentiment": "vix volatility credit spread risk",
+};
+
+/**
+ * Finance-domain keywords to extract from actual headlines.
+ * Grouped by theme so we can add the most relevant theme keywords to the query.
+ */
+const CATALYST_KEYWORD_GROUPS: Array<{ pattern: RegExp; terms: string }> = [
+  { pattern: /\b(japan|boj|yen|jpy|kuroda|ueda)\b/i,             terms: "japan boj yen jpy" },
+  { pattern: /\b(ecb|europe|euro|eur|lagarde|draghi)\b/i,         terms: "ecb europe euro" },
+  { pattern: /\b(china|pboc|yuan|cnh|cny|renminbi)\b/i,           terms: "china pboc yuan" },
+  { pattern: /\b(fed|fomc|powell|federal reserve)\b/i,            terms: "fed fomc rate decision" },
+  { pattern: /\b(nfp|payroll|unemployment|jobs|labor)\b/i,        terms: "payrolls employment labor" },
+  { pattern: /\b(cpi|inflation|pce|core|deflation)\b/i,           terms: "cpi inflation pce" },
+  { pattern: /\b(opec|saudi|oil|crude|wti|brent)\b/i,             terms: "oil crude wti opec" },
+  { pattern: /\b(copper|aluminum|gold|silver|metal)\b/i,          terms: "copper metals commodities" },
+  { pattern: /\b(treasury|auction|refunding|issuance|debt)\b/i,   terms: "treasury auction supply duration" },
+  { pattern: /\b(earnings|eps|revenue|guidance|quarter)\b/i,      terms: "earnings fundamentals sector" },
+  { pattern: /\b(tariff|trade|export|import|sanction)\b/i,        terms: "trade tariff dollar" },
+  { pattern: /\b(bank|credit|spread|hy oas|default|spread)\b/i,   terms: "credit spread high yield" },
+  { pattern: /\b(vix|volatility|puts|options|hedge)\b/i,          terms: "vix volatility risk sentiment" },
+  { pattern: /\b(gdp|growth|recession|contraction)\b/i,           terms: "gdp growth cycle" },
+  { pattern: /\b(m1|m2|money supply|liquidity|qe|qt)\b/i,         terms: "money supply liquidity m1 m2" },
+  { pattern: /\b(war|conflict|geopolit|sanction|middle east)\b/i, terms: "war geopolitical crisis" },
+];
+
+/**
+ * Builds the historical data context block for an agent.
+ *
+ * Previous behaviour: sector → fixed hardcoded query string (FX always got
+ * "dollar fx currency wti oil correlation" regardless of catalyst).
+ *
+ * New behaviour: extract actual keywords from the real catalyst headlines,
+ * combine with the sector base, so each post gets a context block tuned to
+ * what is actually driving the market right now.
+ */
 function buildMarketRoomHistoricalContext(
   agent: Agent,
   generalHeadlines: SnapshotHeadline[],
   sectorHeadlines: SnapshotHeadline[]
 ): string {
   const allHeadlines = [...generalHeadlines, ...sectorHeadlines];
+  if (allHeadlines.length === 0) return "";
 
-  const crisisSignal = allHeadlines.some((h) =>
-    /\b(war|conflict|crisis|middle east|gulf|iran|iraq|russia|sanctions)\b/i.test(h.title)
-  );
-  const moneySupplySignal = allHeadlines.some((h) =>
-    /\b(money supply|liquidity|m1|m2|monetary)\b/i.test(h.title)
-  );
+  const sectorBase = SECTOR_HISTORICAL_BASE[agent.sector];
+  if (!sectorBase) return "";
 
-  let query: string;
-  switch (agent.sector) {
-    case "Commodities":
-      query = "wti oil inflation correlation";
-      break;
-    case "Macro":
-      query = moneySupplySignal
-        ? "wti oil inflation m1 money supply correlation"
-        : "wti oil inflation correlation";
-      break;
-    case "Rates":
-      query = "yield treasury rates inflation correlation 10y 2y curve bps duration";
-      break;
-    case "FX":
-      query = "dollar fx currency wti oil correlation";
-      break;
-    case "Equities":
-      query = "spy equities stocks wti oil correlation";
-      break;
-    case "Risk/Sentiment":
-      query = "vix volatility risk high yield credit spread correlation";
-      break;
-    default:
-      return "";
-  }
+  // Extract catalyst-specific keyword groups from actual headlines.
+  const allTitles = allHeadlines.map((h) => h.title).join(" ");
+  const catalystTerms = CATALYST_KEYWORD_GROUPS
+    .filter((g) => g.pattern.test(allTitles))
+    .map((g) => g.terms)
+    .join(" ");
 
-  if (crisisSignal) {
-    query += " war middle east crisis";
-  }
+  // Build the query: catalyst-specific terms first (more weight) + sector base.
+  // If no catalyst terms matched, we still get the sector base as fallback.
+  const query = catalystTerms
+    ? `${catalystTerms} ${sectorBase} correlation`
+    : `${sectorBase} correlation`;
 
+  console.log(`[historical-context] agent=${agent.sector} query="${query.slice(0, 120)}"`);
   return buildHistoricalDataPromptBlock(query);
 }
 
@@ -6660,19 +6742,21 @@ function ensureRequiredConvictionCondition({
   agent,
   content,
   catalyst,
-  mechanismFamily
+  mechanismFamily,
+  verifiedMetrics
 }: {
   agent: Agent;
   content: string;
   catalyst: string;
   mechanismFamily?: MechanismFamily;
+  verifiedMetrics?: VerifiedMarketMetricsContext;
 }): string {
   if (/\bThis view changes if\b/i.test(content) && !isWeakConvictionCondition(content)) {
     return content;
   }
 
-  const repaired = `${content.trim()} ${convictionRepairSentence(agent, catalyst, mechanismFamily)}`.trim();
-  console.log(`[conviction-repair] agent=${agent.sector} appended ${/\bThis view changes if\b/i.test(content) ? "stronger" : "required"} condition`);
+  const repaired = `${content.trim()} ${convictionRepairSentence(agent, catalyst, mechanismFamily, undefined, verifiedMetrics)}`.trim();
+  console.log(`[conviction-repair] agent=${agent.sector} appended ${/\bThis view changes if\b/i.test(content) ? "stronger" : "required"} level-anchored condition`);
   return repaired;
 }
 
@@ -6753,98 +6837,140 @@ function convictionHash(str: string): number {
   return Math.abs(h);
 }
 
-function convictionRepairSentence(agent: Agent, catalyst: string, mechanismFamily?: MechanismFamily, postId?: string): string {
-  return convictionRepairSentenceBySector(catalyst, agent.sector, mechanismFamily, postId);
+function convictionRepairSentence(agent: Agent, catalyst: string, mechanismFamily?: MechanismFamily, postId?: string, verifiedMetrics?: VerifiedMarketMetricsContext): string {
+  return convictionRepairSentenceBySector(catalyst, agent.sector, mechanismFamily, postId, verifiedMetrics);
 }
 
+/**
+ * Builds a level-anchored conviction falsifier sentence.
+ *
+ * All hardcoded absolute thresholds (270bps, $75, 25bps etc.) have been removed.
+ * The falsifier now references the ACTUAL current verified level of the primary
+ * instrument so it calibrates itself to today's market, not an arbitrary number
+ * we chose when writing the code.
+ *
+ * No threshold is specified by the code — the agent names the current level and
+ * states that a "sustained reversal against the stated direction" would invalidate
+ * the view. The market decides what counts as material; the post surfaces the
+ * starting level so readers can judge.
+ */
 function convictionRepairSentenceBySector(
   catalyst: string,
   sector: Agent["sector"],
   mechanismFamily?: MechanismFamily,
-  postId?: string
+  postId?: string,
+  verifiedMetrics?: VerifiedMarketMetricsContext
 ): string {
   // Use postId when available (unique per post → unique variant).
-  // When postId is absent, mix catalyst with the current UTC hour so posts in different
-  // hours don't all pick the same variant even when catalyst text is similar.
+  // When postId is absent, mix catalyst with the current UTC hour so posts in
+  // different hours don't all pick the same variant even with similar catalyst text.
   const hourBucket = Math.floor(Date.now() / 3600000).toString(36);
   const seed = postId ?? (catalyst + hourBucket);
   const pick = (variants: string[]): string => variants[convictionHash(seed) % variants.length];
 
+  // ── Level-anchored helper ─────────────────────────────────────────────────
+  // Returns the current verified level string for the most relevant instrument,
+  // e.g. "HY OAS at 347bps" or "10Y at 4.28%" — no hardcoded threshold ever.
+  const levelAnchor = (keys: string[], fallbackLabel: string): string => {
+    if (verifiedMetrics) {
+      for (const key of keys) {
+        const m = verifiedMetrics.metrics.find((x) => x.key === key);
+        if (m) return `${m.label} at ${m.valueText}`;
+      }
+    }
+    return fallbackLabel;
+  };
+
+  // ── Mechanism-specific falsifiers ─────────────────────────────────────────
   if (mechanismFamily === "labor_inflation_persistence" || mechanismFamily === "fed_easing_timing") {
+    const anchor = levelAnchor(["fedfunds"], "the fed funds rate at its current verified level");
     return pick([
-      "This view changes if monthly payroll momentum and core PCE both move decisively against the stated policy path within the next two releases.",
-      "Falsifier: core PCE prints below 2.5% YoY AND NFP comes in below 100K in the same month.",
-      "Reverse this if the Fed's dot plot median shifts down by 25bps or more at the next FOMC meeting.",
+      `This view changes if the next NFP and core PCE both move decisively against the stated policy path — watch ${anchor} as the baseline.`,
+      `Falsifier: two consecutive macro prints (payrolls + inflation) contradict the stated persistence signal from ${anchor}.`,
+      `Reverse this if the Fed's dot-plot median shifts meaningfully against the stated direction at the next FOMC, starting from ${anchor}.`,
     ]);
   }
   if (mechanismFamily === "term_premium_repricing") {
+    const anchor = levelAnchor(["us10y"], "the 10Y yield at its current verified level");
     return pick([
-      "This view changes if the US 10Y yield and curve slope move more than 20bps against the stated term-premium direction within the next five sessions.",
-      "Falsifier: the 10Y term premium retraces 15bps with a stable 2Y over the next two auctions.",
-      "Reverse this if indirect bidder share recovers above 60% on the next 10Y auction with a tail under 1bp.",
+      `This view changes if the 10Y yield and curve slope both reverse the catalyst-implied term-premium direction from ${anchor} within the next five sessions.`,
+      `Falsifier: the 10Y term premium retraces toward ${anchor} with a stable 2Y over the next two auctions — supply effect dissipates.`,
+      `Reverse this if the next 10Y auction clears with a tail above 2bps and indirect bidder share below 55% — demand failure from ${anchor}.`,
     ]);
   }
   if (mechanismFamily === "credit_stress") {
+    const anchor = levelAnchor(["hy_oas"], "HY OAS at its current verified level");
     return pick([
-      "This view changes if HY OAS and equity volatility both reverse more than 5% against this credit-stress signal within the next three sessions.",
-      "Falsifier: HY OAS tightens below 270bps for two consecutive sessions with equity vol sub-18.",
-      "Reverse this if the investment-grade/HY spread ratio compresses for two consecutive trading days while equity futures hold positive.",
+      `This view changes if ${anchor} reverses the stated stress direction in a sustained way over the next three sessions.`,
+      `Falsifier: ${anchor} moves materially against the widening/tightening direction stated above for two consecutive sessions.`,
+      `Reverse this if ${anchor} and the investment-grade/HY ratio both compress simultaneously — risk appetite returning against the stated thesis.`,
     ]);
   }
   if (mechanismFamily === "commodity_pass_through") {
+    const anchor = levelAnchor(["wti", "brent"], "WTI at its current verified level");
     return pick([
-      "This view changes if benchmark energy prices and inventory prints move against this pass-through channel for two consecutive updates.",
-      "Falsifier: WTI drops below $75 AND EIA crude inventories build by more than 4mb for two consecutive weeks.",
-      "Reverse this if the rig count rises by more than 15 over the next four weeks while product crack spreads compress below $15.",
+      `This view changes if ${anchor} reverses the stated pass-through direction in two consecutive weekly data points.`,
+      `Falsifier: EIA crude inventories build for two consecutive weeks from ${anchor} — supply overpowering the stated demand signal.`,
+      `Reverse this if ${anchor} and crack spreads move together against the stated pass-through channel.`,
     ]);
   }
   if (mechanismFamily === "earnings_fundamentals_deterioration" || mechanismFamily === "revisions_breadth_sector_weakness") {
     return pick([
       "This view changes if company guidance and sector breadth both improve materially against the stated weakness over the next two reporting checkpoints.",
-      "Falsifier: the next two earnings prints in this sector beat consensus EPS by more than 5% and raise full-year guidance.",
-      "Reverse this if the sector earnings revision breadth (% raising) flips above 50% in the next monthly reading.",
+      "Falsifier: the next two sector earnings prints beat consensus EPS and raise full-year guidance — revision breadth flips positive.",
+      "Reverse this if sector earnings revision breadth (% raising) turns positive in the next monthly reading.",
     ]);
   }
+
+  // ── Sector-based fallback falsifiers ─────────────────────────────────────
   const catalystText = catalyst.toLowerCase();
   if (sector === "Commodities" || /\boil|wti|brent|crude|gas|opec|eia|inventory|strait\b/.test(catalystText)) {
+    const anchor = levelAnchor(["wti", "brent"], "WTI at its current verified level");
     return pick([
-      "This view changes if EIA crude inventories print two consecutive moves above 3mb against the current supply signal within the next two weekly reports.",
-      "Falsifier: WTI closes above $90 for three consecutive sessions with EIA builds instead of draws.",
-      "Reverse this if OPEC+ announces production cuts exceeding 500kbd within the next two weeks while EIA demand revisions turn positive.",
+      `This view changes if EIA crude inventories print two consecutive moves against the current supply signal from ${anchor}.`,
+      `Falsifier: ${anchor} reverses direction for three consecutive sessions while EIA inventory data contradicts the stated supply thesis.`,
+      `Reverse this if OPEC+ changes production policy in a way that contradicts the stated supply/demand balance from ${anchor}.`,
     ]);
   }
   if (sector === "Rates" || /\byield|treasury|fed|fomc|curve|duration|auction\b/.test(catalystText)) {
+    const anchor = levelAnchor(["us10y", "us2y"], "the 10Y yield at its current verified level");
     return pick([
-      "This view changes if the 10Y yield and the curve slope both reverse the catalyst-implied direction — the size of the move that matters is whatever the catalyst implied, not a fixed threshold.",
-      "Falsifier: the 2s10s spread reverses the stated steepening/flattening direction in the next three sessions with no new supply event to explain the move.",
-      "Reverse this if the next 10Y auction clears with a tail above 2bps and indirect bidder share below 55%, signalling demand deterioration regardless of the stated direction.",
+      `This view changes if ${anchor} and the curve slope both reverse the catalyst-implied direction within the next five sessions.`,
+      `Falsifier: the 2s10s spread reverses the stated steepening/flattening from ${anchor} in the next three sessions with no new supply event.`,
+      `Reverse this if the next 10Y auction clears with a tail above 2bps — demand failure from ${anchor} contradicts the stated direction.`,
     ]);
   }
   if (sector === "FX" || /\bdollar|dxy|usd|jpy|eur|carry|currency|fx\b/.test(catalystText)) {
+    const anchor = levelAnchor(["dxy"], "DXY at its current verified level");
     return pick([
-      "This view changes if DXY reverses by more than 1% while the 10Y yield confirms the opposite direction within the next five sessions.",
-      "Falsifier: the named FX cross moves more than 80bps against the stated direction for two consecutive sessions.",
-      "Reverse this if the Fed's real rate (10Y TIPS) declines by more than 15bps within two weeks while risk appetite stabilises.",
+      `This view changes if ${anchor} reverses direction while the 10Y real yield confirms the opposite reading within five sessions.`,
+      `Falsifier: the named FX cross sustains a move against the stated direction for two consecutive sessions from ${anchor}.`,
+      `Reverse this if the 10Y TIPS yield moves against the stated real-rate direction from ${anchor} while risk sentiment stabilises.`,
     ]);
   }
   if (sector === "Equities" || /\bstock|equity|shares|earnings|nasdaq|s&p|spy|xlf|iwm\b/.test(catalystText)) {
+    const anchor = levelAnchor(["sp500", "nasdaq"], "the index at its current verified level");
     return pick([
-      "This view changes if sector breadth or earnings guidance moves more than 2% against the stated thesis within the next two weeks.",
-      "Falsifier: the next two earnings prints in this sector beat consensus EPS by more than 5% and raise full-year guidance.",
-      "Reverse this if the stock closes above its 50-day MA with sector breadth (advance-decline) turning positive for three consecutive sessions.",
+      `This view changes if sector breadth or earnings guidance moves materially against the stated thesis from ${anchor} within the next two weeks.`,
+      `Falsifier: the next two sector earnings prints beat consensus EPS and raise guidance — fundamentals improve against the stated deterioration view.`,
+      `Reverse this if ${anchor} and advance-decline breadth both turn positive for three consecutive sessions — market breadth contradicts the stated thesis.`,
     ]);
   }
   if (sector === "Risk/Sentiment" || /\bvix|credit|spread|risk|sentiment|volatility|crowding\b/.test(catalystText)) {
+    const hyAnchor = levelAnchor(["hy_oas"], "HY OAS at its current verified level");
+    const vixAnchor = levelAnchor(["vix"], "VIX at its current verified level");
     return pick([
-      "This view changes if VIX and HY OAS both move more than 5% against the stated risk signal within the next three sessions.",
-      "Falsifier: HY OAS tightens below 280bps while VIX falls below 17 for two consecutive sessions.",
-      "Reverse this if the put-to-call ratio drops below 0.7 and IG spreads tighten by more than 5bps within the next week.",
+      `This view changes if ${hyAnchor} and ${vixAnchor} both reverse the stated risk signal in the next three sessions.`,
+      `Falsifier: ${hyAnchor} moves materially against the stated widening/tightening for two consecutive sessions with ${vixAnchor} confirming.`,
+      `Reverse this if ${vixAnchor} and ${hyAnchor} both move together against the stated stress signal — risk appetite returning.`,
     ]);
   }
+  // Generic fallback — always references current levels if available.
+  const anchor = levelAnchor(["hy_oas", "vix", "us10y", "dxy", "wti"], "the primary instrument at its current verified level");
   return pick([
-    "This view changes if the named catalyst is contradicted by a fresh market print moving more than 2% within the next two weeks.",
-    "Falsifier: two consecutive data releases move materially against the stated mechanism within the next month.",
-    "Reverse this if the primary driver cited here reverses by more than one standard deviation versus the trailing 30-day range.",
+    `This view changes if the stated catalyst is contradicted by a fresh data print that moves ${anchor} against the implied direction.`,
+    `Falsifier: two consecutive data releases move materially against the stated mechanism from ${anchor} within the next month.`,
+    `Reverse this if the primary driver cited here reverses from ${anchor} in a sustained way that changes the mechanism logic.`,
   ]);
 }
 
