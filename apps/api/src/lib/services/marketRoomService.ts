@@ -34,7 +34,9 @@ import { listRelevantMarketCasesForAgent } from "./marketCaseService";
 import { findRelevantKnowledgeSnippets, type LocalKnowledgeSnippet } from "./knowledgeSnippetService";
 import { recordDiscussionLearning } from "./learningService";
 import { fetchOfficialCatalystLayer, isDataLakeOnlyHeadline, fetchRecentTreasuryAuctionData, formatAuctionDataBlock } from "./officialCatalystService";
-import { buildHistoricalDataPromptBlock, buildAnalogContextBlock, getFxCorrelationMetadata, buildMacroEventCalendarBlock, type SnapshotSignal, type FxCorrelationMetadata } from "./historicalDataContextService";
+import { buildHistoricalDataPromptBlock, buildAnalogContextBlock, getFxCorrelationMetadata, buildMacroEventCalendarBlock, setFredSeriesMap as setHistoricalFredMap, type SnapshotSignal, type FxCorrelationMetadata } from "./historicalDataContextService";
+import { setFredSeriesMap as setMetricsFredMap } from "./verifiedMarketMetricsService";
+import { loadFredSeriesMap } from "./fredCacheService";
 import { fetchYahooFinanceBriefing } from "./yahooFinanceNewsService";
 import { fetchMarketauxBriefing } from "./marketauxNewsService";
 import { fetchFinnhubBriefing } from "./finnhubNewsService";
@@ -1224,6 +1226,24 @@ async function generateAgentForumPosts({
     priorRoomThreads,
     recentSynthesisEventIds
   );
+
+  // ── Live FRED data ────────────────────────────────────────────────────────
+  // Fetch fresh macroeconomic series from FRED API (cached in D1, refreshed
+  // every 18h).  Sets module-level overrides in historicalDataContextService
+  // and verifiedMarketMetricsService so all prompt builders use current values.
+  if (env.FRED_API_KEY && env.DB) {
+    try {
+      const fredMap = await loadFredSeriesMap(env.DB, env.FRED_API_KEY);
+      setHistoricalFredMap(fredMap);
+      setMetricsFredMap(fredMap);
+      console.log(`[fredCache] FRED series map activated (${fredMap.size} series)`);
+    } catch (err) {
+      console.error("[fredCache] Failed to load FRED series map — using embedded static JSON:", err);
+      setHistoricalFredMap(null);
+      setMetricsFredMap(null);
+    }
+  }
+
   const verifiedMetrics = buildVerifiedMarketMetricsContext(marketSnapshot);
   // Tracks posts published earlier in this same run so subsequent agents can avoid echoing them.
   const thisRunPosts: AgentMessage[] = [];
@@ -2093,6 +2113,20 @@ async function generateAgentForumComments({
 }): Promise<PlannedForumEntry[]> {
   const orderedAgents = sortAgentsForForum(agents);
   const commentRoomCoverage = await createRepositories(env).roomCoverage.getByRoomId(roomId);
+
+  // Ensure live FRED data is active for comment path too.
+  if (env.FRED_API_KEY && env.DB) {
+    try {
+      const fredMap = await loadFredSeriesMap(env.DB, env.FRED_API_KEY);
+      setHistoricalFredMap(fredMap);
+      setMetricsFredMap(fredMap);
+    } catch (err) {
+      console.error("[fredCache] comment path: Failed to load FRED series map:", err);
+      setHistoricalFredMap(null);
+      setMetricsFredMap(null);
+    }
+  }
+
   const verifiedMetrics = buildVerifiedMarketMetricsContext(marketSnapshot);
   const targetPosts = selectPostsForComments(
     dedupePostsForComments([...posts, ...priorRoomThreads.map((thread) => thread.post)]),

@@ -18,6 +18,22 @@ import fredFedFunds from "../../../../../knowledge/data-lake/normalized/fred_fed
 import fredPceHeadline from "../../../../../knowledge/data-lake/normalized/fred_pce_headline.json";
 import fredPceCore from "../../../../../knowledge/data-lake/normalized/fred_pce_core.json";
 import fredNonfarmPayrolls from "../../../../../knowledge/data-lake/normalized/fred_nonfarm_payrolls.json";
+import type { FredSeriesMap } from "./fredCacheService";
+
+// ── Live FRED data override ────────────────────────────────────────────────
+// Set once per cron tick from marketRoomService after loading fresh D1/API data.
+// Falls back to the embedded static JSON when null (first deploy / API failure).
+let _activeFredMap: FredSeriesMap | null = null;
+
+/** Called by marketRoomService at the start of each agent run to inject live FRED data. */
+export function setFredSeriesMap(map: FredSeriesMap | null): void {
+  _activeFredMap = map;
+}
+
+/** Returns the live series if available, otherwise the embedded static JSON fallback. */
+function liveSeries(id: string, fallback: object): HistoricalSeries {
+  return (_activeFredMap?.get(id) ?? fallback) as HistoricalSeries;
+}
 
 type HistoricalObservation = {
   date: string;
@@ -217,79 +233,80 @@ function wtiMonthlySeries(): HistoricalSeries {
 }
 
 function cpiHeadlineSeries(): HistoricalSeries {
-  return fredCpiHeadline as HistoricalSeries;
+  return liveSeries("fred_cpi_headline", fredCpiHeadline);
 }
 
 function m1MonthlySeries(): HistoricalSeries {
-  return fredM1Monthly as HistoricalSeries;
+  return liveSeries("fred_m1_monthly", fredM1Monthly);
 }
 
 function m2MonthlySeries(): HistoricalSeries {
-  return fredM2Monthly as HistoricalSeries;
+  return liveSeries("fred_m2_monthly", fredM2Monthly);
 }
 
 function broadDollarSeries(): HistoricalSeries {
-  return fredBroadDollar as HistoricalSeries;
+  return liveSeries("fred_broad_dollar", fredBroadDollar);
 }
 
 function spyMonthlySeries(): HistoricalSeries {
+  // SPY is not a FRED series — always use the embedded Alpha Vantage file.
   return avSpyMonthly as unknown as HistoricalSeries;
 }
 
 function vixSeries(): HistoricalSeries {
-  return fredVix as HistoricalSeries;
+  return liveSeries("fred_vix", fredVix);
 }
 
 function highYieldSpreadSeries(): HistoricalSeries {
-  return fredHighYieldSpread as HistoricalSeries;
+  return liveSeries("fred_high_yield_spread", fredHighYieldSpread);
 }
 
 function us10ySeries(): HistoricalSeries {
-  return fredUs10y as HistoricalSeries;
+  return liveSeries("fred_us10y", fredUs10y);
 }
 
 function us2ySeries(): HistoricalSeries {
-  return fredUs2y as HistoricalSeries;
+  return liveSeries("fred_us2y", fredUs2y);
 }
 
 function curve10y2ySeries(): HistoricalSeries {
-  return fredCurve10y2y as HistoricalSeries;
+  return liveSeries("fred_curve_10y2y", fredCurve10y2y);
 }
 
 function breakeven10ySeries(): HistoricalSeries {
-  return fredBreakeven10y as HistoricalSeries;
+  return liveSeries("fred_breakeven_10y", fredBreakeven10y);
 }
 
 function unemploymentSeries(): HistoricalSeries {
-  return fredUnemployment as HistoricalSeries;
+  return liveSeries("fred_unemployment", fredUnemployment);
 }
 
 function retailSalesSeries(): HistoricalSeries {
-  return fredRetailSales as HistoricalSeries;
+  return liveSeries("fred_retail_sales", fredRetailSales);
 }
 
 function industrialProductionSeries(): HistoricalSeries {
-  return fredIndustrialProduction as HistoricalSeries;
+  return liveSeries("fred_industrial_production", fredIndustrialProduction);
 }
 
 function manufacturingEmploymentSeries(): HistoricalSeries {
-  return fredManufacturingEmployment as HistoricalSeries;
+  return liveSeries("fred_manufacturing_employment", fredManufacturingEmployment);
 }
 
 function fedFundsSeries(): HistoricalSeries {
-  return fredFedFunds as HistoricalSeries;
+  return liveSeries("fred_fedfunds", fredFedFunds);
 }
 
 function pceHeadlineSeries(): HistoricalSeries {
-  return fredPceHeadline as HistoricalSeries;
+  return liveSeries("fred_pce_headline", fredPceHeadline);
 }
 
 function pceCoreSeriesFn(): HistoricalSeries {
-  return fredPceCore as HistoricalSeries;
+  return liveSeries("fred_pce_core", fredPceCore);
 }
 
 function nonfarmPayrollsSeries(): HistoricalSeries {
-  return fredNonfarmPayrolls as HistoricalSeries;
+  return liveSeries("fred_nonfarm_payrolls", fredNonfarmPayrolls);
 }
 
 function computeRatesCpiStats(start?: string, end?: string) {
@@ -637,15 +654,16 @@ function formatYoYSeries(entries: MacroSeriesEntry[]): string {
  * Source: same FRED data lake already imported. No new fetch, no DB call.
  */
 export function buildMacroEventCalendarBlock(): string {
-  const nfpLast4 = (fredNonfarmPayrolls.observations as Array<{ date: string; value: number | null }>)
+  // Use live getters — these check _activeFredMap first, fall back to static JSON.
+  const nfpLast4 = (nonfarmPayrollsSeries().observations as Array<{ date: string; value: number | null }>)
     .filter((o): o is MacroSeriesEntry => typeof o.value === "number" && o.value !== null)
     .slice(-4);
   const nfpDelta = formatNfpDeltaSeries(nfpLast4);
 
-  const ccpi = lastThreeNonNull(fredPceCore.observations as Array<{ date: string; value: number | null }>);
-  const headlineCpi = lastThreeNonNull(fredCpiHeadline.observations as Array<{ date: string; value: number | null }>);
-  const fedFunds = lastThreeNonNull(fredFedFunds.observations as Array<{ date: string; value: number | null }>);
-  const unemployment = lastThreeNonNull(fredUnemployment.observations as Array<{ date: string; value: number | null }>);
+  const ccpi = lastThreeNonNull(pceCoreSeriesFn().observations as Array<{ date: string; value: number | null }>);
+  const headlineCpi = lastThreeNonNull(cpiHeadlineSeries().observations as Array<{ date: string; value: number | null }>);
+  const fedFunds = lastThreeNonNull(fedFundsSeries().observations as Array<{ date: string; value: number | null }>);
+  const unemployment = lastThreeNonNull(unemploymentSeries().observations as Array<{ date: string; value: number | null }>);
 
   const lines: string[] = ["MACRO EVENT CALENDAR — recent prints from FRED data lake (cite at least one):"];
 

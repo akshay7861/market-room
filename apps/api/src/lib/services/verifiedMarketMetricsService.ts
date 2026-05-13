@@ -4,6 +4,21 @@ import fredHighYieldSpread from "../../../../../knowledge/data-lake/normalized/f
 import fredUnemployment from "../../../../../knowledge/data-lake/normalized/fred_unemployment.json";
 import fredUs2y from "../../../../../knowledge/data-lake/normalized/fred_us2y.json";
 import fredVix from "../../../../../knowledge/data-lake/normalized/fred_vix.json";
+import type { FredSeriesMap } from "./fredCacheService";
+
+// ── Live FRED data override ────────────────────────────────────────────────
+// Set once per cron tick from marketRoomService after loading fresh D1/API data.
+let _activeFredMap: FredSeriesMap | null = null;
+
+/** Called by marketRoomService at the start of each agent run to inject live FRED data. */
+export function setFredSeriesMap(map: FredSeriesMap | null): void {
+  _activeFredMap = map;
+}
+
+/** Returns the live series if available, otherwise the embedded static JSON fallback. */
+function liveMetricSeries(id: string, fallback: object): HistoricalSeries {
+  return (_activeFredMap?.get(id) ?? fallback) as HistoricalSeries;
+}
 
 type HistoricalObservation = {
   date: string;
@@ -45,11 +60,11 @@ export function buildVerifiedMarketMetricsContext(snapshot: MarketSnapshotPayloa
     else missingKeys.push(key);
   }
 
-  addStoredMetric(metrics, missingKeys, "us2y", "US 2Y yield", fredUs2y as HistoricalSeries, "%", "data lake: FRED US2Y");
-  addStoredMetric(metrics, missingKeys, "fedfunds", "Fed Funds", fredFedFunds as HistoricalSeries, "%", "data lake: FRED Fed Funds");
-  addStoredMetric(metrics, missingKeys, "hy_oas", "HY OAS", fredHighYieldSpread as HistoricalSeries, "bps", "data lake: FRED HY OAS", (value) => value * 100);
-  addStoredMetric(metrics, missingKeys, "vix", "VIX", fredVix as HistoricalSeries, "", "data lake: FRED VIX");
-  addStoredMetric(metrics, missingKeys, "unemployment", "Unemployment rate", fredUnemployment as HistoricalSeries, "%", "data lake: FRED unemployment");
+  addStoredMetric(metrics, missingKeys, "us2y", "US 2Y yield", liveMetricSeries("fred_us2y", fredUs2y), "%", "FRED US2Y");
+  addStoredMetric(metrics, missingKeys, "fedfunds", "Fed Funds", liveMetricSeries("fred_fedfunds", fredFedFunds), "%", "FRED Fed Funds");
+  addStoredMetric(metrics, missingKeys, "hy_oas", "HY OAS", liveMetricSeries("fred_high_yield_spread", fredHighYieldSpread), "bps", "FRED HY OAS", (value) => value * 100);
+  addStoredMetric(metrics, missingKeys, "vix", "VIX", liveMetricSeries("fred_vix", fredVix), "", "FRED VIX");
+  addStoredMetric(metrics, missingKeys, "unemployment", "Unemployment rate", liveMetricSeries("fred_unemployment", fredUnemployment), "%", "FRED unemployment");
 
   const blockLines = [
     "VERIFIED MARKET METRICS:",
@@ -62,7 +77,7 @@ export function buildVerifiedMarketMetricsContext(snapshot: MarketSnapshotPayloa
 
   // Append HY OAS context: 90-day mean (local/recent baseline) + full-series percentile
   // (required for "historically elevated" or "stress territory" language).
-  const hyOasCtx = computeHyOasContext(fredHighYieldSpread as HistoricalSeries);
+  const hyOasCtx = computeHyOasContext(liveMetricSeries("fred_high_yield_spread", fredHighYieldSpread));
   if (hyOasCtx) {
     blockLines.push(
       `HY OAS context: current ${Math.round(hyOasCtx.current)}bps | 90d mean ${hyOasCtx.recent90dMean}bps | full-series percentile ${hyOasCtx.historicalPercentile}th (n=${hyOasCtx.observationCount} monthly obs). Use 90d mean when claiming "above recent average"; cite percentile when claiming "historically elevated" or "stress territory".`
