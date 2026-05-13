@@ -6763,8 +6763,11 @@ function convictionRepairSentenceBySector(
   mechanismFamily?: MechanismFamily,
   postId?: string
 ): string {
-  // Use postId (or fallback to catalyst) to pick a variant — deterministic, never random
-  const seed = postId ?? catalyst;
+  // Use postId when available (unique per post → unique variant).
+  // When postId is absent, mix catalyst with the current UTC hour so posts in different
+  // hours don't all pick the same variant even when catalyst text is similar.
+  const hourBucket = Math.floor(Date.now() / 3600000).toString(36);
+  const seed = postId ?? (catalyst + hourBucket);
   const pick = (variants: string[]): string => variants[convictionHash(seed) % variants.length];
 
   if (mechanismFamily === "labor_inflation_persistence" || mechanismFamily === "fed_easing_timing") {
@@ -6812,9 +6815,9 @@ function convictionRepairSentenceBySector(
   }
   if (sector === "Rates" || /\byield|treasury|fed|fomc|curve|duration|auction\b/.test(catalystText)) {
     return pick([
-      "This view changes if the US 10Y yield moves more than 25bps against the stated direction within the next five sessions.",
-      "Falsifier: the 2s10s spread moves more than 15bps in the opposite direction over the next three sessions.",
-      "Reverse this if the next 10Y auction prints a tail above 2bps with indirect bidder share below 55%.",
+      "This view changes if the 10Y yield and the curve slope both reverse the catalyst-implied direction — the size of the move that matters is whatever the catalyst implied, not a fixed threshold.",
+      "Falsifier: the 2s10s spread reverses the stated steepening/flattening direction in the next three sessions with no new supply event to explain the move.",
+      "Reverse this if the next 10Y auction clears with a tail above 2bps and indirect bidder share below 55%, signalling demand deterioration regardless of the stated direction.",
     ]);
   }
   if (sector === "FX" || /\bdollar|dxy|usd|jpy|eur|carry|currency|fx\b/.test(catalystText)) {
@@ -7819,7 +7822,7 @@ function buildSectorSpecificInstructions(agent: Agent): string | null {
         "If the catalyst is not about oil-dollar transmission, do NOT force the correlation into the post just because you are the FX agent.",
         "If the block is absent, do NOT cite a correlation number from memory.",
         "Example: 'Stored data shows Broad Dollar YoY% vs WTI YoY% correlation of -0.42 — dollar strength here structurally pressures commodity FX (AUD, CAD, NOK).'",
-        "Name at least one specific cross (e.g. EUR/USD, USD/JPY, AUD/USD) and state whether current price action aligns with or contradicts the stored dollar/oil relationship when that relationship is actually part of the thesis.",
+        "Name at least one specific FX cross that is most relevant to the catalyst — not a default choice. Catalyst-to-cross guide: ECB/EU data → EUR/USD; BoJ/Japan/Asia flows → USD/JPY; UK data → GBP/USD; China/commodities/Australian → AUD/USD; oil/Canada → USD/CAD; EM/China → USD/CNH. State whether current price action aligns with or contradicts the stored dollar/oil relationship when that relationship is actually part of the thesis.",
         "",
         "CARRY MECHANICS PRECISION — be exact about directionality:",
         "  • High US real yields = USD attractive = EM-funded carry trades (short USD, long EM high-yielder) get UNWOUND. This is USD bullish, EM FX bearish.",
@@ -7828,7 +7831,7 @@ function buildSectorSpecificInstructions(agent: Agent): string | null {
         "  • If you are bearish EM FX, state it as: 'bearish EM FX / USD bullish' — not as 'bearish USD carry' (which would mean bearish on holding USD).",
         "  • Avoid saying yields 'compress carry' without specifying the EM side of the spread. State the mechanism precisely.",
         "",
-        "FX CROSS PRECISION: Every post must name at least one specific FX cross (EUR/USD, USD/JPY, GBP/USD, AUD/USD, USD/CAD) and state its directional move vs the prior session. DXY alone is not sufficient — name the cross.",
+        "FX CROSS PRECISION: Every post must name the FX cross that is most directly implicated by the catalyst (not whichever you defaulted to last time). If the catalyst is a US data print with no cross-specific driver, use DXY direction but also name the cross most affected: e.g. 'DXY +0.4%, USD/JPY bears the most of the move as BoJ remains on hold.' Do not name USD/JPY by default when the catalyst is about European or commodity markets.",
         "CORRELATION RATE LIMIT: Do not cite the same correlation coefficient (e.g., the Broad Dollar vs WTI correlation) in more than 1-of-3 consecutive posts. If your last two posts cited it, use a different metric instead: rate differential, real-yield spread, central-bank policy gap, or trade-balance data.",
         "ANTI-FABRICATION: Never add window qualifiers ('during crisis periods', '2007-2009 stress window') to the stored correlation unless the historical context block explicitly states that window. The computed value is unconditional across all periods.",
       ].join("\n");

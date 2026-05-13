@@ -272,7 +272,7 @@ export function buildPeerAgentThesesView(
   return [
     "PEER DESK VIEWS (current top peer theses for this run):",
     ...lines,
-    "Use a directly relevant peer thesis where it matters: agree and add sector evidence, disagree and state the counter-mechanism, or extend the chain forward. Never silently diverge from a directly relevant peer thesis."
+    "If a peer thesis is directly relevant to your catalyst, engage with it in one of three ways: (a) cite it and add fresh sector-specific evidence that supports it, (b) state the counter-mechanism explicitly — why your sector sees the data differently — and own the disagreement, or (c) extend the causal chain forward from where the peer thesis ends. A reasoned disagreement that names the mechanism gap is always better than silent convergence on the same narrative."
   ].join("\n");
 }
 
